@@ -99,6 +99,8 @@ class ReaderPreferences(
         TranslationProvider.AUTO,
     )
 
+    val deeplApiKey: Preference<String> = preferenceStore.getString("pref_deepl_api_key", "")
+
     // region General (continued)
 
     val cropBorders: Preference<Boolean> = preferenceStore.getBoolean("crop_borders", false)

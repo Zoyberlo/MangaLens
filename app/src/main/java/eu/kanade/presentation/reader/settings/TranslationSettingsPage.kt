@@ -11,6 +11,7 @@ import mihon.feature.translate.TARGET_LANGUAGES
 import mihon.feature.translate.TranslationProvider
 import mihon.feature.translate.TranslationSourceLanguage
 import tachiyomi.i18n.MR
+import tachiyomi.presentation.core.components.SelectItem
 import tachiyomi.presentation.core.components.SettingsChipRow
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
@@ -18,26 +19,22 @@ import tachiyomi.presentation.core.util.collectAsState
 @Composable
 internal fun ColumnScope.TranslationSettingsPage(viewModel: ReaderSettingsViewModel) {
     val sourceLanguage by viewModel.preferences.autoTranslateSourceLanguage.collectAsState()
-    SettingsChipRow(MR.strings.pref_auto_translate_source) {
-        TranslationSourceLanguage.entries.map {
-            FilterChip(
-                selected = it == sourceLanguage,
-                onClick = { viewModel.preferences.autoTranslateSourceLanguage.set(it) },
-                label = { Text(LocaleHelper.getDisplayName(it.langCode)) },
-            )
-        }
-    }
+    SelectItem(
+        label = stringResource(MR.strings.pref_auto_translate_source),
+        options = TranslationSourceLanguage.entries
+            .map { LocaleHelper.getDisplayName(it.langCode) }
+            .toTypedArray(),
+        selectedIndex = TranslationSourceLanguage.entries.indexOf(sourceLanguage).coerceAtLeast(0),
+        onSelect = { viewModel.preferences.autoTranslateSourceLanguage.set(TranslationSourceLanguage.entries[it]) },
+    )
 
     val targetLanguage by viewModel.preferences.autoTranslateTargetLanguage.collectAsState()
-    SettingsChipRow(MR.strings.pref_auto_translate_target) {
-        TARGET_LANGUAGES.map {
-            FilterChip(
-                selected = it == targetLanguage,
-                onClick = { viewModel.preferences.autoTranslateTargetLanguage.set(it) },
-                label = { Text(LocaleHelper.getDisplayName(it)) },
-            )
-        }
-    }
+    SelectItem(
+        label = stringResource(MR.strings.pref_auto_translate_target),
+        options = TARGET_LANGUAGES.map { LocaleHelper.getDisplayName(it) }.toTypedArray(),
+        selectedIndex = TARGET_LANGUAGES.indexOf(targetLanguage).coerceAtLeast(0),
+        onSelect = { viewModel.preferences.autoTranslateTargetLanguage.set(TARGET_LANGUAGES[it]) },
+    )
 
     val provider by viewModel.preferences.translationProvider.collectAsState()
     SettingsChipRow(MR.strings.pref_translation_provider) {

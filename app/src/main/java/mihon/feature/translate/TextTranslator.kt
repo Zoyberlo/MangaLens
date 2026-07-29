@@ -3,11 +3,15 @@ package mihon.feature.translate
 import android.util.LruCache
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
+import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.network.parseAs
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import logcat.LogPriority
+import okhttp3.FormBody
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import tachiyomi.core.common.util.system.logcat
 
@@ -42,8 +46,11 @@ class TextTranslator(
         cache.get(key)?.let { return it }
 
         val result = when (readerPreferences.translationProvider.get()) {
-            TranslationProvider.AUTO -> translateViaLingva(trimmed, from, to)
+            TranslationProvider.AUTO -> translateViaGoogle(trimmed, from, to)
+                ?: translateViaLingva(trimmed, from, to)
                 ?: translateViaMyMemory(trimmed, from, to)
+            TranslationProvider.GOOGLE -> translateViaGoogle(trimmed, from, to)
+            TranslationProvider.DEEPL -> translateViaDeepL(trimmed, from, to)
             TranslationProvider.LINGVA -> translateViaLingva(trimmed, from, to)
             TranslationProvider.MYMEMORY -> translateViaMyMemory(trimmed, from, to)
         }
@@ -52,6 +59,64 @@ class TextTranslator(
             cache.put(key, result)
         }
         return result
+    }
+
+    /**
+     * Unofficial keyless Google Translate endpoint (the same one browser
+     * extensions use). Fast and reliable, but not an official API.
+     */
+    private suspend fun translateViaGoogle(text: String, from: String, to: String): String? {
+        return try {
+            val url = "https://translate.googleapis.com/translate_a/single".toHttpUrl().newBuilder()
+                .addQueryParameter("client", "gtx")
+                .addQueryParameter("sl", from)
+                .addQueryParameter("tl", to)
+                .addQueryParameter("dt", "t")
+                .addQueryParameter("q", text)
+                .build()
+            val body = client.newCall(GET(url)).awaitSuccess().body.string()
+            json.parseToJsonElement(body)
+                .jsonArray[0]
+                .jsonArray
+                .joinToString("") { segment -> segment.jsonArray[0].jsonPrimitive.content }
+                .takeIf { it.isNotBlank() }
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Google translation failed" }
+            null
+        }
+    }
+
+    /**
+     * Official DeepL API; needs a user-supplied key (reader settings).
+     * Free-tier keys end in ":fx" and use the api-free host.
+     */
+    private suspend fun translateViaDeepL(text: String, from: String, to: String): String? {
+        val apiKey = readerPreferences.deeplApiKey.get().trim()
+        if (apiKey.isEmpty()) {
+            logcat(LogPriority.WARN) { "DeepL selected but no API key is set" }
+            return null
+        }
+        return try {
+            val host = if (apiKey.endsWith(":fx")) "api-free.deepl.com" else "api.deepl.com"
+            val body = FormBody.Builder()
+                .add("text", text)
+                .add("source_lang", from.uppercase())
+                .add("target_lang", to.uppercase())
+                .build()
+            val request = POST("https://$host/v2/translate", body = body)
+                .newBuilder()
+                .header("Authorization", "DeepL-Auth-Key $apiKey")
+                .build()
+            val response = client.newCall(request).awaitSuccess()
+            with(json) { response.parseAs<DeepLResponse>() }
+                .translations
+                ?.firstOrNull()
+                ?.text
+                ?.takeIf { it.isNotBlank() }
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "DeepL translation failed" }
+            null
+        }
     }
 
     private suspend fun translateViaLingva(text: String, from: String, to: String): String? {
@@ -96,6 +161,16 @@ class TextTranslator(
             logcat(LogPriority.WARN, e) { "MyMemory translation failed" }
             null
         }
+    }
+
+    @Serializable
+    private data class DeepLResponse(
+        val translations: List<Translation>? = null,
+    ) {
+        @Serializable
+        data class Translation(
+            val text: String? = null,
+        )
     }
 
     @Serializable

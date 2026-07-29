@@ -15,11 +15,13 @@ enum class TranslationSourceLanguage(val langCode: String) {
 }
 
 /**
- * Which backend performs the translation. AUTO tries Lingva first and
- * falls back to MyMemory.
+ * Which backend performs the translation. AUTO tries Google, then Lingva,
+ * then MyMemory. DEEPL requires an API key set in reader settings.
  */
 enum class TranslationProvider(val displayName: String) {
     AUTO("Auto"),
+    GOOGLE("Google"),
+    DEEPL("DeepL"),
     LINGVA("Lingva"),
     MYMEMORY("MyMemory"),
 }

@@ -94,6 +94,11 @@ object SettingsReaderScreen : SearchableSettings {
                     entries = TranslationProvider.entries.associateWith { it.displayName },
                     title = stringResource(MR.strings.pref_translation_provider),
                 ),
+                Preference.PreferenceItem.EditTextPreference(
+                    preference = readerPreferences.deeplApiKey,
+                    title = stringResource(MR.strings.pref_deepl_api_key),
+                    subtitle = stringResource(MR.strings.pref_deepl_api_key_summary),
+                ),
             ),
         )
     }
