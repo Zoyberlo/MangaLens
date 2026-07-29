@@ -20,9 +20,18 @@ class TextTranslator(
     private val json: Json,
 ) {
 
-    private val client by lazy { networkHelper.client }
+    // Short call timeout: a dead Lingva instance should fail fast so the
+    // fallback chain stays responsive
+    private val client by lazy {
+        networkHelper.client.newBuilder()
+            .callTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+    }
 
     private val cache = LruCache<String, String>(1000)
+
+    // Instances that recently failed are skipped for a cooldown period
+    private val instanceBackoffUntil = mutableMapOf<String, Long>()
 
     suspend fun translate(text: String, from: String, to: String): String? {
         val trimmed = text.trim()
@@ -42,6 +51,8 @@ class TextTranslator(
 
     private suspend fun translateViaLingva(text: String, from: String, to: String): String? {
         for (instance in LINGVA_INSTANCES) {
+            val backoffUntil = synchronized(instanceBackoffUntil) { instanceBackoffUntil[instance] ?: 0L }
+            if (System.currentTimeMillis() < backoffUntil) continue
             try {
                 val url = instance.toHttpUrl().newBuilder()
                     .addPathSegment("api")
@@ -57,6 +68,9 @@ class TextTranslator(
                 }
             } catch (e: Exception) {
                 logcat(LogPriority.WARN, e) { "Lingva translation failed on $instance" }
+                synchronized(instanceBackoffUntil) {
+                    instanceBackoffUntil[instance] = System.currentTimeMillis() + INSTANCE_BACKOFF_MS
+                }
             }
         }
         return null
@@ -95,6 +109,8 @@ class TextTranslator(
     }
 
     companion object {
+        private const val INSTANCE_BACKOFF_MS = 5 * 60 * 1000L
+
         private val LINGVA_INSTANCES = listOf(
             "https://lingva.ml",
             "https://translate.plausibility.cloud",

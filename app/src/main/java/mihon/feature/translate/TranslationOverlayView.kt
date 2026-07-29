@@ -78,30 +78,56 @@ class TranslationOverlayView(context: Context) : View(context) {
             if (rect.width() < 8 * density || rect.height() < 8 * density) continue
             if (rect.right < 0 || rect.bottom < 0 || rect.left > width || rect.top > height) continue
 
-            canvas.drawRoundRect(rect, cornerRadius, cornerRadius, boxPaint)
-            canvas.drawRoundRect(rect, cornerRadius, cornerRadius, borderPaint)
-            drawTextInRect(canvas, block.translatedText, rect)
+            drawBlock(canvas, block.translatedText, rect, cornerRadius)
         }
     }
 
-    private fun drawTextInRect(canvas: Canvas, text: String, rect: RectF) {
-        val padding = 2 * density
+    /**
+     * Draws the translation box. The box starts at the OCR bounds but grows
+     * (wider up to [MAX_WIDTH_GROWTH], and as tall as needed) when the text
+     * doesn't fit at the minimum readable size.
+     */
+    private fun drawBlock(canvas: Canvas, text: String, rect: RectF, cornerRadius: Float) {
+        val padding = 3 * density
+        val minTextPx = MIN_TEXT_SP * density
         val availableWidth = (rect.width() - 2 * padding).toInt()
-        val availableHeight = rect.height() - 2 * padding
-        if (availableWidth <= 0 || availableHeight <= 0) return
+        if (availableWidth <= 0) return
 
-        // Shrink the text size until the block fits (or the floor is hit)
-        var textSize = (rect.height() * 0.3f).coerceIn(MIN_TEXT_SP * density, MAX_TEXT_SP * density)
+        var textSize = (rect.height() * 0.3f).coerceIn(minTextPx, MAX_TEXT_SP * density)
         var layout = buildLayout(text, textSize, availableWidth)
-        while (layout.height > availableHeight && textSize > MIN_TEXT_SP * density) {
-            textSize = (textSize * 0.85f).coerceAtLeast(MIN_TEXT_SP * density)
+        while (layout.height > rect.height() - 2 * padding && textSize > minTextPx) {
+            textSize = (textSize * 0.85f).coerceAtLeast(minTextPx)
             layout = buildLayout(text, textSize, availableWidth)
         }
 
+        val drawRect: RectF
+        if (layout.height > rect.height() - 2 * padding) {
+            // Doesn't fit even at minimum size: grow the box instead of clipping
+            val margin = 4 * density
+            val grownWidth = (rect.width() * MAX_WIDTH_GROWTH)
+                .coerceAtMost(width - 2 * margin)
+                .coerceAtLeast(rect.width())
+            layout = buildLayout(text, minTextPx, (grownWidth - 2 * padding).toInt())
+            val newHeight = layout.height + 2 * padding
+            drawRect = RectF(
+                rect.centerX() - grownWidth / 2,
+                rect.centerY() - newHeight / 2,
+                rect.centerX() + grownWidth / 2,
+                rect.centerY() + newHeight / 2,
+            )
+            // Keep the grown box on screen horizontally
+            if (drawRect.left < margin) drawRect.offset(margin - drawRect.left, 0f)
+            if (drawRect.right > width - margin) drawRect.offset(width - margin - drawRect.right, 0f)
+        } else {
+            drawRect = rect
+        }
+
+        canvas.drawRoundRect(drawRect, cornerRadius, cornerRadius, boxPaint)
+        canvas.drawRoundRect(drawRect, cornerRadius, cornerRadius, borderPaint)
         canvas.withSave {
-            clipRect(rect)
-            val dy = rect.top + ((rect.height() - layout.height) / 2).coerceAtLeast(padding)
-            translate(rect.left + padding, dy)
+            clipRect(drawRect)
+            val dy = drawRect.top + ((drawRect.height() - layout.height) / 2).coerceAtLeast(padding)
+            translate(drawRect.left + padding, dy)
             layout.draw(this)
         }
     }
@@ -115,7 +141,8 @@ class TranslationOverlayView(context: Context) : View(context) {
     }
 
     companion object {
-        private const val MIN_TEXT_SP = 9f
+        private const val MIN_TEXT_SP = 11f
         private const val MAX_TEXT_SP = 22f
+        private const val MAX_WIDTH_GROWTH = 1.6f
     }
 }

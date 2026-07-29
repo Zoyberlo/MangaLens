@@ -3,6 +3,11 @@ package mihon.feature.translate
 import android.graphics.BitmapFactory
 import android.util.LruCache
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 
@@ -72,18 +77,29 @@ class PageTranslator(
         BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
+        val imageRect = android.graphics.Rect(0, 0, bounds.outWidth, bounds.outHeight)
         val clamped = android.graphics.Rect(region)
-        if (!clamped.intersect(android.graphics.Rect(0, 0, bounds.outWidth, bounds.outHeight))) return null
+        if (!clamped.intersect(imageRect)) return null
+
+        // OCR a padded area so a partial selection still catches the whole
+        // text block; blocks are then filtered by the original selection.
+        val padded = android.graphics.Rect(clamped).apply {
+            inset(
+                -(clamped.width() * REGION_PADDING).toInt().coerceAtLeast(MIN_REGION_PADDING_PX),
+                -(clamped.height() * REGION_PADDING).toInt().coerceAtLeast(MIN_REGION_PADDING_PX),
+            )
+        }
+        padded.intersect(imageRect)
 
         var sampleSize = 1
-        while (maxOf(clamped.width(), clamped.height()) / (sampleSize * 2) >= MAX_OCR_DIMENSION) {
+        while (maxOf(padded.width(), padded.height()) / (sampleSize * 2) >= MAX_OCR_DIMENSION) {
             sampleSize *= 2
         }
 
         @Suppress("DEPRECATION")
         val decoder = android.graphics.BitmapRegionDecoder.newInstance(imageBytes, 0, imageBytes.size, false)
         val bitmap = try {
-            decoder.decodeRegion(clamped, BitmapFactory.Options().apply { inSampleSize = sampleSize })
+            decoder.decodeRegion(padded, BitmapFactory.Options().apply { inSampleSize = sampleSize })
         } finally {
             decoder.recycle()
         } ?: return null
@@ -97,16 +113,20 @@ class PageTranslator(
             bitmap.recycle()
         }
 
-        val blocks = translateBlocks(recognized, from, to).map { block ->
-            block.copy(
-                bounds = android.graphics.Rect(
-                    clamped.left + block.bounds.left * sampleSize,
-                    clamped.top + block.bounds.top * sampleSize,
-                    clamped.left + block.bounds.right * sampleSize,
-                    clamped.top + block.bounds.bottom * sampleSize,
-                ),
-            )
-        }
+        val inSelection = recognized
+            .map { block ->
+                block.copy(
+                    bounds = android.graphics.Rect(
+                        padded.left + block.bounds.left * sampleSize,
+                        padded.top + block.bounds.top * sampleSize,
+                        padded.left + block.bounds.right * sampleSize,
+                        padded.top + block.bounds.bottom * sampleSize,
+                    ),
+                )
+            }
+            .filter { android.graphics.Rect.intersects(it.bounds, clamped) }
+
+        val blocks = translateBlocks(inSelection, from, to)
         if (blocks.isEmpty()) return null
 
         return PageTranslation(bounds.outWidth, bounds.outHeight, blocks)
@@ -116,19 +136,26 @@ class PageTranslator(
         recognized: List<RecognizedBlock>,
         from: TranslationSourceLanguage,
         to: String,
-    ): List<TranslatedBlock> {
-        return recognized
+    ): List<TranslatedBlock> = coroutineScope {
+        val semaphore = Semaphore(MAX_PARALLEL_TRANSLATIONS)
+        recognized
             .filter { block -> block.text.length >= 2 && block.text.any { it.isLetter() } }
             .take(MAX_BLOCKS_PER_PAGE)
-            .mapNotNull { block ->
-                val translated = try {
-                    translator.translate(block.text, from.langCode, to)
-                } catch (e: Exception) {
-                    logcat(LogPriority.WARN, e) { "Translation failed for block" }
-                    null
+            .map { block ->
+                async {
+                    semaphore.withPermit {
+                        val translated = try {
+                            translator.translate(block.text, from.langCode, to)
+                        } catch (e: Exception) {
+                            logcat(LogPriority.WARN, e) { "Translation failed for block" }
+                            null
+                        }
+                        translated?.let { TranslatedBlock(block.text, it, block.bounds) }
+                    }
                 }
-                translated?.let { TranslatedBlock(block.text, it, block.bounds) }
             }
+            .awaitAll()
+            .filterNotNull()
     }
 
     private fun decodeSampled(imageBytes: ByteArray): android.graphics.Bitmap? {
@@ -148,6 +175,12 @@ class PageTranslator(
     companion object {
         private const val PAGE_CACHE_SIZE = 40
         private const val MAX_BLOCKS_PER_PAGE = 24
+        private const val MAX_PARALLEL_TRANSLATIONS = 4
+
+        // Extra area around a manual selection so partially-selected text
+        // blocks are still recognized in full
+        private const val REGION_PADDING = 0.35f
+        private const val MIN_REGION_PADDING_PX = 48
 
         // ML Kit accuracy degrades on very large inputs and huge bitmaps waste memory
         private const val MAX_OCR_DIMENSION = 2560
