@@ -145,6 +145,11 @@ class ReaderViewModel @JvmOverloads constructor(
 
     private var chapterToDownload: Download? = null
 
+    /**
+     * Whether long-strip detection has already run for this reader session.
+     */
+    private var webtoonDetectionDone = false
+
     private val unfilteredChapterList by lazy {
         val manga = manga!!
         runBlocking { getChaptersByMangaId.await(manga.id, applyScanlatorFilter = false) }
@@ -333,7 +338,37 @@ class ReaderViewModel @JvmOverloads constructor(
                 )
             }
         }
+        maybeAutoDetectWebtoon(newChapters.currChapter)
         return newChapters
+    }
+
+    /**
+     * Switches this manga to webtoon mode when the first page is a long strip
+     * (height at least [WEBTOON_RATIO]x the width). Runs only while the manga
+     * has no explicit per-series reading mode and the resolved mode is a pager
+     * type, so a manual choice always wins.
+     */
+    private fun maybeAutoDetectWebtoon(chapter: ReaderChapter) {
+        if (webtoonDetectionDone) return
+        webtoonDetectionDone = true
+
+        if (ReadingMode.fromPreference(manga?.readingMode?.toInt()) != ReadingMode.DEFAULT) return
+        if (!ReadingMode.isPagerType(getMangaReadingMode())) return
+
+        val page = chapter.pages?.firstOrNull() ?: return
+        viewModelScope.launchIO {
+            page.statusFlow.first { it == Page.State.Ready }
+            val streamFn = page.stream ?: return@launchIO
+            try {
+                val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                streamFn().use { android.graphics.BitmapFactory.decodeStream(it, null, options) }
+                if (options.outWidth > 0 && options.outHeight >= options.outWidth * WEBTOON_RATIO) {
+                    withUIContext { setMangaReadingMode(ReadingMode.WEBTOON) }
+                }
+            } catch (e: Exception) {
+                logcat(LogPriority.WARN, e)
+            }
+        }
     }
 
     /**
@@ -986,3 +1021,6 @@ class ReaderViewModel @JvmOverloads constructor(
         data class CopyImage(val uri: Uri) : Event
     }
 }
+
+// A page this many times taller than wide is treated as a webtoon strip
+private const val WEBTOON_RATIO = 3
