@@ -50,7 +50,74 @@ class PageTranslator(
             bitmap.recycle()
         }
 
-        val blocks = recognized
+        val blocks = translateBlocks(recognized, from, to)
+        if (blocks.isEmpty()) return null
+
+        return PageTranslation(imageWidth, imageHeight, blocks)
+            .also { pageCache.put(fullKey, it) }
+    }
+
+    /**
+     * Translates a user-selected region of a page. [region] is in the
+     * coordinate space of the full decoded image ([imageBytes]). Unlike
+     * [translatePage] this ignores the auto-translate toggle — it's an
+     * explicit user action. Returned block bounds are in full-image space.
+     */
+    suspend fun translateRegion(imageBytes: ByteArray, region: android.graphics.Rect): PageTranslation? {
+        val from = readerPreferences.autoTranslateSourceLanguage.get()
+        val to = readerPreferences.autoTranslateTargetLanguage.get()
+        if (from.langCode == to) return null
+
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        val clamped = android.graphics.Rect(region)
+        if (!clamped.intersect(android.graphics.Rect(0, 0, bounds.outWidth, bounds.outHeight))) return null
+
+        var sampleSize = 1
+        while (maxOf(clamped.width(), clamped.height()) / (sampleSize * 2) >= MAX_OCR_DIMENSION) {
+            sampleSize *= 2
+        }
+
+        @Suppress("DEPRECATION")
+        val decoder = android.graphics.BitmapRegionDecoder.newInstance(imageBytes, 0, imageBytes.size, false)
+        val bitmap = try {
+            decoder.decodeRegion(clamped, BitmapFactory.Options().apply { inSampleSize = sampleSize })
+        } finally {
+            decoder.recycle()
+        } ?: return null
+
+        val recognized = try {
+            recognizer.recognize(bitmap, from)
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Text recognition failed" }
+            return null
+        } finally {
+            bitmap.recycle()
+        }
+
+        val blocks = translateBlocks(recognized, from, to).map { block ->
+            block.copy(
+                bounds = android.graphics.Rect(
+                    clamped.left + block.bounds.left * sampleSize,
+                    clamped.top + block.bounds.top * sampleSize,
+                    clamped.left + block.bounds.right * sampleSize,
+                    clamped.top + block.bounds.bottom * sampleSize,
+                ),
+            )
+        }
+        if (blocks.isEmpty()) return null
+
+        return PageTranslation(bounds.outWidth, bounds.outHeight, blocks)
+    }
+
+    private suspend fun translateBlocks(
+        recognized: List<RecognizedBlock>,
+        from: TranslationSourceLanguage,
+        to: String,
+    ): List<TranslatedBlock> {
+        return recognized
             .filter { block -> block.text.length >= 2 && block.text.any { it.isLetter() } }
             .take(MAX_BLOCKS_PER_PAGE)
             .mapNotNull { block ->
@@ -62,11 +129,6 @@ class PageTranslator(
                 }
                 translated?.let { TranslatedBlock(block.text, it, block.bounds) }
             }
-
-        if (blocks.isEmpty()) return null
-
-        return PageTranslation(imageWidth, imageHeight, blocks)
-            .also { pageCache.put(fullKey, it) }
     }
 
     private fun decodeSampled(imageBytes: ByteArray): android.graphics.Bitmap? {

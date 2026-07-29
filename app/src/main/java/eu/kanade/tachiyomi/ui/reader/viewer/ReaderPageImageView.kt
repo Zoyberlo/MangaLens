@@ -90,6 +90,18 @@ open class ReaderPageImageView @JvmOverloads constructor(
     }
 
     /**
+     * Maps a rectangle in this view's coordinates to source-image coordinates.
+     * Returns null while the image is not ready or for animated images.
+     */
+    fun viewToSourceRect(viewRect: RectF): RectF? {
+        val ssiv = pageView as? SubsamplingScaleImageView ?: return null
+        if (!ssiv.isReady) return null
+        val topLeft = ssiv.viewToSourceCoord(viewRect.left, viewRect.top) ?: return null
+        val bottomRight = ssiv.viewToSourceCoord(viewRect.right, viewRect.bottom) ?: return null
+        return RectF(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y)
+    }
+
+    /**
      * Shows (or clears, when null) the auto-translate overlay for this page.
      */
     fun setTranslation(translation: PageTranslation?) {

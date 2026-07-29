@@ -12,6 +12,7 @@ import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderProgressIndicator
 import eu.kanade.tachiyomi.ui.webview.WebViewActivity
+import eu.kanade.tachiyomi.util.system.toast
 import eu.kanade.tachiyomi.widget.ViewPagerAdapter
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
@@ -251,6 +252,38 @@ class PagerPageHolder(
     private fun onPageSplit(page: ReaderPage) {
         val newPage = InsertPage(page)
         viewer.onPageSplit(page, newPage)
+    }
+
+    /**
+     * Translates a user-selected area. [viewRect] is in this view's coordinate
+     * space (the selection overlay matches it). Shows the result as an overlay
+     * or a toast when nothing was recognized.
+     */
+    fun translateRegion(viewRect: android.graphics.RectF) {
+        val sourceRect = viewToSourceRect(viewRect) ?: return
+        val streamFn = page.stream ?: return
+        scope.launchIO {
+            val translation = try {
+                val bytes = streamFn().use { process(item, Buffer().readFrom(it)) }.readByteArray()
+                val region = android.graphics.Rect(
+                    sourceRect.left.toInt(),
+                    sourceRect.top.toInt(),
+                    sourceRect.right.toInt(),
+                    sourceRect.bottom.toInt(),
+                )
+                pageTranslator.translateRegion(bytes, region)
+            } catch (e: Exception) {
+                logcat(LogPriority.WARN, e)
+                null
+            }
+            withUIContext {
+                if (translation != null) {
+                    setTranslation(translation)
+                } else {
+                    viewer.activity.toast(MR.strings.translate_selection_no_text)
+                }
+            }
+        }
     }
 
     /**

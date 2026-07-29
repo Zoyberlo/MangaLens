@@ -77,6 +77,7 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderSettingsViewModel
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderProgressIndicator
+import eu.kanade.tachiyomi.ui.reader.viewer.pager.PagerViewer
 import eu.kanade.tachiyomi.ui.reader.viewer.pager.R2LPagerViewer
 import eu.kanade.tachiyomi.ui.webview.WebViewActivity
 import eu.kanade.tachiyomi.util.system.isNightMode
@@ -94,6 +95,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
 import logcat.LogPriority
+import mihon.feature.translate.TranslateSelectionView
 import tachiyomi.core.common.Constants
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchIO
@@ -133,6 +135,8 @@ class ReaderActivity : BaseActivity() {
     private var config: ReaderConfig? = null
 
     private var menuToggleToast: Toast? = null
+
+    private var translateSelectionView: TranslateSelectionView? = null
     private var readingModeToast: Toast? = null
     private val displayRefreshHost = DisplayRefreshHost()
 
@@ -523,8 +527,36 @@ class ReaderActivity : BaseActivity() {
                 menuToggleToast?.cancel()
                 menuToggleToast = toast(if (enabled) MR.strings.on else MR.strings.off)
             },
+            onClickTranslateSelection = ::startTranslateSelection.takeIf { state.viewer is PagerViewer },
             onClickSettings = viewModel::openSettingsDialog,
         )
+    }
+
+    /**
+     * Shows the "translate area" rubber-band selector over the current page.
+     */
+    private fun startTranslateSelection() {
+        setMenuVisibility(false)
+        val selector = translateSelectionView ?: TranslateSelectionView(this).also { view ->
+            view.onSelectionFinished = { rect ->
+                view.visibility = View.GONE
+                if (rect != null) {
+                    (viewModel.state.value.viewer as? PagerViewer)
+                        ?.currentPageHolder()
+                        ?.translateRegion(rect)
+                }
+            }
+            translateSelectionView = view
+            binding.readerContainer.addView(
+                view,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+        }
+        selector.visibility = View.VISIBLE
+        selector.bringToFront()
+        menuToggleToast?.cancel()
+        menuToggleToast = toast(MR.strings.translate_selection_hint)
     }
 
     /**

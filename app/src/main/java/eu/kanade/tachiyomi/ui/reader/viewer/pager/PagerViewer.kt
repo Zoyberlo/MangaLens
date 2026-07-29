@@ -163,6 +163,11 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
     }
 
     /**
+     * Returns the holder of the currently active page, if it is a regular page.
+     */
+    fun currentPageHolder(): PagerPageHolder? = (currentPage as? ReaderPage)?.let(::getPageHolder)
+
+    /**
      * Returns the PagerPageHolder for the provided page
      */
     private fun getPageHolder(page: ReaderPage): PagerPageHolder? =
