@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import eu.kanade.presentation.more.settings.widget.InfoWidget
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderSettingsViewModel
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import mihon.feature.translate.PageTranslator
@@ -43,15 +44,22 @@ internal fun ColumnScope.TranslationSettingsPage(viewModel: ReaderSettingsViewMo
     )
 
     val provider by viewModel.preferences.translationProvider.collectAsState()
+    val deeplApiKey by viewModel.preferences.deeplApiKey.collectAsState()
     val pageTranslator = remember { Injekt.get<PageTranslator>() }
     val lastAutoProvider by pageTranslator.lastAutoProvider.collectAsState()
     SettingsChipRow(MR.strings.pref_translation_provider) {
         TranslationProvider.entries.map {
+            // DeepL has no keyless tier, so it stays disabled until a key is set
+            val enabled = it != TranslationProvider.DEEPL || deeplApiKey.isNotBlank()
             FilterChip(
                 selected = it == provider,
+                enabled = enabled,
                 onClick = { viewModel.preferences.translationProvider.set(it) },
                 label = { Text(it.labelWithAutoHint(lastAutoProvider)) },
             )
         }
+    }
+    if (deeplApiKey.isBlank()) {
+        InfoWidget(text = stringResource(MR.strings.pref_deepl_api_key_summary))
     }
 }

@@ -80,6 +80,7 @@ object SettingsReaderScreen : SearchableSettings {
     private fun getAutoTranslateGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
         val pageTranslator = remember { Injekt.get<PageTranslator>() }
         val lastAutoProvider by pageTranslator.lastAutoProvider.collectAsState()
+        val deeplApiKey by readerPreferences.deeplApiKey.collectAsState()
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_category_auto_translate),
             preferenceItems = listOf(
@@ -96,7 +97,10 @@ object SettingsReaderScreen : SearchableSettings {
                 ),
                 Preference.PreferenceItem.ListPreference(
                     preference = readerPreferences.translationProvider,
-                    entries = TranslationProvider.entries.associateWith { it.labelWithAutoHint(lastAutoProvider) },
+                    // DeepL has no keyless tier, so it is only offered once a key is set
+                    entries = TranslationProvider.entries
+                        .filter { it != TranslationProvider.DEEPL || deeplApiKey.isNotBlank() }
+                        .associateWith { it.labelWithAutoHint(lastAutoProvider) },
                     title = stringResource(MR.strings.pref_translation_provider),
                 ),
                 Preference.PreferenceItem.EditTextPreference(

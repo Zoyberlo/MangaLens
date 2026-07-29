@@ -51,7 +51,18 @@ class TextTranslator(
         val key = "$from:$to:${trimmed.lowercase()}"
         cache.get(key)?.let { return it }
 
-        val result = when (readerPreferences.translationProvider.get()) {
+        val selectedProvider = readerPreferences.translationProvider.get()
+            .let {
+                // A DeepL selection left over from before the key was cleared
+                // would never succeed; fall back to the automatic chain
+                if (it == TranslationProvider.DEEPL && readerPreferences.deeplApiKey.get().isBlank()) {
+                    TranslationProvider.AUTO
+                } else {
+                    it
+                }
+            }
+
+        val result = when (selectedProvider) {
             TranslationProvider.AUTO -> {
                 translateViaGoogle(trimmed, from, to)
                     ?.also { lastAutoProvider.value = TranslationProvider.GOOGLE }
