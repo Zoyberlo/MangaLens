@@ -128,7 +128,7 @@ class AppModule(val app: Application) : InjektModule {
 
         addSingletonFactory { ImageSaver(app) }
 
-        addSingletonFactory { PageTranslator(PageTextRecognizer(), TextTranslator(get(), get()), get()) }
+        addSingletonFactory { PageTranslator(PageTextRecognizer(), TextTranslator(get(), get(), get()), get()) }
 
         addSingletonFactory { AndroidStorageFolderProvider(app) }
         addSingletonFactory { LocalSourceFileSystem(get()) }

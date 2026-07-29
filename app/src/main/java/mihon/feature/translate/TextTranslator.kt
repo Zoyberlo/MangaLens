@@ -18,6 +18,7 @@ import tachiyomi.core.common.util.system.logcat
 class TextTranslator(
     private val networkHelper: NetworkHelper,
     private val json: Json,
+    private val readerPreferences: eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences,
 ) {
 
     // Short call timeout: a dead Lingva instance should fail fast so the
@@ -40,8 +41,12 @@ class TextTranslator(
         val key = "$from:$to:${trimmed.lowercase()}"
         cache.get(key)?.let { return it }
 
-        val result = translateViaLingva(trimmed, from, to)
-            ?: translateViaMyMemory(trimmed, from, to)
+        val result = when (readerPreferences.translationProvider.get()) {
+            TranslationProvider.AUTO -> translateViaLingva(trimmed, from, to)
+                ?: translateViaMyMemory(trimmed, from, to)
+            TranslationProvider.LINGVA -> translateViaLingva(trimmed, from, to)
+            TranslationProvider.MYMEMORY -> translateViaMyMemory(trimmed, from, to)
+        }
 
         if (result != null) {
             cache.put(key, result)

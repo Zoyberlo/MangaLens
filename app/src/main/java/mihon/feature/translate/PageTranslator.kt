@@ -23,6 +23,37 @@ class PageTranslator(
 ) {
 
     /**
+     * Warms up the slow-to-start pieces of the pipeline so the first real
+     * translation is fast: loads the ML Kit model for the configured source
+     * language and fires a throwaway translation (which also probes and
+     * backs off dead Lingva instances). Safe to call repeatedly.
+     */
+    suspend fun warmUp() {
+        val from = readerPreferences.autoTranslateSourceLanguage.get()
+        val to = readerPreferences.autoTranslateTargetLanguage.get()
+
+        try {
+            val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
+            bitmap.eraseColor(android.graphics.Color.WHITE)
+            try {
+                recognizer.recognize(bitmap, from)
+            } finally {
+                bitmap.recycle()
+            }
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "OCR warm-up failed" }
+        }
+
+        if (from.langCode != to) {
+            try {
+                translator.translate("hello", from.langCode, to)
+            } catch (e: Exception) {
+                logcat(LogPriority.WARN, e) { "Translator warm-up failed" }
+            }
+        }
+    }
+
+    /**
      * Translates a user-selected region of a page. [region] is in the
      * coordinate space of the *displayed* source image, whose width is
      * [regionSpaceWidth] — it may be downsampled relative to [imageBytes]

@@ -11,6 +11,8 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import eu.kanade.tachiyomi.util.system.hasDisplayCutout
+import mihon.feature.translate.TARGET_LANGUAGES
+import mihon.feature.translate.TranslationProvider
 import mihon.feature.translate.TranslationSourceLanguage
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.pluralStringResource
@@ -86,6 +88,11 @@ object SettingsReaderScreen : SearchableSettings {
                     preference = readerPreferences.autoTranslateTargetLanguage,
                     entries = TARGET_LANGUAGES.associateWith { LocaleHelper.getDisplayName(it) },
                     title = stringResource(MR.strings.pref_auto_translate_target),
+                ),
+                Preference.PreferenceItem.ListPreference(
+                    preference = readerPreferences.translationProvider,
+                    entries = TranslationProvider.entries.associateWith { it.displayName },
+                    title = stringResource(MR.strings.pref_translation_provider),
                 ),
             ),
         )
@@ -463,5 +470,3 @@ object SettingsReaderScreen : SearchableSettings {
         )
     }
 }
-
-private val TARGET_LANGUAGES = listOf("en", "uk", "de", "fr", "es", "it", "pl", "pt", "ru", "tr", "vi", "id", "th")

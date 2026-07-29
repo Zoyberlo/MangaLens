@@ -15,6 +15,21 @@ enum class TranslationSourceLanguage(val langCode: String) {
 }
 
 /**
+ * Which backend performs the translation. AUTO tries Lingva first and
+ * falls back to MyMemory.
+ */
+enum class TranslationProvider(val displayName: String) {
+    AUTO("Auto"),
+    LINGVA("Lingva"),
+    MYMEMORY("MyMemory"),
+}
+
+/**
+ * Target languages offered in the translation settings.
+ */
+val TARGET_LANGUAGES = listOf("en", "uk", "de", "fr", "es", "it", "pl", "pt", "ru", "tr", "vi", "id", "th")
+
+/**
  * A block of text recognized on a page, in the coordinate space of the
  * bitmap that was fed to the recognizer.
  */

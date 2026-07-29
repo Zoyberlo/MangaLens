@@ -96,6 +96,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
 import logcat.LogPriority
+import mihon.feature.translate.PageTranslator
 import mihon.feature.translate.TranslateSelectionView
 import tachiyomi.core.common.Constants
 import tachiyomi.core.common.i18n.stringResource
@@ -175,6 +176,10 @@ class ReaderActivity : BaseActivity() {
         binding = ReaderActivityBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.setComposeOverlay()
+
+        // Load the OCR model and probe translation backends off the critical
+        // path so the first "translate area" action is fast
+        lifecycleScope.launchIO { Injekt.get<PageTranslator>().warmUp() }
 
         if (viewModel.needsInit()) {
             val manga = intent.extras?.getLong("manga", -1) ?: -1L

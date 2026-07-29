@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.ui.reader.setting
 import android.os.Build
 import androidx.compose.ui.graphics.BlendMode
 import dev.icerock.moko.resources.StringResource
+import mihon.feature.translate.TranslationProvider
 import mihon.feature.translate.TranslationSourceLanguage
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
@@ -91,6 +92,11 @@ class ReaderPreferences(
     val autoTranslateTargetLanguage: Preference<String> = preferenceStore.getString(
         "pref_auto_translate_target_lang",
         "en",
+    )
+
+    val translationProvider: Preference<TranslationProvider> = preferenceStore.getEnum(
+        "pref_translation_provider",
+        TranslationProvider.AUTO,
     )
 
     // region General (continued)
