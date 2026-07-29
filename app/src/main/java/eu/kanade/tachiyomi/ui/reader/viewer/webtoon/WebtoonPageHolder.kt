@@ -18,12 +18,14 @@ import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderProgressIndicator
 import eu.kanade.tachiyomi.ui.webview.WebViewActivity
 import eu.kanade.tachiyomi.util.system.dpToPx
+import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import logcat.LogPriority
+import mihon.feature.translate.PageTranslator
 import okio.Buffer
 import okio.BufferedSource
 import tachiyomi.core.common.i18n.stringResource
@@ -33,6 +35,7 @@ import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.ImageUtil
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
+import uy.kohesive.injekt.injectLazy
 
 /**
  * Holder of the webtoon reader for a single page of a chapter.
@@ -74,6 +77,8 @@ class WebtoonPageHolder(
     private var page: ReaderPage? = null
 
     private val scope = MainScope()
+
+    private val pageTranslator: PageTranslator by injectLazy()
 
     /**
      * Job for loading the page.
@@ -211,6 +216,40 @@ class WebtoonPageHolder(
             logcat(LogPriority.ERROR, e)
             withUIContext {
                 setError(e)
+            }
+        }
+    }
+
+    /**
+     * Translates a user-selected area. [frameRect] is in [frame]'s coordinate
+     * space. Shows the result as an overlay or a toast when nothing was
+     * recognized.
+     */
+    fun translateRegion(frameRect: android.graphics.RectF) {
+        val page = page ?: return
+        val sourceRect = frame.viewToSourceRect(frameRect) ?: return
+        val sourceWidth = frame.sourceWidth() ?: return
+        val streamFn = page.stream ?: return
+        scope.launchIO {
+            val translation = try {
+                val bytes = streamFn().use { process(Buffer().readFrom(it)) }.readByteArray()
+                val region = android.graphics.Rect(
+                    sourceRect.left.toInt(),
+                    sourceRect.top.toInt(),
+                    sourceRect.right.toInt(),
+                    sourceRect.bottom.toInt(),
+                )
+                pageTranslator.translateRegion(bytes, region, sourceWidth)
+            } catch (e: Exception) {
+                logcat(LogPriority.WARN, e)
+                null
+            }
+            withUIContext {
+                if (translation != null) {
+                    frame.setTranslation(translation)
+                } else {
+                    viewer.activity.toast(MR.strings.translate_selection_no_text)
+                }
             }
         }
     }

@@ -1,7 +1,6 @@
 package mihon.feature.translate
 
 import android.graphics.BitmapFactory
-import android.util.LruCache
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -23,52 +22,20 @@ class PageTranslator(
     private val readerPreferences: ReaderPreferences,
 ) {
 
-    val isEnabled: Boolean
-        get() = readerPreferences.autoTranslate.get()
-
-    private val pageCache = LruCache<String, PageTranslation>(PAGE_CACHE_SIZE)
-
-    /**
-     * Translates a page image. [cacheKey] must uniquely identify the page
-     * (chapter + page index). Returns null when disabled, nothing was
-     * recognized, or every translation failed.
-     */
-    suspend fun translatePage(cacheKey: String, imageBytes: ByteArray): PageTranslation? {
-        if (!isEnabled) return null
-
-        val from = readerPreferences.autoTranslateSourceLanguage.get()
-        val to = readerPreferences.autoTranslateTargetLanguage.get()
-        if (from.langCode == to) return null
-
-        val fullKey = "$cacheKey:${from.langCode}:$to"
-        pageCache.get(fullKey)?.let { return it }
-
-        val bitmap = decodeSampled(imageBytes) ?: return null
-        val imageWidth = bitmap.width
-        val imageHeight = bitmap.height
-        val recognized = try {
-            recognizer.recognize(bitmap, from)
-        } catch (e: Exception) {
-            logcat(LogPriority.WARN, e) { "Text recognition failed" }
-            return null
-        } finally {
-            bitmap.recycle()
-        }
-
-        val blocks = translateBlocks(recognized, from, to)
-        if (blocks.isEmpty()) return null
-
-        return PageTranslation(imageWidth, imageHeight, blocks)
-            .also { pageCache.put(fullKey, it) }
-    }
-
     /**
      * Translates a user-selected region of a page. [region] is in the
-     * coordinate space of the full decoded image ([imageBytes]). Unlike
-     * [translatePage] this ignores the auto-translate toggle — it's an
-     * explicit user action. Returned block bounds are in full-image space.
+     * coordinate space of the *displayed* source image, whose width is
+     * [regionSpaceWidth] — it may be downsampled relative to [imageBytes]
+     * (long strips decoded through Coil), so coordinates are rescaled.
+     * Returned block bounds are in displayed-source space via the returned
+     * [PageTranslation] dimensions.
      */
-    suspend fun translateRegion(imageBytes: ByteArray, region: android.graphics.Rect): PageTranslation? {
+    suspend fun translateRegion(
+        imageBytes: ByteArray,
+        region: android.graphics.Rect,
+        regionSpaceWidth: Int,
+    ): PageTranslation? {
+        if (regionSpaceWidth <= 0) return null
         val from = readerPreferences.autoTranslateSourceLanguage.get()
         val to = readerPreferences.autoTranslateTargetLanguage.get()
         if (from.langCode == to) return null
@@ -77,8 +44,14 @@ class PageTranslator(
         BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
+        val scale = bounds.outWidth.toFloat() / regionSpaceWidth
         val imageRect = android.graphics.Rect(0, 0, bounds.outWidth, bounds.outHeight)
-        val clamped = android.graphics.Rect(region)
+        val clamped = android.graphics.Rect(
+            (region.left * scale).toInt(),
+            (region.top * scale).toInt(),
+            (region.right * scale).toInt(),
+            (region.bottom * scale).toInt(),
+        )
         if (!clamped.intersect(imageRect)) return null
 
         // OCR a padded area so a partial selection still catches the whole
@@ -158,22 +131,7 @@ class PageTranslator(
             .filterNotNull()
     }
 
-    private fun decodeSampled(imageBytes: ByteArray): android.graphics.Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-
-        var sampleSize = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sampleSize * 2) >= MAX_OCR_DIMENSION) {
-            sampleSize *= 2
-        }
-
-        val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-        return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, options)
-    }
-
     companion object {
-        private const val PAGE_CACHE_SIZE = 40
         private const val MAX_BLOCKS_PER_PAGE = 24
         private const val MAX_PARALLEL_TRANSLATIONS = 4
 

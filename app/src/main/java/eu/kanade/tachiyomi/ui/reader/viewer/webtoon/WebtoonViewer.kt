@@ -48,6 +48,37 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
     private val frame = WebtoonFrame(activity)
 
     /**
+     * Routes a translate-area selection (in the viewer's coordinate space) to
+     * the page holder under the selection center. Accounts for the recycler's
+     * zoom/pan transform.
+     */
+    fun translateRegionAt(rect: android.graphics.RectF) {
+        val inverse = android.graphics.Matrix()
+        if (!recycler.matrix.invert(inverse)) return
+        val points = floatArrayOf(
+            rect.left - recycler.left,
+            rect.top - recycler.top,
+            rect.right - recycler.left,
+            rect.bottom - recycler.top,
+        )
+        inverse.mapPoints(points)
+
+        val centerX = (points[0] + points[2]) / 2
+        val centerY = (points[1] + points[3]) / 2
+        val child = recycler.findChildViewUnder(centerX, centerY) ?: return
+        val holder = recycler.getChildViewHolder(child) as? WebtoonPageHolder ?: return
+
+        holder.translateRegion(
+            android.graphics.RectF(
+                points[0] - child.left - child.translationX,
+                points[1] - child.top - child.translationY,
+                points[2] - child.left - child.translationX,
+                points[3] - child.top - child.translationY,
+            ),
+        )
+    }
+
+    /**
      * Distance to scroll when the user taps on one side of the recycler view.
      */
     private val scrollDistance = activity.resources.displayMetrics.heightPixels * 3 / 4

@@ -102,6 +102,16 @@ open class ReaderPageImageView @JvmOverloads constructor(
     }
 
     /**
+     * Dimensions of the displayed source image (which may be downsampled
+     * relative to the original file, e.g. long strips decoded through Coil).
+     */
+    fun sourceWidth(): Int? {
+        val ssiv = pageView as? SubsamplingScaleImageView ?: return null
+        if (!ssiv.isReady) return null
+        return ssiv.sWidth
+    }
+
+    /**
      * Shows (or clears, when null) the auto-translate overlay for this page.
      */
     fun setTranslation(translation: PageTranslation?) {

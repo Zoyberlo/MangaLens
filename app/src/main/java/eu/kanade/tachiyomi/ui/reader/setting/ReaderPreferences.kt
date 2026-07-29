@@ -81,9 +81,7 @@ class ReaderPreferences(
 
     // endregion
 
-    // region Auto-translate
-
-    val autoTranslate: Preference<Boolean> = preferenceStore.getBoolean("pref_auto_translate", false)
+    // region Translation
 
     val autoTranslateSourceLanguage: Preference<TranslationSourceLanguage> = preferenceStore.getEnum(
         "pref_auto_translate_source_lang",

@@ -73,27 +73,19 @@ object SettingsReaderScreen : SearchableSettings {
 
     @Composable
     private fun getAutoTranslateGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
-        val autoTranslate by readerPreferences.autoTranslate.collectAsState()
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_category_auto_translate),
             preferenceItems = listOf(
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = readerPreferences.autoTranslate,
-                    title = stringResource(MR.strings.pref_auto_translate),
-                    subtitle = stringResource(MR.strings.pref_auto_translate_summary),
-                ),
                 Preference.PreferenceItem.ListPreference(
                     preference = readerPreferences.autoTranslateSourceLanguage,
                     entries = TranslationSourceLanguage.entries
                         .associateWith { LocaleHelper.getDisplayName(it.langCode) },
                     title = stringResource(MR.strings.pref_auto_translate_source),
-                    enabled = autoTranslate,
                 ),
                 Preference.PreferenceItem.ListPreference(
                     preference = readerPreferences.autoTranslateTargetLanguage,
                     entries = TARGET_LANGUAGES.associateWith { LocaleHelper.getDisplayName(it) },
                     title = stringResource(MR.strings.pref_auto_translate_target),
-                    enabled = autoTranslate,
                 ),
             ),
         )

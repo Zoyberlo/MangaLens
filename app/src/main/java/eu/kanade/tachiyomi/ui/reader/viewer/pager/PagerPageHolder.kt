@@ -165,12 +165,6 @@ class PagerPageHolder(
                 }
                 Triple(source, isAnimated, background)
             }
-            // Copy the bytes before the image view consumes the source
-            val translateBytes = if (!isAnimated && pageTranslator.isEnabled) {
-                withIOContext { source.peek().readByteArray() }
-            } else {
-                null
-            }
             withUIContext {
                 setImage(
                     source,
@@ -188,7 +182,6 @@ class PagerPageHolder(
                 }
                 removeErrorLayout()
             }
-            translateBytes?.let { launchTranslation(it) }
         } catch (e: Throwable) {
             logcat(LogPriority.ERROR, e)
             withUIContext {
@@ -261,6 +254,7 @@ class PagerPageHolder(
      */
     fun translateRegion(viewRect: android.graphics.RectF) {
         val sourceRect = viewToSourceRect(viewRect) ?: return
+        val sourceWidth = sourceWidth() ?: return
         val streamFn = page.stream ?: return
         scope.launchIO {
             val translation = try {
@@ -271,7 +265,7 @@ class PagerPageHolder(
                     sourceRect.right.toInt(),
                     sourceRect.bottom.toInt(),
                 )
-                pageTranslator.translateRegion(bytes, region)
+                pageTranslator.translateRegion(bytes, region, sourceWidth)
             } catch (e: Exception) {
                 logcat(LogPriority.WARN, e)
                 null
@@ -283,23 +277,6 @@ class PagerPageHolder(
                     viewer.activity.toast(MR.strings.translate_selection_no_text)
                 }
             }
-        }
-    }
-
-    /**
-     * Runs OCR + translation on the displayed image bytes and attaches the
-     * result as an overlay. Never surfaces errors to the reader UI.
-     */
-    private fun launchTranslation(imageBytes: ByteArray) {
-        scope.launchIO {
-            val cacheKey = "${page.chapter.chapter.id}:${page.index}:${page.javaClass.simpleName}"
-            val translation = try {
-                pageTranslator.translatePage(cacheKey, imageBytes)
-            } catch (e: Exception) {
-                logcat(LogPriority.WARN, e)
-                null
-            } ?: return@launchIO
-            withUIContext { setTranslation(translation) }
         }
     }
 

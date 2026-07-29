@@ -79,6 +79,7 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderProgressIndicator
 import eu.kanade.tachiyomi.ui.reader.viewer.pager.PagerViewer
 import eu.kanade.tachiyomi.ui.reader.viewer.pager.R2LPagerViewer
+import eu.kanade.tachiyomi.ui.reader.viewer.webtoon.WebtoonViewer
 import eu.kanade.tachiyomi.ui.webview.WebViewActivity
 import eu.kanade.tachiyomi.util.system.isNightMode
 import eu.kanade.tachiyomi.util.system.openInBrowser
@@ -527,7 +528,7 @@ class ReaderActivity : BaseActivity() {
                 menuToggleToast?.cancel()
                 menuToggleToast = toast(if (enabled) MR.strings.on else MR.strings.off)
             },
-            onClickTranslateSelection = ::startTranslateSelection.takeIf { state.viewer is PagerViewer },
+            onClickTranslateSelection = ::startTranslateSelection.takeIf { state.viewer != null },
             onClickSettings = viewModel::openSettingsDialog,
         )
     }
@@ -541,9 +542,11 @@ class ReaderActivity : BaseActivity() {
             view.onSelectionFinished = { rect ->
                 view.visibility = View.GONE
                 if (rect != null) {
-                    (viewModel.state.value.viewer as? PagerViewer)
-                        ?.currentPageHolder()
-                        ?.translateRegion(rect)
+                    when (val viewer = viewModel.state.value.viewer) {
+                        is PagerViewer -> viewer.currentPageHolder()?.translateRegion(rect)
+                        is WebtoonViewer -> viewer.translateRegionAt(rect)
+                        else -> {}
+                    }
                 }
             }
             translateSelectionView = view
