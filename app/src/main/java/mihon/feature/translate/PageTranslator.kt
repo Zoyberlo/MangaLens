@@ -71,15 +71,15 @@ class PageTranslator(
         imageBytes: ByteArray,
         region: android.graphics.Rect,
         regionSpaceWidth: Int,
-    ): PageTranslation? {
-        if (regionSpaceWidth <= 0) return null
+    ): RegionTranslateResult {
+        if (regionSpaceWidth <= 0) return RegionTranslateResult.NoText
         val from = readerPreferences.autoTranslateSourceLanguage.get()
         val to = readerPreferences.autoTranslateTargetLanguage.get()
-        if (from.langCode == to) return null
+        if (from.langCode == to) return RegionTranslateResult.Failed
 
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return RegionTranslateResult.NoText
 
         val scale = bounds.outWidth.toFloat() / regionSpaceWidth
         val imageRect = android.graphics.Rect(0, 0, bounds.outWidth, bounds.outHeight)
@@ -89,7 +89,7 @@ class PageTranslator(
             (region.right * scale).toInt(),
             (region.bottom * scale).toInt(),
         )
-        if (!clamped.intersect(imageRect)) return null
+        if (!clamped.intersect(imageRect)) return RegionTranslateResult.NoText
 
         // OCR a padded area so a partial selection still catches the whole
         // text block; blocks are then filtered by the original selection.
@@ -112,13 +112,13 @@ class PageTranslator(
             decoder.decodeRegion(padded, BitmapFactory.Options().apply { inSampleSize = sampleSize })
         } finally {
             decoder.recycle()
-        } ?: return null
+        } ?: return RegionTranslateResult.NoText
 
         val recognized = try {
             recognizer.recognize(bitmap, from)
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Text recognition failed" }
-            return null
+            return RegionTranslateResult.NoText
         } finally {
             bitmap.recycle()
         }
@@ -136,10 +136,79 @@ class PageTranslator(
             }
             .filter { android.graphics.Rect.intersects(it.bounds, clamped) }
 
-        val blocks = translateBlocks(inSelection, from, to)
-        if (blocks.isEmpty()) return null
+        val candidates = mergeBlocks(inSelection, from)
+            .filter { block -> block.text.length >= 2 && block.text.any { it.isLetter() } }
+            .take(MAX_BLOCKS_PER_PAGE)
+        if (candidates.isEmpty()) return RegionTranslateResult.NoText
 
-        return PageTranslation(bounds.outWidth, bounds.outHeight, blocks)
+        val blocks = translateBlocks(candidates, from, to)
+        if (blocks.isEmpty()) return RegionTranslateResult.Failed
+
+        return RegionTranslateResult.Success(PageTranslation(bounds.outWidth, bounds.outHeight, blocks))
+    }
+
+    /**
+     * ML Kit often splits one speech bubble into a block per line. Merge
+     * blocks that sit close together (relative to their line size) so the
+     * whole bubble is translated as a single piece of text.
+     */
+    private fun mergeBlocks(
+        blocks: List<RecognizedBlock>,
+        from: TranslationSourceLanguage,
+    ): List<RecognizedBlock> {
+        val separator = when (from) {
+            TranslationSourceLanguage.JAPANESE, TranslationSourceLanguage.CHINESE -> ""
+            else -> " "
+        }
+        val list = blocks.toMutableList()
+        var changed = true
+        while (changed) {
+            changed = false
+            outer@ for (i in list.indices) {
+                for (j in i + 1 until list.size) {
+                    if (!shouldMerge(list[i].bounds, list[j].bounds)) continue
+                    val a = list[i]
+                    val b = list[j]
+                    val ordered = orderForReading(a, b, from)
+                    val union = android.graphics.Rect(a.bounds)
+                    union.union(b.bounds)
+                    list[i] = RecognizedBlock(
+                        ordered.joinToString(separator) { it.text },
+                        union,
+                    )
+                    list.removeAt(j)
+                    changed = true
+                    break@outer
+                }
+            }
+        }
+        return list
+    }
+
+    private fun shouldMerge(a: android.graphics.Rect, b: android.graphics.Rect): Boolean {
+        val lineSize = minOf(a.height(), b.height()).coerceAtLeast(1)
+        val verticalGap = maxOf(a.top, b.top) - minOf(a.bottom, b.bottom)
+        val horizontalGap = maxOf(a.left, b.left) - minOf(a.right, b.right)
+        return verticalGap < lineSize * 0.9f && horizontalGap < lineSize * 1.5f
+    }
+
+    private fun orderForReading(
+        a: RecognizedBlock,
+        b: RecognizedBlock,
+        from: TranslationSourceLanguage,
+    ): List<RecognizedBlock> {
+        val lineSize = minOf(a.bounds.height(), b.bounds.height()).coerceAtLeast(1)
+        val sameRow = kotlin.math.abs(a.bounds.top - b.bounds.top) < lineSize / 2
+        return if (sameRow) {
+            // Vertical Japanese columns read right to left
+            if (from == TranslationSourceLanguage.JAPANESE) {
+                listOf(a, b).sortedByDescending { it.bounds.left }
+            } else {
+                listOf(a, b).sortedBy { it.bounds.left }
+            }
+        } else {
+            listOf(a, b).sortedBy { it.bounds.top }
+        }
     }
 
     private suspend fun translateBlocks(
@@ -149,8 +218,6 @@ class PageTranslator(
     ): List<TranslatedBlock> = coroutineScope {
         val semaphore = Semaphore(MAX_PARALLEL_TRANSLATIONS)
         recognized
-            .filter { block -> block.text.length >= 2 && block.text.any { it.isLetter() } }
-            .take(MAX_BLOCKS_PER_PAGE)
             .map { block ->
                 async {
                     semaphore.withPermit {

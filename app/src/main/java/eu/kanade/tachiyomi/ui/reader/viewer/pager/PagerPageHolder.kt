@@ -257,7 +257,7 @@ class PagerPageHolder(
         val sourceWidth = sourceWidth() ?: return
         val streamFn = page.stream ?: return
         scope.launchIO {
-            val translation = try {
+            val result = try {
                 val bytes = streamFn().use { process(item, Buffer().readFrom(it)) }.readByteArray()
                 val region = android.graphics.Rect(
                     sourceRect.left.toInt(),
@@ -268,13 +268,15 @@ class PagerPageHolder(
                 pageTranslator.translateRegion(bytes, region, sourceWidth)
             } catch (e: Exception) {
                 logcat(LogPriority.WARN, e)
-                null
+                mihon.feature.translate.RegionTranslateResult.Failed
             }
             withUIContext {
-                if (translation != null) {
-                    setTranslation(translation)
-                } else {
-                    viewer.activity.toast(MR.strings.translate_selection_no_text)
+                when (result) {
+                    is mihon.feature.translate.RegionTranslateResult.Success -> setTranslation(result.translation)
+                    mihon.feature.translate.RegionTranslateResult.NoText ->
+                        viewer.activity.toast(MR.strings.translate_selection_no_text)
+                    mihon.feature.translate.RegionTranslateResult.Failed ->
+                        viewer.activity.toast(MR.strings.translate_selection_failed)
                 }
             }
         }

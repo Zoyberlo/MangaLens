@@ -70,3 +70,13 @@ data class PageTranslation(
     val imageHeight: Int,
     val blocks: List<TranslatedBlock>,
 )
+
+/**
+ * Outcome of a translate-area request, so the UI can tell "nothing was
+ * recognized" apart from "recognition worked but translation failed".
+ */
+sealed interface RegionTranslateResult {
+    data class Success(val translation: PageTranslation) : RegionTranslateResult
+    data object NoText : RegionTranslateResult
+    data object Failed : RegionTranslateResult
+}
