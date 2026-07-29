@@ -390,6 +390,11 @@
     <string name="pref_double_tap_zoom">Double tap to zoom</string>
     <string name="pref_cutout_short">Show content in cutout area</string>
     <string name="pref_page_transitions">Animate page transitions</string>
+    <string name="pref_category_auto_translate">Auto-translate</string>
+    <string name="pref_auto_translate">Auto-translate pages</string>
+    <string name="pref_auto_translate_summary">Recognize text on pages on-device and overlay a translation</string>
+    <string name="pref_auto_translate_source">Translate from</string>
+    <string name="pref_auto_translate_target">Translate to</string>
     <string name="pref_flash_page">Flash on page change</string>
     <string name="pref_flash_page_summ">Reduces ghosting on e-ink displays</string>
     <string name="pref_flash_duration">Flash duration</string>

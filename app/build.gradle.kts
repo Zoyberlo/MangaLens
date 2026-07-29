@@ -283,6 +283,9 @@ dependencies {
     // Dependency injection
     implementation(libs.injekt)
 
+    // On-device text recognition for page auto-translate (bundled models, no Play Services required)
+    implementation(libs.bundles.mlkit.text)
+
     // Image loading
     implementation(libs.bundles.coil)
     implementation(libs.subsamplingScaleImageView) {

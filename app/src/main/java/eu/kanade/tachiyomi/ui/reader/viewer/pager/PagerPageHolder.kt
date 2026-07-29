@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import logcat.LogPriority
+import mihon.feature.translate.PageTranslator
 import okio.Buffer
 import okio.BufferedSource
 import tachiyomi.core.common.i18n.stringResource
@@ -28,6 +29,7 @@ import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.ImageUtil
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
+import uy.kohesive.injekt.injectLazy
 
 /**
  * View of the ViewPager that contains a page of a chapter.
@@ -56,6 +58,8 @@ class PagerPageHolder(
     private var errorLayout: ReaderErrorBinding? = null
 
     private val scope = MainScope()
+
+    private val pageTranslator: PageTranslator by injectLazy()
 
     /**
      * Job for loading the page and processing changes to the page's status.
@@ -160,6 +164,12 @@ class PagerPageHolder(
                 }
                 Triple(source, isAnimated, background)
             }
+            // Copy the bytes before the image view consumes the source
+            val translateBytes = if (!isAnimated && pageTranslator.isEnabled) {
+                withIOContext { source.peek().readByteArray() }
+            } else {
+                null
+            }
             withUIContext {
                 setImage(
                     source,
@@ -177,6 +187,7 @@ class PagerPageHolder(
                 }
                 removeErrorLayout()
             }
+            translateBytes?.let { launchTranslation(it) }
         } catch (e: Throwable) {
             logcat(LogPriority.ERROR, e)
             withUIContext {
@@ -240,6 +251,23 @@ class PagerPageHolder(
     private fun onPageSplit(page: ReaderPage) {
         val newPage = InsertPage(page)
         viewer.onPageSplit(page, newPage)
+    }
+
+    /**
+     * Runs OCR + translation on the displayed image bytes and attaches the
+     * result as an overlay. Never surfaces errors to the reader UI.
+     */
+    private fun launchTranslation(imageBytes: ByteArray) {
+        scope.launchIO {
+            val cacheKey = "${page.chapter.chapter.id}:${page.index}:${page.javaClass.simpleName}"
+            val translation = try {
+                pageTranslator.translatePage(cacheKey, imageBytes)
+            } catch (e: Exception) {
+                logcat(LogPriority.WARN, e)
+                null
+            } ?: return@launchIO
+            withUIContext { setTranslation(translation) }
+        }
     }
 
     /**

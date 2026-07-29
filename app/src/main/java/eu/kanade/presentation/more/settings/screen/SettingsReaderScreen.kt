@@ -9,7 +9,9 @@ import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderOrientation
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
+import eu.kanade.tachiyomi.util.system.LocaleHelper
 import eu.kanade.tachiyomi.util.system.hasDisplayCutout
+import mihon.feature.translate.TranslationSourceLanguage
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.pluralStringResource
 import tachiyomi.presentation.core.i18n.stringResource
@@ -58,6 +60,7 @@ object SettingsReaderScreen : SearchableSettings {
                 preference = readerPref.pageTransitions,
                 title = stringResource(MR.strings.pref_page_transitions),
             ),
+            getAutoTranslateGroup(readerPreferences = readerPref),
             getDisplayGroup(readerPreferences = readerPref),
             getEInkGroup(readerPreferences = readerPref),
             getReadingGroup(readerPreferences = readerPref),
@@ -65,6 +68,34 @@ object SettingsReaderScreen : SearchableSettings {
             getWebtoonGroup(readerPreferences = readerPref),
             getNavigationGroup(readerPreferences = readerPref),
             getActionsGroup(readerPreferences = readerPref),
+        )
+    }
+
+    @Composable
+    private fun getAutoTranslateGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
+        val autoTranslate by readerPreferences.autoTranslate.collectAsState()
+        return Preference.PreferenceGroup(
+            title = stringResource(MR.strings.pref_category_auto_translate),
+            preferenceItems = listOf(
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = readerPreferences.autoTranslate,
+                    title = stringResource(MR.strings.pref_auto_translate),
+                    subtitle = stringResource(MR.strings.pref_auto_translate_summary),
+                ),
+                Preference.PreferenceItem.ListPreference(
+                    preference = readerPreferences.autoTranslateSourceLanguage,
+                    entries = TranslationSourceLanguage.entries
+                        .associateWith { LocaleHelper.getDisplayName(it.langCode) },
+                    title = stringResource(MR.strings.pref_auto_translate_source),
+                    enabled = autoTranslate,
+                ),
+                Preference.PreferenceItem.ListPreference(
+                    preference = readerPreferences.autoTranslateTargetLanguage,
+                    entries = TARGET_LANGUAGES.associateWith { LocaleHelper.getDisplayName(it) },
+                    title = stringResource(MR.strings.pref_auto_translate_target),
+                    enabled = autoTranslate,
+                ),
+            ),
         )
     }
 
@@ -440,3 +471,5 @@ object SettingsReaderScreen : SearchableSettings {
         )
     }
 }
+
+private val TARGET_LANGUAGES = listOf("en", "uk", "de", "fr", "es", "it", "pl", "pt", "ru", "tr", "vi", "id", "th")

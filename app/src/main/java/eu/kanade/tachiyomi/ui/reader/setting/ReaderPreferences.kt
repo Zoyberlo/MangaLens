@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.ui.reader.setting
 import android.os.Build
 import androidx.compose.ui.graphics.BlendMode
 import dev.icerock.moko.resources.StringResource
+import mihon.feature.translate.TranslationSourceLanguage
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.core.common.preference.getEnum
@@ -77,6 +78,24 @@ class ReaderPreferences(
         "always_show_chapter_transition",
         true,
     )
+
+    // endregion
+
+    // region Auto-translate
+
+    val autoTranslate: Preference<Boolean> = preferenceStore.getBoolean("pref_auto_translate", false)
+
+    val autoTranslateSourceLanguage: Preference<TranslationSourceLanguage> = preferenceStore.getEnum(
+        "pref_auto_translate_source_lang",
+        TranslationSourceLanguage.JAPANESE,
+    )
+
+    val autoTranslateTargetLanguage: Preference<String> = preferenceStore.getString(
+        "pref_auto_translate_target_lang",
+        "en",
+    )
+
+    // region General (continued)
 
     val cropBorders: Preference<Boolean> = preferenceStore.getBoolean("crop_borders", false)
 

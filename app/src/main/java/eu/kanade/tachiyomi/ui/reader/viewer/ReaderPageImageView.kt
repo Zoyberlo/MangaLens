@@ -39,6 +39,8 @@ import eu.kanade.tachiyomi.data.coil.customDecoder
 import eu.kanade.tachiyomi.ui.reader.viewer.webtoon.WebtoonSubsamplingImageView
 import eu.kanade.tachiyomi.util.system.animatorDurationScale
 import eu.kanade.tachiyomi.util.view.isVisibleOnScreen
+import mihon.feature.translate.PageTranslation
+import mihon.feature.translate.TranslationOverlayView
 import okio.BufferedSource
 import tachiyomi.core.common.util.system.ImageUtil
 import uy.kohesive.injekt.Injekt
@@ -66,6 +68,8 @@ open class ReaderPageImageView @JvmOverloads constructor(
 
     private var pageView: View? = null
 
+    private var translationOverlay: TranslationOverlayView? = null
+
     private var config: Config? = null
 
     var onImageLoaded: (() -> Unit)? = null
@@ -82,6 +86,24 @@ open class ReaderPageImageView @JvmOverloads constructor(
     open fun onImageLoaded() {
         onImageLoaded?.invoke()
         background = pageBackground
+        translationOverlay?.invalidate()
+    }
+
+    /**
+     * Shows (or clears, when null) the auto-translate overlay for this page.
+     */
+    fun setTranslation(translation: PageTranslation?) {
+        if (translation == null) {
+            translationOverlay?.setTranslation(null)
+            return
+        }
+        val overlay = translationOverlay ?: TranslationOverlayView(context).also {
+            it.ssivProvider = { pageView as? SubsamplingScaleImageView }
+            translationOverlay = it
+            addView(it, MATCH_PARENT, MATCH_PARENT)
+        }
+        overlay.bringToFront()
+        overlay.setTranslation(translation)
     }
 
     @CallSuper
@@ -248,16 +270,18 @@ open class ReaderPageImageView @JvmOverloads constructor(
                 object : SubsamplingScaleImageView.OnStateChangedListener {
                     override fun onScaleChanged(newScale: Float, origin: Int) {
                         this@ReaderPageImageView.onScaleChanged(newScale)
+                        translationOverlay?.invalidate()
                     }
 
                     override fun onCenterChanged(newCenter: PointF?, origin: Int) {
-                        // Not used
+                        translationOverlay?.invalidate()
                     }
                 },
             )
             setOnClickListener { this@ReaderPageImageView.onViewClicked() }
         }
         addView(pageView, MATCH_PARENT, MATCH_PARENT)
+        translationOverlay?.bringToFront()
     }
 
     private fun SubsamplingScaleImageView.setupZoom(config: Config?) {
@@ -375,6 +399,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
             }
         }
         addView(pageView, MATCH_PARENT, MATCH_PARENT)
+        translationOverlay?.bringToFront()
     }
 
     private fun setAnimatedImage(
