@@ -35,6 +35,12 @@ class TextTranslator(
 
     private val cache = LruCache<String, String>(1000)
 
+    /**
+     * The backend that served the most recent AUTO-mode translation;
+     * surfaced in settings as "Auto (Google)".
+     */
+    val lastAutoProvider = kotlinx.coroutines.flow.MutableStateFlow<TranslationProvider?>(null)
+
     // Instances that recently failed are skipped for a cooldown period
     private val instanceBackoffUntil = mutableMapOf<String, Long>()
 
@@ -46,9 +52,14 @@ class TextTranslator(
         cache.get(key)?.let { return it }
 
         val result = when (readerPreferences.translationProvider.get()) {
-            TranslationProvider.AUTO -> translateViaGoogle(trimmed, from, to)
-                ?: translateViaLingva(trimmed, from, to)
-                ?: translateViaMyMemory(trimmed, from, to)
+            TranslationProvider.AUTO -> {
+                translateViaGoogle(trimmed, from, to)
+                    ?.also { lastAutoProvider.value = TranslationProvider.GOOGLE }
+                    ?: translateViaLingva(trimmed, from, to)
+                        ?.also { lastAutoProvider.value = TranslationProvider.LINGVA }
+                    ?: translateViaMyMemory(trimmed, from, to)
+                        ?.also { lastAutoProvider.value = TranslationProvider.MYMEMORY }
+            }
             TranslationProvider.GOOGLE -> translateViaGoogle(trimmed, from, to)
             TranslationProvider.DEEPL -> translateViaDeepL(trimmed, from, to)
             TranslationProvider.LINGVA -> translateViaLingva(trimmed, from, to)

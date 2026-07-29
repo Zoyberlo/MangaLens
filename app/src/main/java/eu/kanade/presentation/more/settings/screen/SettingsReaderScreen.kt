@@ -2,6 +2,7 @@ package eu.kanade.presentation.more.settings.screen
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalView
@@ -11,9 +12,11 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import eu.kanade.tachiyomi.util.system.hasDisplayCutout
+import mihon.feature.translate.PageTranslator
 import mihon.feature.translate.TARGET_LANGUAGES
 import mihon.feature.translate.TranslationProvider
 import mihon.feature.translate.TranslationSourceLanguage
+import mihon.feature.translate.labelWithAutoHint
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.pluralStringResource
 import tachiyomi.presentation.core.i18n.stringResource
@@ -75,6 +78,8 @@ object SettingsReaderScreen : SearchableSettings {
 
     @Composable
     private fun getAutoTranslateGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
+        val pageTranslator = remember { Injekt.get<PageTranslator>() }
+        val lastAutoProvider by pageTranslator.lastAutoProvider.collectAsState()
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_category_auto_translate),
             preferenceItems = listOf(
@@ -91,7 +96,7 @@ object SettingsReaderScreen : SearchableSettings {
                 ),
                 Preference.PreferenceItem.ListPreference(
                     preference = readerPreferences.translationProvider,
-                    entries = TranslationProvider.entries.associateWith { it.displayName },
+                    entries = TranslationProvider.entries.associateWith { it.labelWithAutoHint(lastAutoProvider) },
                     title = stringResource(MR.strings.pref_translation_provider),
                 ),
                 Preference.PreferenceItem.EditTextPreference(

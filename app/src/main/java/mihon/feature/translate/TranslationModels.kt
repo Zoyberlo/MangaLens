@@ -27,6 +27,17 @@ enum class TranslationProvider(val displayName: String) {
 }
 
 /**
+ * Display label for a provider; AUTO shows which backend it last used,
+ * e.g. "Auto (Google)".
+ */
+fun TranslationProvider.labelWithAutoHint(lastAuto: TranslationProvider?): String =
+    if (this == TranslationProvider.AUTO && lastAuto != null) {
+        "$displayName (${lastAuto.displayName})"
+    } else {
+        displayName
+    }
+
+/**
  * Target languages offered in the translation settings.
  */
 val TARGET_LANGUAGES = listOf("en", "uk", "de", "fr", "es", "it", "pl", "pt", "ru", "tr", "vi", "id", "th")

@@ -23,6 +23,12 @@ class PageTranslator(
 ) {
 
     /**
+     * The backend that served the most recent AUTO-mode translation.
+     */
+    val lastAutoProvider: kotlinx.coroutines.flow.StateFlow<TranslationProvider?>
+        get() = translator.lastAutoProvider
+
+    /**
      * Warms up the slow-to-start pieces of the pipeline so the first real
      * translation is fast: loads the ML Kit model for the configured source
      * language and fires a throwaway translation (which also probes and
