@@ -153,17 +153,27 @@ class TranslationOverlayView(context: Context) : View(context) {
         val padding = 3 * density
         val minTextPx = MIN_TEXT_SP * density
         val availableWidth = (rect.width() - 2 * padding).toInt()
+        val availableHeight = rect.height() - 2 * padding
         if (availableWidth <= 0) return rect
 
-        var textSize = (rect.height() * 0.3f).coerceIn(minTextPx, MAX_TEXT_SP * density)
-        var layout = buildLayout(text, textSize, availableWidth)
-        while (layout.height > rect.height() - 2 * padding && textSize > minTextPx) {
-            textSize = (textSize * 0.85f).coerceAtLeast(minTextPx)
-            layout = buildLayout(text, textSize, availableWidth)
+        // Pick the largest size that still fits, so text fills big bubbles
+        var layout = buildLayout(text, minTextPx, availableWidth)
+        var low = minTextPx
+        var high = minOf(MAX_TEXT_SP * density, availableHeight)
+        repeat(FIT_SEARCH_STEPS) {
+            if (high - low < 0.5f) return@repeat
+            val mid = (low + high) / 2
+            val candidate = buildLayout(text, mid, availableWidth)
+            if (candidate.height <= availableHeight) {
+                low = mid
+                layout = candidate
+            } else {
+                high = mid
+            }
         }
 
         val drawRect: RectF
-        if (layout.height > rect.height() - 2 * padding) {
+        if (layout.height > availableHeight) {
             // Doesn't fit even at minimum size: grow the box instead of clipping
             val margin = 4 * density
             val grownWidth = (rect.width() * MAX_WIDTH_GROWTH)
@@ -266,8 +276,9 @@ class TranslationOverlayView(context: Context) : View(context) {
 
     companion object {
         private const val MIN_TEXT_SP = 11f
-        private const val MAX_TEXT_SP = 22f
+        private const val MAX_TEXT_SP = 40f
         private const val MAX_WIDTH_GROWTH = 1.6f
         private const val CLOSE_RADIUS_DP = 12f
+        private const val FIT_SEARCH_STEPS = 8
     }
 }
