@@ -1,0 +1,97 @@
+# Feature: Translation
+
+Manual, user-triggered translation of a selected area of a manga page:
+**select area → OCR on device → translate → draw an overlay pinned to the image**.
+
+There is deliberately **no automatic whole-page translation** — see
+`context/decisions.md`.
+
+## Files (all fork-only unless noted)
+
+| File | Role |
+|------|------|
+| `mihon/feature/translate/TranslationModels.kt` | `TranslationSourceLanguage`, `TranslationProvider`, `TARGET_LANGUAGES`, `RecognizedBlock`, `TranslatedBlock`, `PageTranslation`, `RegionTranslateResult` |
+| `mihon/feature/translate/PageTextRecognizer.kt` | ML Kit OCR; one cached recognizer per source language |
+| `mihon/feature/translate/TextTranslator.kt` | Translation backends, text normalization, LRU cache, instance backoff |
+| `mihon/feature/translate/PageTranslator.kt` | Orchestration: decode region → OCR → merge blocks → translate; also `warmUp()` |
+| `mihon/feature/translate/TranslationOverlayView.kt` | Draws the boxes; tap-to-select, X-to-dismiss |
+| `mihon/feature/translate/TranslateSelectionView.kt` | Full-screen rubber-band selector |
+| `presentation/reader/settings/TranslationSettingsPage.kt` | The reader dialog's Translation tab |
+
+Upstream call-outs are listed in `context/fork-vs-upstream.md`.
+
+## Flow
+
+1. **Button** — `ReaderBottomBar` shows a translate icon; `ReaderActivity.startTranslateSelection()`
+   hides the menu and adds a `TranslateSelectionView` over `reader_container`.
+2. **Selection** — the user drags a rect (view coordinates). A tap, or a drag
+   smaller than 24dp, cancels.
+3. **Routing** —
+   - pager: `PagerViewer.currentPageHolder()?.translateRegion(rect)`
+   - webtoon: `WebtoonViewer.translateRegionAt(rect)` maps the rect through the
+     recycler's zoom matrix, finds the child under its center, and converts to that
+     holder's coordinates.
+4. **Coordinates** — the holder converts view → *displayed source* coordinates with
+   `ReaderPageImageView.viewToSourceRect()`, and passes
+   `sourceWidth()` so `PageTranslator` can rescale into *full-image* space (a long
+   strip displayed through Coil is downsampled; the region decoder needs original
+   pixels).
+5. **OCR** — `PageTranslator.translateRegion()` pads the region by 35% (min 48px),
+   decodes just that area with `BitmapRegionDecoder`, runs ML Kit, then keeps only
+   blocks intersecting the *unpadded* selection. So a sloppy selection still
+   captures a whole bubble.
+6. **Merge** — `mergeBlocks()` unions blocks whose gap is under ~one line height,
+   so a multi-line bubble is translated as one sentence (Japanese vertical columns
+   are ordered right-to-left).
+7. **Translate** — `TextTranslator.translate()` normalizes the text, checks the LRU
+   cache, then calls the configured provider. Blocks run 4-at-a-time
+   (`Semaphore`).
+8. **Draw** — `ReaderPageImageView.setTranslation()` attaches/updates a
+   `TranslationOverlayView`, invalidated on every scale/center change.
+
+## Providers (`TranslationProvider`)
+
+| Value | Notes |
+|-------|-------|
+| `AUTO` | Google → Lingva → MyMemory, first success wins. Records which one worked in `TextTranslator.lastAutoProvider`, shown in settings as "Auto (Google)". |
+| `GOOGLE` | Keyless `translate.googleapis.com/translate_a/single` (`client=gtx`). Unofficial. |
+| `DEEPL` | Needs `ReaderPreferences.deeplApiKey`. Host is `api-free.deepl.com` when the key ends in `:fx`, else `api.deepl.com`. Disabled in the UI until a key exists, and falls back to `AUTO` if selected without one. |
+| `LINGVA` | Public Lingva instances; a failing instance is skipped for 5 minutes. |
+| `MYMEMORY` | Slow but keyless fallback. |
+
+The OkHttp client is `NetworkHelper.client` with an **8s call timeout** so a dead
+instance fails fast.
+
+## Text normalization (quality-critical)
+
+`TextTranslator.normalizeForTranslation()` runs before every request:
+
+- rejoins hyphenated line breaks (`IMPRES- SION` → `IMPRESSION`),
+- collapses whitespace,
+- converts SHOUTY ALL-CAPS lettering to sentence case (>80% uppercase letters).
+
+Comic lettering is all-caps, and machine translation of all-caps text drops or
+invents words. Do not remove this step.
+
+## Overlay behavior
+
+- Box positions come from `sourceToViewCoord`, so they track pan/zoom.
+- Text size is chosen by binary search: the **largest** size in 11–40sp that fits.
+- If the text cannot fit even at 11sp, the box grows (up to 1.6× wider, taller as
+  needed) and is clamped to stay on screen.
+- Tap a box → it is selected and shows an X; tap the X → the box is removed. Taps
+  outside any box return `false` from `onTouchEvent`, so page gestures still work.
+
+## Settings
+
+Language pair, provider and DeepL key live in `ReaderPreferences` and are surfaced
+twice: globally in **Settings → Reader** (`SettingsReaderScreen`) and in-reader in
+the **Translation** tab (`TranslationSettingsPage`). Both edit the same
+preferences. See `context/features/reader-settings.md`.
+
+## Warm-up
+
+`ReaderActivity.onCreate` calls `PageTranslator.warmUp()` on IO: it loads the ML Kit
+model for the current source language and fires a throwaway translation (which also
+probes/backs off dead Lingva instances). Without it the first translation costs
+10–20s.

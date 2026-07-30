@@ -1,0 +1,72 @@
+# Fork vs upstream Mihon
+
+This repo is a fork of [mihonapp/mihon](https://github.com/mihonapp/mihon). Almost
+everything is upstream code; the fork adds an on-device **translation** feature and
+a small rebrand. Read this before editing anything — it tells you which files are
+"ours" and which are shared with upstream.
+
+## Remotes & branch
+
+| Remote | Points at |
+|--------|-----------|
+| `origin` | the fork (`Zoyberlo/mihon`) |
+| `upstream` | `mihonapp/mihon` |
+
+Work happens on `feature/auto-translate`. The base commit the fork branched from is
+the parent of the first fork commit; `git log upstream/main..HEAD` lists everything
+we added.
+
+## Rebrand
+
+| What | Value | Where |
+|------|-------|-------|
+| App name | `Mihon TL` | `i18n/.../base/strings.xml` → `app_name` |
+| Application id | `app.mihon.tl` | `app/build.gradle.kts` → `defaultConfig.applicationId` |
+
+The changed `applicationId` is what lets the fork be installed **alongside** the
+official Mihon. Debug builds add `.dev` on top of it (upstream behavior). Package
+names (`eu.kanade.tachiyomi`) and the namespace were deliberately **not** renamed —
+that would cause a merge conflict in every file for no user-visible gain.
+
+## Fork-only code (safe to edit freely)
+
+`app/src/main/java/mihon/feature/translate/` — the whole feature:
+`PageTextRecognizer`, `TextTranslator`, `PageTranslator`, `TranslationModels`,
+`TranslationOverlayView`, `TranslateSelectionView`. See
+`context/features/translate.md`.
+
+Plus one fork-only UI file:
+`app/src/main/java/eu/kanade/presentation/reader/settings/TranslationSettingsPage.kt`.
+
+## Upstream files the fork touches (merge-conflict surface)
+
+Keep these edits **small and localized** — every line here is a line that can
+conflict when syncing with upstream.
+
+| File | Fork change |
+|------|-------------|
+| `app/build.gradle.kts` | `applicationId`, ML Kit dependency bundle |
+| `gradle/libs.versions.toml` | `mlkit-text` version, 4 libraries, `mlkit-text` bundle |
+| `i18n/.../moko-resources/base/strings.xml` | `app_name` + translation strings |
+| `di/AppModule.kt` | registers `PageTranslator` singleton |
+| `ui/reader/setting/ReaderPreferences.kt` | translation preferences block |
+| `ui/reader/ReaderActivity.kt` | warm-up call, selection overlay, translate button wiring |
+| `ui/reader/ReaderViewModel.kt` | webtoon auto-detection (`maybeAutoDetectWebtoon`) |
+| `ui/reader/viewer/ReaderPageImageView.kt` | hosts the overlay; `viewToSourceRect`, `sourceWidth`, `setTranslation` |
+| `ui/reader/viewer/pager/PagerPageHolder.kt` | `translateRegion` |
+| `ui/reader/viewer/pager/PagerViewer.kt` | `currentPageHolder()` |
+| `ui/reader/viewer/webtoon/WebtoonPageHolder.kt` | `translateRegion` |
+| `ui/reader/viewer/webtoon/WebtoonViewer.kt` | `translateRegionAt` (routes a selection to a holder) |
+| `presentation/reader/appbars/ReaderAppBars.kt`, `ReaderBottomBar.kt` | translate button |
+| `presentation/reader/settings/ReaderSettingsDialog.kt` | 4th tab |
+| `presentation/more/settings/screen/SettingsReaderScreen.kt` | translation preference group |
+
+**Rule:** prefer adding a method to a fork-only class over adding logic to an
+upstream file. When an upstream file must change, keep it to a call-out (one
+method call, one parameter) and put the body in `mihon/feature/translate/`.
+
+Adding a row to this table is part of the change that touches a new upstream file.
+
+## Syncing
+
+See `processes/sync-with-upstream.md`.
