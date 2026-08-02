@@ -59,6 +59,8 @@ conflict when syncing with upstream.
 |------|-------------|
 | `app/build.gradle.kts` | `applicationId`, ML Kit dependency bundle |
 | `app/proguard-rules.pro` | ML Kit keep rules (R8 strips its reflectively-loaded components in release builds) |
+| `app/src/main/AndroidManifest.xml` | `<queries>` for Mihon-family packages (migrate-from-app detection) |
+| `presentation/more/MoreScreen.kt`, `ui/more/MoreTab.kt` | Saved words + Migrate from another app rows |
 | `gradle/libs.versions.toml` | `mlkit-text` version, 4 libraries, `mlkit-text` bundle |
 | `i18n/.../moko-resources/base/strings.xml` | `app_name` + translation strings |
 | `di/AppModule.kt` | registers `PageTranslator` singleton |
