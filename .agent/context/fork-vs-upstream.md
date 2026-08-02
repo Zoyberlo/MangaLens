@@ -20,7 +20,7 @@ we added.
 
 | What | Value | Where |
 |------|-------|-------|
-| App name | `Mihon TL` | `i18n/.../base/strings.xml` → `app_name` |
+| App name | `Mihon Lingo` (ex `Mihon TL`) | `i18n/.../base/strings.xml` → `app_name` |
 | Application id | `app.mihon.tl` | `app/build.gradle.kts` → `defaultConfig.applicationId` |
 
 The changed `applicationId` is what lets the fork be installed **alongside** the
