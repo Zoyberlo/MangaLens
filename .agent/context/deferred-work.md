@@ -3,6 +3,20 @@
 Things deliberately not done yet. Not a backlog of ideas — only work that has been
 discussed and consciously postponed, plus known rough edges.
 
+## Agreed queue (in order)
+
+1. **Translator UX settings**: (a) show-original-first mode — area selection
+   shows recognized original text as tappable blocks, translation happens
+   per-block/word on demand; (b) result-display mode — bottom panel instead of
+   in-place overlay boxes. Both as reader preferences.
+2. **Migrate from another app**: detect installed Mihon-family apps
+   (PackageManager + `<queries>`), guide backup creation, scan the chosen
+   storage folder for `.tachibk` files and hand the newest to the existing
+   restore flow. Direct DB reads are impossible (sandbox) — backup files are
+   the only path.
+3. **Edit info**: per-manga custom title/cover/notes overrides.
+4. **Merged series**: one library entry fed by several sources (largest, last).
+
 ## Discussed, not built
 
 - **CI secrets are pending a human step.** `.github/workflows/build-fork.yml`
