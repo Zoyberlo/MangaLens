@@ -217,12 +217,15 @@ class PageTranslator(
         to: String,
     ): List<TranslatedBlock> = coroutineScope {
         val semaphore = Semaphore(MAX_PARALLEL_TRANSLATIONS)
+        // The other blocks of the selection serve as translation context
+        // (consumed by DeepL; harmless for the other providers)
+        val pageContext = recognized.joinToString("\n") { it.text }.take(MAX_CONTEXT_CHARS)
         recognized
             .map { block ->
                 async {
                     semaphore.withPermit {
                         val translated = try {
-                            translator.translate(block.text, from.langCode, to)
+                            translator.translate(block.text, from.langCode, to, pageContext)
                         } catch (e: Exception) {
                             logcat(LogPriority.WARN, e) { "Translation failed for block" }
                             null
@@ -235,9 +238,53 @@ class PageTranslator(
             .filterNotNull()
     }
 
+    // region Overlay restore cache
+
+    private val overlayCache = android.util.LruCache<String, PageTranslation>(OVERLAY_CACHE_SIZE)
+
+    /** Last shown overlay for a page, so re-entering the page restores it. */
+    fun cachedOverlay(pageKey: String): PageTranslation? = overlayCache.get(pageKey)
+
+    /**
+     * Merges [translation] into the stored overlay for [pageKey] and returns
+     * the merged result (several selections on one page accumulate).
+     */
+    fun storeOverlay(pageKey: String, translation: PageTranslation): PageTranslation {
+        val existing = overlayCache.get(pageKey)
+        val merged = if (
+            existing != null &&
+            existing.imageWidth == translation.imageWidth &&
+            existing.imageHeight == translation.imageHeight
+        ) {
+            PageTranslation(
+                translation.imageWidth,
+                translation.imageHeight,
+                (existing.blocks + translation.blocks).distinct(),
+            )
+        } else {
+            translation
+        }
+        overlayCache.put(pageKey, merged)
+        return merged
+    }
+
+    /** Replaces the stored overlay blocks after the user dismissed some. */
+    fun replaceOverlay(pageKey: String, blocks: List<TranslatedBlock>) {
+        val existing = overlayCache.get(pageKey) ?: return
+        if (blocks.isEmpty()) {
+            overlayCache.remove(pageKey)
+        } else {
+            overlayCache.put(pageKey, PageTranslation(existing.imageWidth, existing.imageHeight, blocks))
+        }
+    }
+
+    // endregion
+
     companion object {
         private const val MAX_BLOCKS_PER_PAGE = 24
         private const val MAX_PARALLEL_TRANSLATIONS = 4
+        private const val MAX_CONTEXT_CHARS = 1500
+        private const val OVERLAY_CACHE_SIZE = 30
 
         // Extra area around a manual selection so partially-selected text
         // blocks are still recognized in full

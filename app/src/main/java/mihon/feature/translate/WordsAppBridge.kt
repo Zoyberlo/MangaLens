@@ -19,9 +19,17 @@ object WordsAppBridge {
      * toast when the app is not installed.
      */
     fun saveWord(context: Context, block: TranslatedBlock) {
+        saveWord(context, block.sourceText, block.translatedText)
+    }
+
+    /**
+     * Opens words-app prefilled with [word]. When [translation] is null the
+     * words-app editor looks the word up itself.
+     */
+    fun saveWord(context: Context, word: String, translation: String? = null) {
         val uri = Uri.parse("wordsapp://add").buildUpon()
-            .appendQueryParameter("word", block.sourceText)
-            .appendQueryParameter("translation", block.translatedText)
+            .appendQueryParameter("word", word)
+            .apply { if (!translation.isNullOrBlank()) appendQueryParameter("translation", translation) }
             .build()
         val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         try {

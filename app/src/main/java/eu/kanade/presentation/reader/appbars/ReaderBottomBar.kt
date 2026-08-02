@@ -1,15 +1,20 @@
 package eu.kanade.presentation.reader.appbars
 
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import eu.kanade.tachiyomi.R
@@ -27,6 +32,7 @@ fun ReaderBottomBar(
     cropEnabled: Boolean,
     onClickCropBorder: () -> Unit,
     onClickTranslateSelection: (() -> Unit)?,
+    onLongClickTranslateSelection: (() -> Unit)?,
     onClickSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -58,7 +64,17 @@ fun ReaderBottomBar(
         }
 
         if (onClickTranslateSelection != null) {
-            IconButton(onClick = onClickTranslateSelection) {
+            // Tap = select an area; long-press = translate the whole page
+            Box(
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .clip(CircleShape)
+                    .combinedClickable(
+                        onClick = onClickTranslateSelection,
+                        onLongClick = onLongClickTranslateSelection,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
                 Icon(
                     imageVector = Icons.Outlined.Translate,
                     contentDescription = stringResource(MR.strings.action_translate_selection),

@@ -40,6 +40,7 @@ import eu.kanade.tachiyomi.ui.reader.viewer.webtoon.WebtoonSubsamplingImageView
 import eu.kanade.tachiyomi.util.system.animatorDurationScale
 import eu.kanade.tachiyomi.util.view.isVisibleOnScreen
 import mihon.feature.translate.PageTranslation
+import mihon.feature.translate.TranslatedBlock
 import mihon.feature.translate.TranslationOverlayView
 import mihon.feature.translate.WordsAppBridge
 import okio.BufferedSource
@@ -77,6 +78,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
     var onImageLoadError: ((Throwable?) -> Unit)? = null
     var onScaleChanged: ((newScale: Float) -> Unit)? = null
     var onViewClicked: (() -> Unit)? = null
+    var onTranslationBlocksChanged: ((List<TranslatedBlock>) -> Unit)? = null
 
     /**
      * For automatic background. Will be set as background color when [onImageLoaded] is called.
@@ -123,6 +125,8 @@ open class ReaderPageImageView @JvmOverloads constructor(
         val overlay = translationOverlay ?: TranslationOverlayView(context).also {
             it.ssivProvider = { pageView as? SubsamplingScaleImageView }
             it.onSaveBlock = { block -> WordsAppBridge.saveWord(context, block) }
+            it.onWordTapped = { word -> WordsAppBridge.saveWord(context, word) }
+            it.onBlocksChanged = { blocks -> onTranslationBlocksChanged?.invoke(blocks) }
             translationOverlay = it
             addView(it, MATCH_PARENT, MATCH_PARENT)
         }

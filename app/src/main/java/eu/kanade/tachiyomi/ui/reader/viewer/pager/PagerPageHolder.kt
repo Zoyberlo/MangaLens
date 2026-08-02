@@ -67,7 +67,11 @@ class PagerPageHolder(
      */
     private var loadJob: Job? = null
 
+    private val pageKey: String
+        get() = "${page.chapter.chapter.id}:${page.index}"
+
     init {
+        onTranslationBlocksChanged = { blocks -> pageTranslator.replaceOverlay(pageKey, blocks) }
         loadJob = scope.launch { loadPageAndProcessStatus() }
     }
 
@@ -181,6 +185,8 @@ class PagerPageHolder(
                     pageBackground = background
                 }
                 removeErrorLayout()
+                // Restore translations shown on this page earlier in the session
+                pageTranslator.cachedOverlay(pageKey)?.let { setTranslation(it) }
             }
         } catch (e: Throwable) {
             logcat(LogPriority.ERROR, e)
@@ -272,7 +278,8 @@ class PagerPageHolder(
             }
             withUIContext {
                 when (result) {
-                    is mihon.feature.translate.RegionTranslateResult.Success -> setTranslation(result.translation)
+                    is mihon.feature.translate.RegionTranslateResult.Success ->
+                        setTranslation(pageTranslator.storeOverlay(pageKey, result.translation))
                     mihon.feature.translate.RegionTranslateResult.NoText ->
                         viewer.activity.toast(MR.strings.translate_selection_no_text)
                     mihon.feature.translate.RegionTranslateResult.Failed ->

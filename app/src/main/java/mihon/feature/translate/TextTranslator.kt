@@ -82,7 +82,12 @@ class TextTranslator(
     // Instances that recently failed are skipped for a cooldown period
     private val instanceBackoffUntil = mutableMapOf<String, Long>()
 
-    suspend fun translate(text: String, from: String, to: String): String? {
+    /**
+     * [context] is optional surrounding text (the other bubbles of the page);
+     * only DeepL consumes it, but callers may always pass it. It is not part
+     * of the cache key.
+     */
+    suspend fun translate(text: String, from: String, to: String, context: String? = null): String? {
         val trimmed = normalizeForTranslation(text)
         if (trimmed.isEmpty() || from == to) return null
 
@@ -114,7 +119,7 @@ class TextTranslator(
                         ?.also { lastAutoProvider.value = TranslationProvider.MYMEMORY }
             }
             TranslationProvider.GOOGLE -> translateViaGoogle(trimmed, from, to)
-            TranslationProvider.DEEPL -> translateViaDeepL(trimmed, from, to)
+            TranslationProvider.DEEPL -> translateViaDeepL(trimmed, from, to, context)
             TranslationProvider.LINGVA -> translateViaLingva(trimmed, from, to)
             TranslationProvider.MYMEMORY -> translateViaMyMemory(trimmed, from, to)
         }
@@ -187,7 +192,7 @@ class TextTranslator(
      * Official DeepL API; needs a user-supplied key (reader settings).
      * Free-tier keys end in ":fx" and use the api-free host.
      */
-    private suspend fun translateViaDeepL(text: String, from: String, to: String): String? {
+    private suspend fun translateViaDeepL(text: String, from: String, to: String, context: String? = null): String? {
         val apiKey = readerPreferences.deeplApiKey.get().trim()
         if (apiKey.isEmpty()) {
             logcat(LogPriority.WARN) { "DeepL selected but no API key is set" }
@@ -199,6 +204,7 @@ class TextTranslator(
                 .add("text", text)
                 .add("source_lang", from.uppercase())
                 .add("target_lang", to.uppercase())
+                .apply { if (!context.isNullOrBlank()) add("context", context) }
                 .build()
             val request = POST("https://$host/v2/translate", body = body)
                 .newBuilder()

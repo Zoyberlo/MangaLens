@@ -34,6 +34,18 @@ class TranslationOverlayView(context: Context) : View(context) {
     /** Called when the user taps the save button on a selected block. */
     var onSaveBlock: ((TranslatedBlock) -> Unit)? = null
 
+    /** Called when the user taps a single word inside a selected block. */
+    var onWordTapped: ((String) -> Unit)? = null
+
+    /** Called after the user removes a block, with the remaining blocks. */
+    var onBlocksChanged: ((List<TranslatedBlock>) -> Unit)? = null
+
+    // Layout of the currently selected block, kept for word hit-testing
+    private var selectedLayout: StaticLayout? = null
+    private var selectedLayoutLeft = 0f
+    private var selectedLayoutTop = 0f
+    private var selectedLayoutText: String = ""
+
     private var imageWidth = 0
     private var imageHeight = 0
     private val blocks = mutableListOf<TranslatedBlock>()
@@ -106,6 +118,7 @@ class TranslationOverlayView(context: Context) : View(context) {
         super.onDraw(canvas)
         hitRects.clear()
         closeButtonVisible = false
+        selectedLayout = null
         if (blocks.isEmpty() || imageWidth <= 0 || imageHeight <= 0) return
         val ssiv = ssivProvider?.invoke() ?: return
         if (!ssiv.isReady) return
@@ -241,10 +254,17 @@ class TranslationOverlayView(context: Context) : View(context) {
 
         canvas.drawRoundRect(drawRect, cornerRadius, cornerRadius, if (isSelected) selectedBoxPaint else boxPaint)
         canvas.drawRoundRect(drawRect, cornerRadius, cornerRadius, borderPaint)
+        val textLeft = drawRect.left + padding
+        val textTop = drawRect.top + ((drawRect.height() - layout.height) / 2).coerceAtLeast(padding)
+        if (isSelected) {
+            selectedLayout = layout
+            selectedLayoutLeft = textLeft
+            selectedLayoutTop = textTop
+            selectedLayoutText = text
+        }
         canvas.withSave {
             clipRect(drawRect)
-            val dy = drawRect.top + ((drawRect.height() - layout.height) / 2).coerceAtLeast(padding)
-            translate(drawRect.left + padding, dy)
+            translate(textLeft, textTop)
             layout.draw(this)
         }
         return drawRect
@@ -278,6 +298,37 @@ class TranslationOverlayView(context: Context) : View(context) {
             ?.let { (_, block) -> TouchTarget.Block(block) }
     }
 
+    /**
+     * Finds the word at a touch position inside the selected block's rendered
+     * text via layout hit-testing. Returns null when the touch misses the
+     * text (padding, gaps between lines).
+     */
+    private fun wordAt(x: Float, y: Float): String? {
+        val layout = selectedLayout ?: return null
+        val text = selectedLayoutText
+        val localY = (y - selectedLayoutTop).toInt()
+        if (localY < 0 || localY > layout.height) return null
+        val line = layout.getLineForVertical(localY)
+        var offset = layout.getOffsetForHorizontal(line, x - selectedLayoutLeft).coerceIn(0, text.length)
+
+        fun isWordChar(c: Char) = c.isLetterOrDigit() || c == '\'' || c == '’' || c == '-'
+
+        // The offset is a cursor position; it may sit just after the tapped word
+        if ((offset >= text.length || !isWordChar(text[offset])) &&
+            offset > 0 &&
+            isWordChar(text[offset - 1])
+        ) {
+            offset--
+        }
+        if (offset >= text.length || !isWordChar(text[offset])) return null
+
+        var start = offset
+        var end = offset
+        while (start > 0 && isWordChar(text[start - 1])) start--
+        while (end < text.length && isWordChar(text[end])) end++
+        return text.substring(start, end).trim('\'', '’', '-').takeIf { it.isNotBlank() }
+    }
+
     private var downX = 0f
     private var downY = 0f
 
@@ -308,13 +359,24 @@ class TranslationOverlayView(context: Context) : View(context) {
                     is TouchTarget.CloseButton -> {
                         blocks.remove(selectedBlock)
                         selectedBlock = null
+                        onBlocksChanged?.invoke(blocks.toList())
                     }
                     is TouchTarget.SaveButton -> {
                         selectedBlock?.let { onSaveBlock?.invoke(it) }
                     }
                     is TouchTarget.Block -> {
-                        // Second tap on the same block toggles back to the translation
-                        selectedBlock = if (target.block === selectedBlock) null else target.block
+                        if (target.block === selectedBlock) {
+                            // Tap on a word inside the original text saves that
+                            // word; a miss toggles back to the translation
+                            val word = wordAt(event.x, event.y)
+                            if (word != null) {
+                                onWordTapped?.invoke(word)
+                            } else {
+                                selectedBlock = null
+                            }
+                        } else {
+                            selectedBlock = target.block
+                        }
                     }
                 }
                 invalidate()

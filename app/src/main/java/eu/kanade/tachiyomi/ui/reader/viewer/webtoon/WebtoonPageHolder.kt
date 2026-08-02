@@ -93,11 +93,18 @@ class WebtoonPageHolder(
         frame.onScaleChanged = { viewer.activity.hideMenu() }
     }
 
+    private val pageKey: String?
+        get() = page?.let { "${it.chapter.chapter.id}:${it.index}" }
+
     /**
      * Binds the given [page] with this view holder, subscribing to its state.
      */
     fun bind(page: ReaderPage) {
         this.page = page
+        frame.setTranslation(null)
+        frame.onTranslationBlocksChanged = { blocks ->
+            pageKey?.let { pageTranslator.replaceOverlay(it, blocks) }
+        }
         loadJob?.cancel()
         loadJob = scope.launch { loadPageAndProcessStatus() }
         refreshLayoutParams()
@@ -211,6 +218,8 @@ class WebtoonPageHolder(
                     ),
                 )
                 removeErrorLayout()
+                // Restore translations shown on this page earlier in the session
+                pageKey?.let { key -> pageTranslator.cachedOverlay(key)?.let { frame.setTranslation(it) } }
             }
         } catch (e: Throwable) {
             logcat(LogPriority.ERROR, e)
@@ -246,7 +255,11 @@ class WebtoonPageHolder(
             }
             withUIContext {
                 when (result) {
-                    is mihon.feature.translate.RegionTranslateResult.Success -> frame.setTranslation(result.translation)
+                    is mihon.feature.translate.RegionTranslateResult.Success -> {
+                        val merged = pageKey?.let { pageTranslator.storeOverlay(it, result.translation) }
+                            ?: result.translation
+                        frame.setTranslation(merged)
+                    }
                     mihon.feature.translate.RegionTranslateResult.NoText ->
                         viewer.activity.toast(MR.strings.translate_selection_no_text)
                     mihon.feature.translate.RegionTranslateResult.Failed ->

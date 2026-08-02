@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import android.graphics.RectF
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -534,8 +535,28 @@ class ReaderActivity : BaseActivity() {
                 menuToggleToast = toast(if (enabled) MR.strings.on else MR.strings.off)
             },
             onClickTranslateSelection = ::startTranslateSelection.takeIf { state.viewer != null },
+            onLongClickTranslateSelection = ::translateFullPage.takeIf { state.viewer != null },
             onClickSettings = viewModel::openSettingsDialog,
         )
+    }
+
+    /**
+     * Long-press on the translate button: translate everything currently on
+     * screen without drawing a selection.
+     */
+    private fun translateFullPage() {
+        setMenuVisibility(false)
+        menuToggleToast?.cancel()
+        menuToggleToast = toast(MR.strings.translate_in_progress)
+        when (val viewer = viewModel.state.value.viewer) {
+            is PagerViewer -> viewer.currentPageHolder()?.let { holder ->
+                holder.translateRegion(RectF(0f, 0f, holder.width.toFloat(), holder.height.toFloat()))
+            }
+            is WebtoonViewer -> viewer.translateRegionAt(
+                RectF(0f, 0f, binding.viewerContainer.width.toFloat(), binding.viewerContainer.height.toFloat()),
+            )
+            else -> {}
+        }
     }
 
     /**
