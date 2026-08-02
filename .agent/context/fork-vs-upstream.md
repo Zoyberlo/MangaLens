@@ -58,6 +58,7 @@ conflict when syncing with upstream.
 | File | Fork change |
 |------|-------------|
 | `app/build.gradle.kts` | `applicationId`, ML Kit dependency bundle |
+| `app/proguard-rules.pro` | ML Kit keep rules (R8 strips its reflectively-loaded components in release builds) |
 | `gradle/libs.versions.toml` | `mlkit-text` version, 4 libraries, `mlkit-text` bundle |
 | `i18n/.../moko-resources/base/strings.xml` | `app_name` + translation strings |
 | `di/AppModule.kt` | registers `PageTranslator` singleton |
