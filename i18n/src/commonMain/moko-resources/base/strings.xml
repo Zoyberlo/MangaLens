@@ -403,6 +403,10 @@
     <string name="translate_selection_failed">Translation failed — check the translation service in settings</string>
     <string name="translate_in_progress">Translating…</string>
     <string name="translate_save_no_app">Words app is not installed</string>
+    <string name="label_saved_words">Saved words</string>
+    <string name="translate_word_saved">Saved: %s</string>
+    <string name="saved_words_empty">Nothing saved yet. Translate an area in the reader, then tap a block or a single word to save it.</string>
+    <string name="action_send_to_words_app">Send to words app</string>
     <string name="pref_flash_page">Flash on page change</string>
     <string name="pref_flash_page_summ">Reduces ghosting on e-ink displays</string>
     <string name="pref_flash_duration">Flash duration</string>
