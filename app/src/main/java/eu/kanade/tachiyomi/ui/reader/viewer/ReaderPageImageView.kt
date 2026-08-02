@@ -80,6 +80,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
     var onViewClicked: (() -> Unit)? = null
     var onTranslationBlocksChanged: ((List<TranslatedBlock>) -> Unit)? = null
     var onTranslationPhraseSelected: ((String?) -> Unit)? = null
+    var onTranslationBlockTranslateRequested: ((TranslatedBlock) -> Unit)? = null
 
     /**
      * For automatic background. Will be set as background color when [onImageLoaded] is called.
@@ -126,7 +127,14 @@ open class ReaderPageImageView @JvmOverloads constructor(
         val overlay = translationOverlay ?: TranslationOverlayView(context).also {
             val vocabulary = Injekt.get<VocabularyStore>()
             it.ssivProvider = { pageView as? SubsamplingScaleImageView }
-            it.onSaveBlock = { block -> vocabulary.saveAsync(block.sourceText, block.translatedText) }
+            it.onSaveBlock = { block ->
+                if (block.translatedText.isBlank()) {
+                    // Original-first mode: + on an untranslated block translates it
+                    onTranslationBlockTranslateRequested?.invoke(block)
+                } else {
+                    vocabulary.saveAsync(block.sourceText, block.translatedText)
+                }
+            }
             it.onPhraseSelected = { phrase -> onTranslationPhraseSelected?.invoke(phrase) }
             it.savedWordsProvider = { vocabulary.wordSet.value }
             it.onBlocksChanged = { blocks -> onTranslationBlocksChanged?.invoke(blocks) }

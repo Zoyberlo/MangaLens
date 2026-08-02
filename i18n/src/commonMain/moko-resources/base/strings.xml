@@ -410,6 +410,15 @@
     <string name="stats_words_total">Words saved</string>
     <string name="stats_words_week">This week</string>
     <string name="stats_blocks_translated">Bubbles translated</string>
+    <string name="pref_translate_original_first">Show original text first</string>
+    <string name="pref_translate_original_first_summary">Selections show recognized text untranslated; tap a block\'s + to translate it, tap words to look them up</string>
+    <string name="pref_translate_result_display">Translation display</string>
+    <string name="translate_display_overlay">On the page</string>
+    <string name="translate_display_panel">Bottom panel</string>
+    <string name="label_migrate_from_app">Migrate from another app</string>
+    <string name="migrate_from_app_info">Apps can\'t read each other\'s data directly, so migration works through backup files. Open the detected app, create a backup (Settings → Data and storage), then find it below and restore it.</string>
+    <string name="migrate_from_app_find_backups">Find backup files…</string>
+    <string name="migrate_from_app_none_found">No backup files found in that folder</string>
     <string name="pref_flash_page">Flash on page change</string>
     <string name="pref_flash_page_summ">Reduces ghosting on e-ink displays</string>
     <string name="pref_flash_duration">Flash duration</string>

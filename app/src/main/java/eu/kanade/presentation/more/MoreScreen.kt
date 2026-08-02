@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.VolunteerActivism
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.GetApp
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.MoveDown
 import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storage
@@ -39,6 +40,7 @@ fun MoreScreen(
     onClickDownloadQueue: () -> Unit,
     onClickCategories: () -> Unit,
     onClickSavedWords: () -> Unit,
+    onClickMigrateFromApp: () -> Unit,
     onClickStats: () -> Unit,
     onClickDataAndStorage: () -> Unit,
     onClickSettings: () -> Unit,
@@ -116,6 +118,13 @@ fun MoreScreen(
                     title = stringResource(MR.strings.label_saved_words),
                     icon = Icons.Outlined.Translate,
                     onPreferenceClick = onClickSavedWords,
+                )
+            }
+            item {
+                TextPreferenceWidget(
+                    title = stringResource(MR.strings.label_migrate_from_app),
+                    icon = Icons.Outlined.MoveDown,
+                    onPreferenceClick = onClickMigrateFromApp,
                 )
             }
             item {

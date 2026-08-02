@@ -556,7 +556,38 @@ class ReaderActivity : BaseActivity() {
             hideWordInspector()
             return
         }
-        val inspector = wordInspectorView ?: WordInspectorView(this).also { view ->
+        val inspector = ensureWordInspector()
+        inspector.showLoading(phrase)
+        inspector.visibility = View.VISIBLE
+        inspector.bringToFront()
+        inspectorLookupJob?.cancel()
+        inspectorLookupJob = lifecycleScope.launchIO {
+            val from = readerPreferences.autoTranslateSourceLanguage.get().langCode
+            val to = readerPreferences.autoTranslateTargetLanguage.get()
+            val variants = Injekt.get<TextTranslator>().lookupVariants(phrase, from, to)
+            withUIContext { inspector.showVariants(phrase, variants) }
+        }
+    }
+
+    /**
+     * Panel result-display mode: shows a whole selection's translation in the
+     * bottom panel instead of overlay boxes.
+     */
+    fun showTranslationResult(translation: mihon.feature.translate.PageTranslation) {
+        val original = translation.blocks.joinToString("\n\n") { it.sourceText }
+        val translated = translation.blocks
+            .mapNotNull { it.translatedText.takeIf(String::isNotBlank) }
+            .joinToString("\n\n")
+        if (original.isBlank() || translated.isBlank()) return
+        val inspector = ensureWordInspector()
+        inspector.showLoading(original)
+        inspector.showVariants(original, listOf(translated))
+        inspector.visibility = View.VISIBLE
+        inspector.bringToFront()
+    }
+
+    private fun ensureWordInspector(): WordInspectorView {
+        return wordInspectorView ?: WordInspectorView(this).also { view ->
             view.onSave = { word, translation ->
                 Injekt.get<VocabularyStore>().saveAsync(word, translation)
                 hideWordInspector()
@@ -571,16 +602,6 @@ class ReaderActivity : BaseActivity() {
                     android.view.Gravity.BOTTOM,
                 ),
             )
-        }
-        inspector.showLoading(phrase)
-        inspector.visibility = View.VISIBLE
-        inspector.bringToFront()
-        inspectorLookupJob?.cancel()
-        inspectorLookupJob = lifecycleScope.launchIO {
-            val from = readerPreferences.autoTranslateSourceLanguage.get().langCode
-            val to = readerPreferences.autoTranslateTargetLanguage.get()
-            val variants = Injekt.get<TextTranslator>().lookupVariants(phrase, from, to)
-            withUIContext { inspector.showVariants(phrase, variants) }
         }
     }
 

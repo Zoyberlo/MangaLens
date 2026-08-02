@@ -27,6 +27,15 @@ enum class TranslationProvider(val displayName: String) {
 }
 
 /**
+ * Where translate-area results are presented: boxes drawn over the page, or
+ * the bottom panel (keeps the artwork unobstructed).
+ */
+enum class TranslateResultDisplay {
+    OVERLAY,
+    PANEL,
+}
+
+/**
  * Display label for a provider; AUTO shows which backend it last used,
  * e.g. "Auto (Google)".
  */

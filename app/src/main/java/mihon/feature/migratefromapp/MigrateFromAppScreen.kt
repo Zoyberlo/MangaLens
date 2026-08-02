@@ -1,0 +1,208 @@
+package mihon.feature.migratefromapp
+
+import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.Restore
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.currentOrThrow
+import com.hippo.unifile.UniFile
+import eu.kanade.presentation.components.AppBar
+import eu.kanade.presentation.more.settings.screen.data.RestoreBackupScreen
+import eu.kanade.presentation.util.Screen
+import tachiyomi.i18n.MR
+import tachiyomi.presentation.core.components.material.Scaffold
+import tachiyomi.presentation.core.i18n.stringResource
+import java.text.DateFormat
+import java.util.Date
+
+private data class DetectedApp(val packageName: String, val label: String)
+
+private data class FoundBackup(val name: String, val uri: String, val lastModified: Long)
+
+/**
+ * Migration helper: detects installed Mihon-family apps and finds their
+ * .tachibk backup files in a user-picked folder, handing the chosen file to
+ * the standard restore flow. Reading another app's database directly is
+ * impossible (sandboxing) — backups are the only migration path.
+ */
+class MigrateFromAppScreen : Screen() {
+
+    @Composable
+    override fun Content() {
+        val navigator = LocalNavigator.currentOrThrow
+        val context = LocalContext.current
+
+        val detectedApps = remember {
+            KNOWN_APPS.mapNotNull { pkg ->
+                try {
+                    val info = context.packageManager.getApplicationInfo(pkg, 0)
+                    DetectedApp(pkg, context.packageManager.getApplicationLabel(info).toString())
+                } catch (_: PackageManager.NameNotFoundException) {
+                    null
+                }
+            }
+        }
+
+        var backups by remember { mutableStateOf<List<FoundBackup>>(emptyList()) }
+        var scanned by remember { mutableStateOf(false) }
+
+        val folderPicker = rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenDocumentTree(),
+        ) { uri ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            } catch (_: SecurityException) {
+                // The one-shot grant is still enough to read during this session
+            }
+            val root = UniFile.fromUri(context, uri) ?: return@rememberLauncherForActivityResult
+            val found = mutableListOf<FoundBackup>()
+            scanForBackups(root, depth = 0, found = found)
+            backups = found.sortedByDescending { it.lastModified }.take(20)
+            scanned = true
+        }
+
+        Scaffold(
+            topBar = { scrollBehavior ->
+                AppBar(
+                    title = stringResource(MR.strings.label_migrate_from_app),
+                    navigateUp = navigator::pop,
+                    scrollBehavior = scrollBehavior,
+                )
+            },
+        ) { paddingValues ->
+            LazyColumn(contentPadding = paddingValues) {
+                item {
+                    Text(
+                        text = stringResource(MR.strings.migrate_from_app_info),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
+                }
+                items(detectedApps, key = { it.packageName }) { app ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = app.label, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = app.packageName,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                context.packageManager.getLaunchIntentForPackage(app.packageName)
+                                    ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    ?.let(context::startActivity)
+                            },
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                                contentDescription = null,
+                            )
+                        }
+                    }
+                }
+                item {
+                    Button(
+                        onClick = { folderPicker.launch(null) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                    ) {
+                        Text(stringResource(MR.strings.migrate_from_app_find_backups))
+                    }
+                }
+                if (scanned && backups.isEmpty()) {
+                    item {
+                        Text(
+                            text = stringResource(MR.strings.migrate_from_app_none_found),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                    }
+                }
+                items(backups, key = { it.uri }) { backup ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = backup.name, style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                text = DateFormat.getDateTimeInstance().format(Date(backup.lastModified)),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        IconButton(onClick = { navigator.push(RestoreBackupScreen(backup.uri)) }) {
+                            Icon(imageVector = Icons.Outlined.Restore, contentDescription = null)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun scanForBackups(dir: UniFile, depth: Int, found: MutableList<FoundBackup>) {
+        if (depth > MAX_SCAN_DEPTH || found.size >= MAX_SCAN_RESULTS) return
+        dir.listFiles()?.forEach { file ->
+            if (found.size >= MAX_SCAN_RESULTS) return
+            if (file.isDirectory) {
+                scanForBackups(file, depth + 1, found)
+            } else if (file.name?.endsWith(".tachibk") == true || file.name?.endsWith(".proto.gz") == true) {
+                found += FoundBackup(file.name!!, file.uri.toString(), file.lastModified())
+            }
+        }
+    }
+
+    private companion object {
+        const val MAX_SCAN_DEPTH = 3
+        const val MAX_SCAN_RESULTS = 50
+
+        val KNOWN_APPS = listOf(
+            "app.mihon",
+            "app.mihon.debug",
+            "app.mihon.tl.dev",
+            "eu.kanade.tachiyomi",
+            "xyz.jmir.tachiyomi.mi.sy",
+            "eu.kanade.tachiyomi.j2k",
+            "komikku.app",
+        )
+    }
+}

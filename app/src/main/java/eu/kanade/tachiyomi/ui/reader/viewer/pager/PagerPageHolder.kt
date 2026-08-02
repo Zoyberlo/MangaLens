@@ -62,6 +62,8 @@ class PagerPageHolder(
 
     private val pageTranslator: PageTranslator by injectLazy()
 
+    private val readerPreferences: eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences by injectLazy()
+
     /**
      * Job for loading the page and processing changes to the page's status.
      */
@@ -73,7 +75,22 @@ class PagerPageHolder(
     init {
         onTranslationBlocksChanged = { blocks -> pageTranslator.replaceOverlay(pageKey, blocks) }
         onTranslationPhraseSelected = { phrase -> viewer.activity.onTranslatePhraseSelected(phrase) }
+        onTranslationBlockTranslateRequested = { block -> translateBlock(block) }
         loadJob = scope.launch { loadPageAndProcessStatus() }
+    }
+
+    /** Original-first mode: translates one block in place. */
+    private fun translateBlock(block: mihon.feature.translate.TranslatedBlock) {
+        scope.launchIO {
+            val translated = pageTranslator.translateSingle(block.sourceText)
+            withUIContext {
+                if (translated != null) {
+                    pageTranslator.updateOverlayBlock(pageKey, block, translated)?.let { setTranslation(it) }
+                } else {
+                    viewer.activity.toast(MR.strings.translate_selection_failed)
+                }
+            }
+        }
     }
 
     /**
@@ -280,7 +297,13 @@ class PagerPageHolder(
             withUIContext {
                 when (result) {
                     is mihon.feature.translate.RegionTranslateResult.Success ->
-                        setTranslation(pageTranslator.storeOverlay(pageKey, result.translation))
+                        if (readerPreferences.translateResultDisplay.get() ==
+                            mihon.feature.translate.TranslateResultDisplay.PANEL
+                        ) {
+                            viewer.activity.showTranslationResult(result.translation)
+                        } else {
+                            setTranslation(pageTranslator.storeOverlay(pageKey, result.translation))
+                        }
                     mihon.feature.translate.RegionTranslateResult.NoText ->
                         viewer.activity.toast(MR.strings.translate_selection_no_text)
                     mihon.feature.translate.RegionTranslateResult.Failed ->

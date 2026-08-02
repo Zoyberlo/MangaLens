@@ -80,6 +80,23 @@ class WebtoonPageHolder(
 
     private val pageTranslator: PageTranslator by injectLazy()
 
+    private val readerPreferences: eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences by injectLazy()
+
+    /** Original-first mode: translates one block in place. */
+    private fun translateBlock(block: mihon.feature.translate.TranslatedBlock) {
+        val key = pageKey ?: return
+        scope.launchIO {
+            val translated = pageTranslator.translateSingle(block.sourceText)
+            withUIContext {
+                if (translated != null) {
+                    pageTranslator.updateOverlayBlock(key, block, translated)?.let { frame.setTranslation(it) }
+                } else {
+                    viewer.activity.toast(MR.strings.translate_selection_failed)
+                }
+            }
+        }
+    }
+
     /**
      * Job for loading the page.
      */
@@ -106,6 +123,7 @@ class WebtoonPageHolder(
             pageKey?.let { pageTranslator.replaceOverlay(it, blocks) }
         }
         frame.onTranslationPhraseSelected = { phrase -> viewer.activity.onTranslatePhraseSelected(phrase) }
+        frame.onTranslationBlockTranslateRequested = { block -> translateBlock(block) }
         loadJob?.cancel()
         loadJob = scope.launch { loadPageAndProcessStatus() }
         refreshLayoutParams()
@@ -257,9 +275,15 @@ class WebtoonPageHolder(
             withUIContext {
                 when (result) {
                     is mihon.feature.translate.RegionTranslateResult.Success -> {
-                        val merged = pageKey?.let { pageTranslator.storeOverlay(it, result.translation) }
-                            ?: result.translation
-                        frame.setTranslation(merged)
+                        if (readerPreferences.translateResultDisplay.get() ==
+                            mihon.feature.translate.TranslateResultDisplay.PANEL
+                        ) {
+                            viewer.activity.showTranslationResult(result.translation)
+                        } else {
+                            val merged = pageKey?.let { pageTranslator.storeOverlay(it, result.translation) }
+                                ?: result.translation
+                            frame.setTranslation(merged)
+                        }
                     }
                     mihon.feature.translate.RegionTranslateResult.NoText ->
                         viewer.activity.toast(MR.strings.translate_selection_no_text)

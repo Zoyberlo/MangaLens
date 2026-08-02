@@ -33,6 +33,17 @@
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
+    <!-- Mihon-family apps the migrate-from-app screen can detect (Android 11+ package visibility) -->
+    <queries>
+        <package android:name="app.mihon" />
+        <package android:name="app.mihon.debug" />
+        <package android:name="app.mihon.tl.dev" />
+        <package android:name="eu.kanade.tachiyomi" />
+        <package android:name="xyz.jmir.tachiyomi.mi.sy" />
+        <package android:name="eu.kanade.tachiyomi.j2k" />
+        <package android:name="komikku.app" />
+    </queries>
+
     <application
         android:name=".App"
         android:allowBackup="false"

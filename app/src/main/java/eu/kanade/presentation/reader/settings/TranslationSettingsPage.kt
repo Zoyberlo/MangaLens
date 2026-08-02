@@ -12,10 +12,12 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReaderSettingsViewModel
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import mihon.feature.translate.PageTranslator
 import mihon.feature.translate.TARGET_LANGUAGES
+import mihon.feature.translate.TranslateResultDisplay
 import mihon.feature.translate.TranslationProvider
 import mihon.feature.translate.TranslationSourceLanguage
 import mihon.feature.translate.labelWithAutoHint
 import tachiyomi.i18n.MR
+import tachiyomi.presentation.core.components.CheckboxItem
 import tachiyomi.presentation.core.components.SelectItem
 import tachiyomi.presentation.core.components.SettingsChipRow
 import tachiyomi.presentation.core.i18n.stringResource
@@ -59,6 +61,33 @@ internal fun ColumnScope.TranslationSettingsPage(viewModel: ReaderSettingsViewMo
             )
         }
     }
+    val resultDisplay by viewModel.preferences.translateResultDisplay.collectAsState()
+    SettingsChipRow(MR.strings.pref_translate_result_display) {
+        TranslateResultDisplay.entries.map {
+            FilterChip(
+                selected = it == resultDisplay,
+                onClick = { viewModel.preferences.translateResultDisplay.set(it) },
+                label = {
+                    Text(
+                        stringResource(
+                            when (it) {
+                                TranslateResultDisplay.OVERLAY -> MR.strings.translate_display_overlay
+                                TranslateResultDisplay.PANEL -> MR.strings.translate_display_panel
+                            },
+                        ),
+                    )
+                },
+            )
+        }
+    }
+
+    if (resultDisplay == TranslateResultDisplay.OVERLAY) {
+        CheckboxItem(
+            label = stringResource(MR.strings.pref_translate_original_first),
+            pref = viewModel.preferences.translateShowOriginalFirst,
+        )
+    }
+
     if (deeplApiKey.isBlank()) {
         InfoWidget(text = stringResource(MR.strings.pref_deepl_api_key_summary))
     }

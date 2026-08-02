@@ -170,8 +170,10 @@ class TranslationOverlayView(context: Context) : View(context) {
             if (rect.right < 0 || rect.bottom < 0 || rect.left > width || rect.top > height) continue
 
             val isSelected = block === selectedBlock
-            // A selected block reveals the original text instead of the translation
-            val text = if (isSelected) block.sourceText else block.translatedText
+            // A selected block reveals the original text instead of the
+            // translation; untranslated blocks (original-first mode) always
+            // show the original
+            val text = if (isSelected || block.translatedText.isBlank()) block.sourceText else block.translatedText
             val drawnRect = drawBlock(canvas, text, rect, cornerRadius, isSelected)
             hitRects += drawnRect to block
 

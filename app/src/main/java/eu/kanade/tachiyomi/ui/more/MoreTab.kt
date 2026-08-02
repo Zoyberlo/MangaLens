@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import mihon.feature.migratefromapp.MigrateFromAppScreen
 import mihon.feature.support.SupportUsScreen
 import mihon.feature.translate.SavedWordsScreen
 import tachiyomi.core.common.util.lang.launchIO
@@ -70,6 +71,7 @@ data object MoreTab : Tab {
             onClickDownloadQueue = { navigator.push(DownloadQueueScreen) },
             onClickCategories = { navigator.push(CategoryScreen()) },
             onClickSavedWords = { navigator.push(SavedWordsScreen()) },
+            onClickMigrateFromApp = { navigator.push(MigrateFromAppScreen()) },
             onClickStats = { navigator.push(StatsScreen()) },
             onClickDataAndStorage = { navigator.push(SettingsScreen(SettingsScreen.Destination.DataAndStorage)) },
             onClickSettings = { navigator.push(SettingsScreen()) },

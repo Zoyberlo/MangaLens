@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.ui.reader.setting
 import android.os.Build
 import androidx.compose.ui.graphics.BlendMode
 import dev.icerock.moko.resources.StringResource
+import mihon.feature.translate.TranslateResultDisplay
 import mihon.feature.translate.TranslationProvider
 import mihon.feature.translate.TranslationSourceLanguage
 import tachiyomi.core.common.preference.Preference
@@ -102,6 +103,16 @@ class ReaderPreferences(
     val deeplApiKey: Preference<String> = preferenceStore.getString("pref_deepl_api_key", "")
 
     val translatedBlockCount: Preference<Int> = preferenceStore.getInt("pref_translated_block_count", 0)
+
+    val translateShowOriginalFirst: Preference<Boolean> = preferenceStore.getBoolean(
+        "pref_translate_original_first",
+        false,
+    )
+
+    val translateResultDisplay: Preference<TranslateResultDisplay> = preferenceStore.getEnum(
+        "pref_translate_result_display",
+        TranslateResultDisplay.OVERLAY,
+    )
 
     // region General (continued)
 

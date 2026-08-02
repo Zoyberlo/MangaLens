@@ -142,11 +142,54 @@ class PageTranslator(
             .take(MAX_BLOCKS_PER_PAGE)
         if (candidates.isEmpty()) return RegionTranslateResult.NoText
 
+        // Original-first mode (overlay display only): show the recognized text
+        // untranslated; each block is translated on demand via translateSingle
+        val originalFirst = readerPreferences.translateShowOriginalFirst.get() &&
+            readerPreferences.translateResultDisplay.get() == TranslateResultDisplay.OVERLAY
+        if (originalFirst) {
+            val blocks = candidates.map { TranslatedBlock(it.text, "", it.bounds) }
+            return RegionTranslateResult.Success(PageTranslation(bounds.outWidth, bounds.outHeight, blocks))
+        }
+
         val blocks = translateBlocks(candidates, from, to)
         if (blocks.isEmpty()) return RegionTranslateResult.Failed
 
         readerPreferences.translatedBlockCount.getAndSet { it + blocks.size }
         return RegionTranslateResult.Success(PageTranslation(bounds.outWidth, bounds.outHeight, blocks))
+    }
+
+    /**
+     * Translates one block's text with the configured language pair; used by
+     * the on-demand path of original-first mode.
+     */
+    suspend fun translateSingle(text: String): String? {
+        val from = readerPreferences.autoTranslateSourceLanguage.get()
+        val to = readerPreferences.autoTranslateTargetLanguage.get()
+        val result = try {
+            translator.translate(text, from.langCode, to)
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Translation failed for block" }
+            null
+        }
+        if (result != null) readerPreferences.translatedBlockCount.getAndSet { it + 1 }
+        return result
+    }
+
+    /**
+     * Writes a block's translation into the stored overlay for [pageKey] and
+     * returns the updated overlay.
+     */
+    fun updateOverlayBlock(pageKey: String, block: TranslatedBlock, translation: String): PageTranslation? {
+        val existing = overlayCache.get(pageKey) ?: return null
+        val updated = existing.blocks.map {
+            if (it === block || (it.sourceText == block.sourceText && it.bounds == block.bounds)) {
+                it.copy(translatedText = translation)
+            } else {
+                it
+            }
+        }
+        return PageTranslation(existing.imageWidth, existing.imageHeight, updated)
+            .also { overlayCache.put(pageKey, it) }
     }
 
     /**
