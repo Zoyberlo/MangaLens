@@ -560,12 +560,16 @@ class ReaderActivity : BaseActivity() {
         inspector.showLoading(phrase)
         inspector.visibility = View.VISIBLE
         inspector.bringToFront()
+        lookupVariantsInto(inspector, phrase)
+    }
+
+    private fun lookupVariantsInto(inspector: WordInspectorView, phrase: String) {
         inspectorLookupJob?.cancel()
         inspectorLookupJob = lifecycleScope.launchIO {
             val from = readerPreferences.autoTranslateSourceLanguage.get().langCode
             val to = readerPreferences.autoTranslateTargetLanguage.get()
             val variants = Injekt.get<TextTranslator>().lookupVariants(phrase, from, to)
-            withUIContext { inspector.showVariants(phrase, variants) }
+            withUIContext { inspector.showVariantsFor(phrase, variants) }
         }
     }
 
@@ -580,8 +584,7 @@ class ReaderActivity : BaseActivity() {
             .joinToString("\n\n")
         if (original.isBlank() || translated.isBlank()) return
         val inspector = ensureWordInspector()
-        inspector.showLoading(original)
-        inspector.showVariants(original, listOf(translated))
+        inspector.showResult(original, translated)
         inspector.visibility = View.VISIBLE
         inspector.bringToFront()
     }
@@ -593,6 +596,7 @@ class ReaderActivity : BaseActivity() {
                 hideWordInspector()
             }
             view.onDismiss = { hideWordInspector() }
+            view.onPhraseTap = { phrase -> lookupVariantsInto(view, phrase) }
             wordInspectorView = view
             binding.readerContainer.addView(
                 view,

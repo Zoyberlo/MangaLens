@@ -4,7 +4,14 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.TextPaint
+import android.text.method.LinkMovementMethod
+import android.text.style.BackgroundColorSpan
+import android.text.style.ClickableSpan
 import android.view.Gravity
+import android.view.View
 import android.widget.Button
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
@@ -16,10 +23,11 @@ import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.i18n.MR
 
 /**
- * Bottom panel shown when the user taps words in a translated block's
- * original text: displays the tapped word/phrase, translation variants as
- * tappable chips, and a save button. Lookup itself is driven by the host
- * (ReaderActivity) through [showLoading]/[showVariants].
+ * Bottom panel for word lookup and panel-mode translation results. The shown
+ * original text is word-tappable in both modes: taps pick a word, further
+ * taps extend the pick to a phrase (highlighted), and the host is asked for
+ * variants of the current pick through [onPhraseTap]. Save submits the
+ * current pick with the chosen variant.
  */
 @SuppressLint("ViewConstructor", "SetTextI18n")
 class WordInspectorView(context: Context) : LinearLayout(context) {
@@ -27,12 +35,17 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
     var onSave: ((word: String, translation: String) -> Unit)? = null
     var onDismiss: (() -> Unit)? = null
 
+    /** Asked to look up variants whenever the picked word/phrase changes. */
+    var onPhraseTap: ((String) -> Unit)? = null
+
     private val dp = context.resources.displayMetrics.density
 
     private val wordView = TextView(context).apply {
         setTextColor(Color.WHITE)
-        textSize = 18f
-        setTypeface(typeface, android.graphics.Typeface.BOLD)
+        textSize = 17f
+        maxLines = 8
+        movementMethod = LinkMovementMethod.getInstance()
+        highlightColor = Color.TRANSPARENT
     }
 
     private val progress = ProgressBar(context).apply {
@@ -48,7 +61,7 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
         isEnabled = false
         setOnClickListener {
             val translation = selectedVariant ?: return@setOnClickListener
-            onSave?.invoke(currentWord, translation)
+            onSave?.invoke(currentSelection, translation)
         }
     }
 
@@ -57,7 +70,10 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
         setOnClickListener { onDismiss?.invoke() }
     }
 
-    private var currentWord: String = ""
+    private var fullText: String = ""
+    private var currentSelection: String = ""
+    private var selStart = -1
+    private var selEnd = -1
     private var selectedVariant: String? = null
     private val chipViews = mutableListOf<TextView>()
 
@@ -90,21 +106,24 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
         )
     }
 
-    /** Shows the panel for [word] with a loading spinner. */
+    /** Shows the panel for [word] with a loading spinner for its variants. */
     fun showLoading(word: String) {
-        currentWord = word
-        selectedVariant = null
-        wordView.text = word
-        chipsRow.removeAllViews()
-        chipViews.clear()
-        progress.isVisible = true
-        saveButton.isEnabled = false
-        isVisible = true
+        setText(word)
+        showChipsLoading()
     }
 
-    /** Replaces the spinner with variant chips; the first one is preselected. */
-    fun showVariants(word: String, variants: List<String>) {
-        if (word != currentWord) return
+    /**
+     * Panel-mode result: shows the original with its translation as the
+     * preselected variant; words remain tappable for narrower lookups.
+     */
+    fun showResult(original: String, translation: String) {
+        setText(original)
+        showVariantsFor(original, listOf(translation))
+    }
+
+    /** Replaces the spinner with variant chips for the current pick. */
+    fun showVariantsFor(selection: String, variants: List<String>) {
+        if (selection != currentSelection) return
         progress.isVisible = false
         chipsRow.removeAllViews()
         chipViews.clear()
@@ -125,6 +144,78 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
             chipViews += chip
         }
         variants.firstOrNull()?.let { select(it) }
+    }
+
+    private fun setText(text: String) {
+        fullText = text
+        currentSelection = text
+        selStart = -1
+        selEnd = -1
+        selectedVariant = null
+        renderText()
+        isVisible = true
+    }
+
+    private fun showChipsLoading() {
+        progress.isVisible = true
+        chipsRow.removeAllViews()
+        chipViews.clear()
+        selectedVariant = null
+        saveButton.isEnabled = false
+    }
+
+    private fun isWordChar(c: Char) = c.isLetterOrDigit() || c == '\'' || c == '’' || c == '-'
+
+    private fun renderText() {
+        val spannable = SpannableString(fullText)
+        var i = 0
+        while (i < fullText.length) {
+            if (!isWordChar(fullText[i])) {
+                i++
+                continue
+            }
+            val start = i
+            var end = i
+            while (end < fullText.length && isWordChar(fullText[end])) end++
+            spannable.setSpan(
+                object : ClickableSpan() {
+                    override fun onClick(widget: View) = onWordSpanTapped(start, end)
+                    override fun updateDrawState(ds: TextPaint) {
+                        ds.isUnderlineText = false
+                        ds.color = Color.WHITE
+                    }
+                },
+                start,
+                end,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+            i = end
+        }
+        if (selStart in 0 until selEnd) {
+            spannable.setSpan(
+                BackgroundColorSpan(0x5942A5F5),
+                selStart,
+                selEnd.coerceAtMost(fullText.length),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+        }
+        wordView.text = spannable
+    }
+
+    private fun onWordSpanTapped(start: Int, end: Int) {
+        if (selStart < 0) {
+            selStart = start
+            selEnd = end
+        } else {
+            selStart = minOf(selStart, start)
+            selEnd = maxOf(selEnd, end)
+        }
+        val phrase = fullText.substring(selStart, selEnd.coerceAtMost(fullText.length)).trim('\'', '’', '-', ' ')
+        if (phrase.isBlank()) return
+        currentSelection = phrase
+        renderText()
+        showChipsLoading()
+        onPhraseTap?.invoke(phrase)
     }
 
     private fun select(variant: String) {
