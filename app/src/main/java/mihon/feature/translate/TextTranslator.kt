@@ -164,6 +164,35 @@ class TextTranslator(
     }
 
     /**
+     * Word/phrase lookup with alternatives: the main translation first, then
+     * dictionary variants from Google's gtx endpoint (dt=bd). Falls back to
+     * just the main translation when the dictionary section is unavailable.
+     */
+    suspend fun lookupVariants(text: String, from: String, to: String): List<String> {
+        val variants = mutableListOf<String>()
+        translate(text, from, to)?.let { variants += it }
+        try {
+            val url = "https://translate.googleapis.com/translate_a/single".toHttpUrl().newBuilder()
+                .addQueryParameter("client", "gtx")
+                .addQueryParameter("sl", from)
+                .addQueryParameter("tl", to)
+                .addQueryParameter("dt", "bd")
+                .addQueryParameter("q", normalizeForTranslation(text))
+                .build()
+            val body = client.newCall(GET(url)).awaitSuccess().body.string()
+            val root = json.parseToJsonElement(body).jsonArray
+            (root.getOrNull(1) as? kotlinx.serialization.json.JsonArray)?.forEach { entry ->
+                (entry.jsonArray.getOrNull(1) as? kotlinx.serialization.json.JsonArray)?.forEach { term ->
+                    term.jsonPrimitive.content.takeIf { it.isNotBlank() }?.let { variants += it }
+                }
+            }
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Variant lookup failed" }
+        }
+        return variants.distinctBy { it.lowercase() }.take(MAX_VARIANTS)
+    }
+
+    /**
      * Unofficial keyless Google Translate endpoint (the same one browser
      * extensions use). Fast and reliable, but not an official API.
      */
@@ -295,6 +324,7 @@ class TextTranslator(
         private const val INSTANCE_BACKOFF_MS = 5 * 60 * 1000L
         private const val DISK_CACHE_VERSION = 1
         private const val DISK_CACHE_SIZE_BYTES = 4L * 1024 * 1024
+        private const val MAX_VARIANTS = 8
 
         private val HYPHEN_LINE_BREAK = Regex("(?<=\\p{L})-\\s+(?=\\p{L})")
         private val WHITESPACE = Regex("\\s+")

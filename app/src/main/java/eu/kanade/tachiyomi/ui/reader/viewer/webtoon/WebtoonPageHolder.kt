@@ -105,6 +105,7 @@ class WebtoonPageHolder(
         frame.onTranslationBlocksChanged = { blocks ->
             pageKey?.let { pageTranslator.replaceOverlay(it, blocks) }
         }
+        frame.onTranslationPhraseSelected = { phrase -> viewer.activity.onTranslatePhraseSelected(phrase) }
         loadJob?.cancel()
         loadJob = scope.launch { loadPageAndProcessStatus() }
         refreshLayoutParams()

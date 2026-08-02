@@ -34,8 +34,26 @@ class TranslationOverlayView(context: Context) : View(context) {
     /** Called when the user taps the save button on a selected block. */
     var onSaveBlock: ((TranslatedBlock) -> Unit)? = null
 
-    /** Called when the user taps a single word inside a selected block. */
-    var onWordTapped: ((String) -> Unit)? = null
+    /**
+     * Called with the currently picked word/phrase (taps on further words
+     * extend the range), or null when the pick is cleared.
+     */
+    var onPhraseSelected: ((String?) -> Unit)? = null
+
+    // Character range of the picked phrase inside the selected block's text
+    private var phraseStart = -1
+    private var phraseEnd = -1
+
+    private val phrasePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0x5942A5F5
+        style = Paint.Style.FILL
+    }
+
+    private fun clearPhrase(notify: Boolean) {
+        phraseStart = -1
+        phraseEnd = -1
+        if (notify) onPhraseSelected?.invoke(null)
+    }
 
     /** Called after the user removes a block, with the remaining blocks. */
     var onBlocksChanged: ((List<TranslatedBlock>) -> Unit)? = null
@@ -115,6 +133,7 @@ class TranslationOverlayView(context: Context) : View(context) {
     fun setTranslation(translation: PageTranslation?) {
         blocks.clear()
         selectedBlock = null
+        clearPhrase(notify = false)
         if (translation != null) {
             imageWidth = translation.imageWidth
             imageHeight = translation.imageHeight
@@ -274,10 +293,35 @@ class TranslationOverlayView(context: Context) : View(context) {
         canvas.withSave {
             clipRect(drawRect)
             translate(textLeft, textTop)
-            if (isSelected) drawSavedWordHighlights(this, layout, text)
+            if (isSelected) {
+                drawSavedWordHighlights(this, layout, text)
+                drawPhraseHighlight(this, layout)
+            }
             layout.draw(this)
         }
         return drawRect
+    }
+
+    private fun drawPhraseHighlight(canvas: Canvas, layout: StaticLayout) {
+        if (phraseStart < 0 || phraseEnd <= phraseStart) return
+        val end = phraseEnd.coerceAtMost(layout.text.length)
+        val startLine = layout.getLineForOffset(phraseStart)
+        val endLine = layout.getLineForOffset(end - 1)
+        for (line in startLine..endLine) {
+            val left = if (line == startLine) layout.getPrimaryHorizontal(phraseStart) else layout.getLineLeft(line)
+            val right = if (line == endLine) layout.getPrimaryHorizontal(end) else layout.getLineRight(line)
+            canvas.drawRoundRect(
+                RectF(
+                    minOf(left, right),
+                    layout.getLineTop(line).toFloat(),
+                    maxOf(left, right),
+                    layout.getLineBottom(line).toFloat(),
+                ),
+                2 * density,
+                2 * density,
+                phrasePaint,
+            )
+        }
     }
 
     /**
@@ -354,7 +398,7 @@ class TranslationOverlayView(context: Context) : View(context) {
      * text via layout hit-testing. Returns null when the touch misses the
      * text (padding, gaps between lines).
      */
-    private fun wordAt(x: Float, y: Float): String? {
+    private fun wordRangeAt(x: Float, y: Float): IntRange? {
         val layout = selectedLayout ?: return null
         val text = selectedLayoutText
         val localY = (y - selectedLayoutTop).toInt()
@@ -377,7 +421,7 @@ class TranslationOverlayView(context: Context) : View(context) {
         var end = offset
         while (start > 0 && isWordChar(text[start - 1])) start--
         while (end < text.length && isWordChar(text[end])) end++
-        return text.substring(start, end).trim('\'', '’', '-').takeIf { it.isNotBlank() }
+        return if (end > start) start until end else null
     }
 
     private var downX = 0f
@@ -392,6 +436,7 @@ class TranslationOverlayView(context: Context) : View(context) {
                     // Deselect and let the page handle this touch
                     if (selectedBlock != null) {
                         selectedBlock = null
+                        clearPhrase(notify = true)
                         invalidate()
                     }
                     return false
@@ -410,6 +455,7 @@ class TranslationOverlayView(context: Context) : View(context) {
                     is TouchTarget.CloseButton -> {
                         blocks.remove(selectedBlock)
                         selectedBlock = null
+                        clearPhrase(notify = true)
                         onBlocksChanged?.invoke(blocks.toList())
                     }
                     is TouchTarget.SaveButton -> {
@@ -417,16 +463,28 @@ class TranslationOverlayView(context: Context) : View(context) {
                     }
                     is TouchTarget.Block -> {
                         if (target.block === selectedBlock) {
-                            // Tap on a word inside the original text saves that
-                            // word; a miss toggles back to the translation
-                            val word = wordAt(event.x, event.y)
-                            if (word != null) {
-                                onWordTapped?.invoke(word)
+                            // Taps on words pick a word; further taps extend it
+                            // to a phrase. A miss toggles back to the translation.
+                            val range = wordRangeAt(event.x, event.y)
+                            if (range != null) {
+                                if (phraseStart < 0) {
+                                    phraseStart = range.first
+                                    phraseEnd = range.last + 1
+                                } else {
+                                    phraseStart = minOf(phraseStart, range.first)
+                                    phraseEnd = maxOf(phraseEnd, range.last + 1)
+                                }
+                                val phrase = selectedLayoutText
+                                    .substring(phraseStart, phraseEnd.coerceAtMost(selectedLayoutText.length))
+                                    .trim('\'', '’', '-', ' ')
+                                if (phrase.isNotBlank()) onPhraseSelected?.invoke(phrase)
                             } else {
                                 selectedBlock = null
+                                clearPhrase(notify = true)
                             }
                         } else {
                             selectedBlock = target.block
+                            clearPhrase(notify = true)
                         }
                     }
                 }

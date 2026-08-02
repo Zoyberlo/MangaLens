@@ -98,7 +98,10 @@ import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
 import logcat.LogPriority
 import mihon.feature.translate.PageTranslator
+import mihon.feature.translate.TextTranslator
 import mihon.feature.translate.TranslateSelectionView
+import mihon.feature.translate.VocabularyStore
+import mihon.feature.translate.WordInspectorView
 import tachiyomi.core.common.Constants
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchIO
@@ -140,6 +143,9 @@ class ReaderActivity : BaseActivity() {
     private var menuToggleToast: Toast? = null
 
     private var translateSelectionView: TranslateSelectionView? = null
+
+    private var wordInspectorView: WordInspectorView? = null
+    private var inspectorLookupJob: kotlinx.coroutines.Job? = null
     private var readingModeToast: Toast? = null
     private val displayRefreshHost = DisplayRefreshHost()
 
@@ -538,6 +544,49 @@ class ReaderActivity : BaseActivity() {
             onLongClickTranslateSelection = ::translateFullPage.takeIf { state.viewer != null },
             onClickSettings = viewModel::openSettingsDialog,
         )
+    }
+
+    /**
+     * Shows the word-inspector panel for a word/phrase picked in a
+     * translation overlay (null hides it): looks up translation variants and
+     * lets the user pick one before saving to the vocabulary.
+     */
+    fun onTranslatePhraseSelected(phrase: String?) {
+        if (phrase == null) {
+            hideWordInspector()
+            return
+        }
+        val inspector = wordInspectorView ?: WordInspectorView(this).also { view ->
+            view.onSave = { word, translation ->
+                Injekt.get<VocabularyStore>().saveAsync(word, translation)
+                hideWordInspector()
+            }
+            view.onDismiss = { hideWordInspector() }
+            wordInspectorView = view
+            binding.readerContainer.addView(
+                view,
+                android.widget.FrameLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                    android.view.Gravity.BOTTOM,
+                ),
+            )
+        }
+        inspector.showLoading(phrase)
+        inspector.visibility = View.VISIBLE
+        inspector.bringToFront()
+        inspectorLookupJob?.cancel()
+        inspectorLookupJob = lifecycleScope.launchIO {
+            val from = readerPreferences.autoTranslateSourceLanguage.get().langCode
+            val to = readerPreferences.autoTranslateTargetLanguage.get()
+            val variants = Injekt.get<TextTranslator>().lookupVariants(phrase, from, to)
+            withUIContext { inspector.showVariants(phrase, variants) }
+        }
+    }
+
+    private fun hideWordInspector() {
+        inspectorLookupJob?.cancel()
+        wordInspectorView?.visibility = View.GONE
     }
 
     /**

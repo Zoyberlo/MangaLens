@@ -72,6 +72,7 @@ class PagerPageHolder(
 
     init {
         onTranslationBlocksChanged = { blocks -> pageTranslator.replaceOverlay(pageKey, blocks) }
+        onTranslationPhraseSelected = { phrase -> viewer.activity.onTranslatePhraseSelected(phrase) }
         loadJob = scope.launch { loadPageAndProcessStatus() }
     }
 
