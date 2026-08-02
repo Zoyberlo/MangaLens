@@ -343,30 +343,41 @@ class ReaderViewModel @JvmOverloads constructor(
     }
 
     /**
-     * Switches this manga to webtoon mode when the first page is a long strip
-     * (height at least [WEBTOON_RATIO]x the width). Runs only while the manga
-     * has no explicit per-series reading mode and the resolved mode is a pager
-     * type, so a manual choice always wins.
+     * Switches this manga to webtoon mode when its pages are long strips.
+     * Watches the first [WEBTOON_DETECTION_PAGES] pages as they load; a tall
+     * page beyond the first is conclusive (first pages are often
+     * scanlator-credit or cover images with misleading proportions, in both
+     * directions). A single-page chapter is judged by that page alone. Runs
+     * only while the manga has no explicit per-series reading mode and the
+     * resolved mode is a pager type, so a manual choice always wins.
      */
     private fun maybeAutoDetectWebtoon(chapter: ReaderChapter) {
         if (webtoonDetectionDone) return
-        webtoonDetectionDone = true
-
         if (ReadingMode.fromPreference(manga?.readingMode?.toInt()) != ReadingMode.DEFAULT) return
         if (!ReadingMode.isPagerType(getMangaReadingMode())) return
 
-        val page = chapter.pages?.firstOrNull() ?: return
-        viewModelScope.launchIO {
-            page.statusFlow.first { it == Page.State.Ready }
-            val streamFn = page.stream ?: return@launchIO
-            try {
-                val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                streamFn().use { android.graphics.BitmapFactory.decodeStream(it, null, options) }
-                if (options.outWidth > 0 && options.outHeight >= options.outWidth * WEBTOON_RATIO) {
-                    withUIContext { setMangaReadingMode(ReadingMode.WEBTOON) }
+        val pages = chapter.pages ?: return
+        if (pages.isEmpty()) return
+        webtoonDetectionDone = true
+
+        val singlePageChapter = pages.size == 1
+        val decided = java.util.concurrent.atomic.AtomicBoolean(false)
+        pages.take(WEBTOON_DETECTION_PAGES).forEach { page ->
+            viewModelScope.launchIO {
+                page.statusFlow.first { it == Page.State.Ready || it is Page.State.Error }
+                val streamFn = page.stream ?: return@launchIO
+                try {
+                    val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    streamFn().use { android.graphics.BitmapFactory.decodeStream(it, null, options) }
+                    if (options.outWidth <= 0) return@launchIO
+                    val isTall = options.outHeight >= options.outWidth * WEBTOON_RATIO
+                    val conclusive = isTall && (page.index > 0 || singlePageChapter)
+                    if (conclusive && decided.compareAndSet(false, true)) {
+                        withUIContext { setMangaReadingMode(ReadingMode.WEBTOON) }
+                    }
+                } catch (e: Exception) {
+                    logcat(LogPriority.WARN, e)
                 }
-            } catch (e: Exception) {
-                logcat(LogPriority.WARN, e)
             }
         }
     }
@@ -1023,4 +1034,7 @@ class ReaderViewModel @JvmOverloads constructor(
 }
 
 // A page this many times taller than wide is treated as a webtoon strip
-private const val WEBTOON_RATIO = 3
+private const val WEBTOON_RATIO = 2.5
+
+// How many of the chapter's first pages are watched for strip proportions
+private const val WEBTOON_DETECTION_PAGES = 6

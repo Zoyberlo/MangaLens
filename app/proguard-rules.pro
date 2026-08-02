@@ -86,3 +86,12 @@
 # Firebase
 -keep class com.google.firebase.installations.** { *; }
 -keep interface com.google.firebase.installations.** { *; }
+
+# ML Kit text recognition (bundled models, fork's translate feature).
+# Components are instantiated reflectively via MlKitComponentDiscoveryService
+# metadata; R8 full mode strips them, breaking TextRecognition.getClient with
+# an internal NPE in release builds.
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.internal.mlkit_vision_text_common.** { *; }
+-keep class com.google.android.gms.internal.mlkit_vision_text_bundled_common.** { *; }
+-dontwarn com.google.mlkit.**
