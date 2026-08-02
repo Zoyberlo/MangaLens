@@ -81,9 +81,20 @@ invents words. Do not remove this step.
   needed) and is clamped to stay on screen.
 - Tap a box → selected: the box turns warm-tinted and **shows the original text**,
   with an X (top-right, removes it) and a green + (top-left, sends the pair to
-  words-app via `WordsAppBridge` / `wordsapp://add?word=…&translation=…`). Tapping
-  the box again toggles back to the translation. Taps outside any box return
-  `false` from `onTouchEvent`, so page gestures still work.
+  words-app via `WordsAppBridge` / `wordsapp://add?word=…&translation=…`).
+- **Word tap:** tapping a single word inside the selected block's original text
+  sends just that word to words-app (no translation param — its editor looks the
+  word up itself). Word boundaries come from `StaticLayout` hit-testing
+  (`wordAt()`), not OCR boxes, so they match the rendered text. A tap that misses
+  a word toggles back to the translation. Taps outside any box return `false`
+  from `onTouchEvent`, so page gestures still work.
+- **Full-page translate:** long-pressing the bottom-bar translate button routes a
+  screen-sized rect through the normal selection path
+  (`ReaderActivity.translateFullPage`).
+- **Overlay restore:** every shown result is merged into
+  `PageTranslator`'s per-page overlay cache (30 pages, key
+  `chapterId:pageIndex`); holders restore it after the image loads, and
+  dismissals sync back via `onBlocksChanged` → `replaceOverlay`.
 
 ## Caching
 
