@@ -50,15 +50,27 @@ class VocabularyStore(
     private val _words = MutableStateFlow<List<SavedWord>>(emptyList())
     val words: StateFlow<List<SavedWord>> = _words
 
+    private val _wordSet = MutableStateFlow<Set<String>>(emptySet())
+
+    /** Lowercased saved words, for fast known-word highlighting. */
+    val wordSet: StateFlow<Set<String>> = _wordSet
+
     init {
         scope.launch {
-            _words.value = try {
-                if (file.exists()) json.decodeFromString(serializer, file.readText()) else emptyList()
-            } catch (e: Exception) {
-                logcat(LogPriority.WARN, e) { "Failed to load saved words" }
-                emptyList()
-            }
+            updateWords(
+                try {
+                    if (file.exists()) json.decodeFromString(serializer, file.readText()) else emptyList()
+                } catch (e: Exception) {
+                    logcat(LogPriority.WARN, e) { "Failed to load saved words" }
+                    emptyList()
+                },
+            )
         }
+    }
+
+    private fun updateWords(words: List<SavedWord>) {
+        _words.value = words
+        _wordSet.value = words.mapTo(mutableSetOf()) { it.word.lowercase() }
     }
 
     /**
@@ -81,9 +93,11 @@ class VocabularyStore(
                 }
                 ?: ""
             val entry = SavedWord(trimmed, resolved, from, to, System.currentTimeMillis())
-            _words.value = _words.value
-                .filterNot { it.word.equals(trimmed, ignoreCase = true) && it.targetLang == to }
-                .plus(entry)
+            updateWords(
+                _words.value
+                    .filterNot { it.word.equals(trimmed, ignoreCase = true) && it.targetLang == to }
+                    .plus(entry),
+            )
             persist()
             withUIContext {
                 context.toast(context.stringResource(MR.strings.translate_word_saved, trimmed))
@@ -92,7 +106,7 @@ class VocabularyStore(
     }
 
     fun remove(entry: SavedWord) {
-        _words.value = _words.value - entry
+        updateWords(_words.value - entry)
         scope.launch { persist() }
     }
 

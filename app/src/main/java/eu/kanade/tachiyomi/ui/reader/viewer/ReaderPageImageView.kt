@@ -127,6 +127,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
             it.ssivProvider = { pageView as? SubsamplingScaleImageView }
             it.onSaveBlock = { block -> vocabulary.saveAsync(block.sourceText, block.translatedText) }
             it.onWordTapped = { word -> vocabulary.saveAsync(word, null) }
+            it.savedWordsProvider = { vocabulary.wordSet.value }
             it.onBlocksChanged = { blocks -> onTranslationBlocksChanged?.invoke(blocks) }
             translationOverlay = it
             addView(it, MATCH_PARENT, MATCH_PARENT)
