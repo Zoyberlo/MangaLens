@@ -419,6 +419,8 @@
     <string name="migrate_from_app_info">Apps can\'t read each other\'s data directly, so migration works through backup files. Open the detected app, create a backup (Settings → Data and storage), then find it below and restore it.</string>
     <string name="migrate_from_app_find_backups">Find backup files…</string>
     <string name="migrate_from_app_none_found">No backup files found in that folder</string>
+    <string name="pref_nav_tap_zone_size">Page-turn tap zone size</string>
+    <string name="pref_nav_tap_zone_size_summary">Smaller zones leave more room in the center for opening the menu</string>
     <string name="pref_flash_page">Flash on page change</string>
     <string name="pref_flash_page_summ">Reduces ghosting on e-ink displays</string>
     <string name="pref_flash_duration">Flash duration</string>

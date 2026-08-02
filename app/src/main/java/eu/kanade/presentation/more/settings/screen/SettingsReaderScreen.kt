@@ -431,9 +431,20 @@ object SettingsReaderScreen : SearchableSettings {
         val verticalNavigatorHeightPref = readerPreferences.verticalNavigatorHeight
         val verticalNavigatorHeight by verticalNavigatorHeightPref.collectAsState()
 
+        val tapZoneSizePref = readerPreferences.navigationTapZoneSize
+        val tapZoneSize by tapZoneSizePref.collectAsState()
+
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_reader_navigation),
             preferenceItems = listOf(
+                Preference.PreferenceItem.SliderPreference(
+                    value = tapZoneSize,
+                    valueRange = 50..150,
+                    title = stringResource(MR.strings.pref_nav_tap_zone_size),
+                    subtitle = stringResource(MR.strings.pref_nav_tap_zone_size_summary),
+                    valueString = "$tapZoneSize%",
+                    onValueChanged = { tapZoneSizePref.set(it) },
+                ),
                 Preference.PreferenceItem.SwitchPreference(
                     preference = readWithVolumeKeysPref,
                     title = stringResource(MR.strings.pref_read_with_volume_keys),

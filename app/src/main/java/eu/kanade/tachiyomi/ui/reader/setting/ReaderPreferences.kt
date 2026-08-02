@@ -114,6 +114,10 @@ class ReaderPreferences(
         TranslateResultDisplay.OVERLAY,
     )
 
+    // Percent of the stock page-turn tap zone size; smaller zones leave a
+    // larger center area for toggling the menu (fork default: 80)
+    val navigationTapZoneSize: Preference<Int> = preferenceStore.getInt("pref_nav_tap_zone_size", 80)
+
     // region General (continued)
 
     val cropBorders: Preference<Boolean> = preferenceStore.getBoolean("crop_borders", false)

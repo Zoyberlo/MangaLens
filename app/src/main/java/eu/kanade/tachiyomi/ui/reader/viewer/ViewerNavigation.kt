@@ -7,6 +7,7 @@ import dev.icerock.moko.resources.StringResource
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.lang.invert
 import tachiyomi.i18n.MR
+import uy.kohesive.injekt.injectLazy
 
 abstract class ViewerNavigation {
 
@@ -36,9 +37,25 @@ abstract class ViewerNavigation {
 
     protected abstract var regionList: List<Region>
 
-    /** Returns regions with applied inversion. */
+    private val readerPreferences: ReaderPreferences by injectLazy()
+
+    /**
+     * Returns regions with the user's tap-zone size applied (regions scale
+     * about the screen center: below 100% they shrink toward the edges,
+     * enlarging the menu area) and inversion applied.
+     */
     fun getRegions(): List<Region> {
-        return regionList.map { it.invert(invertMode) }
+        val sizePercent = readerPreferences.navigationTapZoneSize.get().coerceIn(50, 150)
+        val factor = 100f / sizePercent
+        return regionList
+            .map { region -> region.copy(rectF = region.rectF.scaleAboutCenter(factor)) }
+            .map { it.invert(invertMode) }
+    }
+
+    private fun RectF.scaleAboutCenter(factor: Float): RectF {
+        // Edges already at the screen border stay pinned to it
+        fun map(v: Float) = if (v <= 0f || v >= 1f) v else (0.5f + (v - 0.5f) * factor).coerceIn(0f, 1f)
+        return RectF(map(left), map(top), map(right), map(bottom))
     }
 
     fun getAction(pos: PointF): NavigationRegion {
