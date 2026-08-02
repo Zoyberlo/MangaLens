@@ -35,8 +35,20 @@ that would cause a merge conflict in every file for no user-visible gain.
 `TranslationOverlayView`, `TranslateSelectionView`. See
 `context/features/translate.md`.
 
-Plus one fork-only UI file:
-`app/src/main/java/eu/kanade/presentation/reader/settings/TranslationSettingsPage.kt`.
+Plus fork-only files outside that package:
+
+- `app/src/main/java/eu/kanade/presentation/reader/settings/TranslationSettingsPage.kt`
+- `.github/workflows/build-fork.yml` — CI building signed release APKs (upstream's
+  own workflows are untouched)
+
+## Signing
+
+`keystore.properties` (gitignored) points at the owner's keystore
+`A:\Projects\.keys\mihon-tl.jks`; with it present Gradle signs release builds via
+the same mechanism upstream uses for its GitHub releases. CI gets the keystore from
+repo secrets (`STORE_FILE_BASE64` etc., uploaded by
+`A:\Projects\.keys\set-github-secrets.ps1`). Losing the keystore means existing
+installs cannot be updated — never commit it, never regenerate it casually.
 
 ## Upstream files the fork touches (merge-conflict surface)
 

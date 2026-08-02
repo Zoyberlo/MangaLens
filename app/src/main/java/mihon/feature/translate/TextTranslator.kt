@@ -20,6 +20,7 @@ import tachiyomi.core.common.util.system.logcat
  * Strategy: Lingva instances (Google Translate proxy) first, MyMemory as fallback.
  */
 class TextTranslator(
+    private val context: android.app.Application,
     private val networkHelper: NetworkHelper,
     private val json: Json,
     private val readerPreferences: eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences,
@@ -34,6 +35,43 @@ class TextTranslator(
     }
 
     private val cache = LruCache<String, String>(1000)
+
+    // Persistent cache so re-reading a chapter works instantly and offline
+    private val diskCache by lazy {
+        try {
+            com.jakewharton.disklrucache.DiskLruCache.open(
+                java.io.File(context.cacheDir, "translations"),
+                DISK_CACHE_VERSION,
+                1,
+                DISK_CACHE_SIZE_BYTES,
+            )
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Failed to open translation disk cache" }
+            null
+        }
+    }
+
+    private fun diskKey(key: String): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-1").digest(key.toByteArray())
+        return digest.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun diskGet(key: String): String? = try {
+        diskCache?.get(diskKey(key))?.use { it.getString(0) }
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun diskPut(key: String, value: String) {
+        try {
+            diskCache?.edit(diskKey(key))?.apply {
+                set(0, value)
+                commit()
+            }
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Failed to write translation disk cache" }
+        }
+    }
 
     /**
      * The backend that served the most recent AUTO-mode translation;
@@ -50,6 +88,10 @@ class TextTranslator(
 
         val key = "$from:$to:${trimmed.lowercase()}"
         cache.get(key)?.let { return it }
+        diskGet(key)?.let {
+            cache.put(key, it)
+            return it
+        }
 
         val selectedProvider = readerPreferences.translationProvider.get()
             .let {
@@ -79,6 +121,7 @@ class TextTranslator(
 
         if (result != null) {
             cache.put(key, result)
+            diskPut(key, result)
         }
         return result
     }
@@ -244,6 +287,8 @@ class TextTranslator(
 
     companion object {
         private const val INSTANCE_BACKOFF_MS = 5 * 60 * 1000L
+        private const val DISK_CACHE_VERSION = 1
+        private const val DISK_CACHE_SIZE_BYTES = 4L * 1024 * 1024
 
         private val HYPHEN_LINE_BREAK = Regex("(?<=\\p{L})-\\s+(?=\\p{L})")
         private val WHITESPACE = Regex("\\s+")

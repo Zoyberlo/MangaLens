@@ -547,6 +547,8 @@ class ReaderActivity : BaseActivity() {
             view.onSelectionFinished = { rect ->
                 view.visibility = View.GONE
                 if (rect != null) {
+                    menuToggleToast?.cancel()
+                    menuToggleToast = toast(MR.strings.translate_in_progress)
                     when (val viewer = viewModel.state.value.viewer) {
                         is PagerViewer -> viewer.currentPageHolder()?.translateRegion(rect)
                         is WebtoonViewer -> viewer.translateRegionAt(rect)

@@ -41,6 +41,7 @@ import eu.kanade.tachiyomi.util.system.animatorDurationScale
 import eu.kanade.tachiyomi.util.view.isVisibleOnScreen
 import mihon.feature.translate.PageTranslation
 import mihon.feature.translate.TranslationOverlayView
+import mihon.feature.translate.WordsAppBridge
 import okio.BufferedSource
 import tachiyomi.core.common.util.system.ImageUtil
 import uy.kohesive.injekt.Injekt
@@ -121,6 +122,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
         }
         val overlay = translationOverlay ?: TranslationOverlayView(context).also {
             it.ssivProvider = { pageView as? SubsamplingScaleImageView }
+            it.onSaveBlock = { block -> WordsAppBridge.saveWord(context, block) }
             translationOverlay = it
             addView(it, MATCH_PARENT, MATCH_PARENT)
         }

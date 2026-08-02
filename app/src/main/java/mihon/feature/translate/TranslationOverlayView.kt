@@ -31,6 +31,9 @@ class TranslationOverlayView(context: Context) : View(context) {
     /** Supplies the image view to map coordinates through; set by the host. */
     var ssivProvider: (() -> SubsamplingScaleImageView?)? = null
 
+    /** Called when the user taps the save button on a selected block. */
+    var onSaveBlock: ((TranslatedBlock) -> Unit)? = null
+
     private var imageWidth = 0
     private var imageHeight = 0
     private val blocks = mutableListOf<TranslatedBlock>()
@@ -41,6 +44,8 @@ class TranslationOverlayView(context: Context) : View(context) {
     private val hitRects = mutableListOf<Pair<RectF, TranslatedBlock>>()
     private var closeButtonCenterX = 0f
     private var closeButtonCenterY = 0f
+    private var saveButtonCenterX = 0f
+    private var saveButtonCenterY = 0f
     private var closeButtonVisible = false
 
     private var downTarget: TouchTarget? = null
@@ -50,6 +55,17 @@ class TranslationOverlayView(context: Context) : View(context) {
 
     private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xF2FFFFFF.toInt()
+        style = Paint.Style.FILL
+    }
+
+    // Warm tint marks a selected block, which shows the original text
+    private val selectedBoxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xF2FFF3D8.toInt()
+        style = Paint.Style.FILL
+    }
+
+    private val saveCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF2E7D32.toInt()
         style = Paint.Style.FILL
     }
 
@@ -112,20 +128,26 @@ class TranslationOverlayView(context: Context) : View(context) {
             if (rect.width() < 8 * density || rect.height() < 8 * density) continue
             if (rect.right < 0 || rect.bottom < 0 || rect.left > width || rect.top > height) continue
 
-            val drawnRect = drawBlock(canvas, block.translatedText, rect, cornerRadius)
+            val isSelected = block === selectedBlock
+            // A selected block reveals the original text instead of the translation
+            val text = if (isSelected) block.sourceText else block.translatedText
+            val drawnRect = drawBlock(canvas, text, rect, cornerRadius, isSelected)
             hitRects += drawnRect to block
 
-            if (block === selectedBlock) {
+            if (isSelected) {
                 closeButtonCenterX = drawnRect.right
                 closeButtonCenterY = drawnRect.top
+                saveButtonCenterX = drawnRect.left
+                saveButtonCenterY = drawnRect.top
                 closeButtonVisible = true
             }
         }
 
         if (closeButtonVisible) {
             val radius = CLOSE_RADIUS_DP * density
-            canvas.drawCircle(closeButtonCenterX, closeButtonCenterY, radius, closeCirclePaint)
             val arm = radius * 0.45f
+
+            canvas.drawCircle(closeButtonCenterX, closeButtonCenterY, radius, closeCirclePaint)
             canvas.drawLine(
                 closeButtonCenterX - arm,
                 closeButtonCenterY - arm,
@@ -138,6 +160,23 @@ class TranslationOverlayView(context: Context) : View(context) {
                 closeButtonCenterY + arm,
                 closeButtonCenterX + arm,
                 closeButtonCenterY - arm,
+                closeCrossPaint,
+            )
+
+            // Save-to-dictionary button: green circle with a plus
+            canvas.drawCircle(saveButtonCenterX, saveButtonCenterY, radius, saveCirclePaint)
+            canvas.drawLine(
+                saveButtonCenterX - arm,
+                saveButtonCenterY,
+                saveButtonCenterX + arm,
+                saveButtonCenterY,
+                closeCrossPaint,
+            )
+            canvas.drawLine(
+                saveButtonCenterX,
+                saveButtonCenterY - arm,
+                saveButtonCenterX,
+                saveButtonCenterY + arm,
                 closeCrossPaint,
             )
         }
@@ -149,7 +188,13 @@ class TranslationOverlayView(context: Context) : View(context) {
      * as tall as needed) when the text doesn't fit at the minimum readable
      * size.
      */
-    private fun drawBlock(canvas: Canvas, text: String, rect: RectF, cornerRadius: Float): RectF {
+    private fun drawBlock(
+        canvas: Canvas,
+        text: String,
+        rect: RectF,
+        cornerRadius: Float,
+        isSelected: Boolean = false,
+    ): RectF {
         val padding = 3 * density
         val minTextPx = MIN_TEXT_SP * density
         val availableWidth = (rect.width() - 2 * padding).toInt()
@@ -194,7 +239,7 @@ class TranslationOverlayView(context: Context) : View(context) {
             drawRect = rect
         }
 
-        canvas.drawRoundRect(drawRect, cornerRadius, cornerRadius, boxPaint)
+        canvas.drawRoundRect(drawRect, cornerRadius, cornerRadius, if (isSelected) selectedBoxPaint else boxPaint)
         canvas.drawRoundRect(drawRect, cornerRadius, cornerRadius, borderPaint)
         canvas.withSave {
             clipRect(drawRect)
@@ -215,6 +260,7 @@ class TranslationOverlayView(context: Context) : View(context) {
 
     private sealed interface TouchTarget {
         data object CloseButton : TouchTarget
+        data object SaveButton : TouchTarget
         data class Block(val block: TranslatedBlock) : TouchTarget
     }
 
@@ -223,6 +269,9 @@ class TranslationOverlayView(context: Context) : View(context) {
             val touchRadius = (CLOSE_RADIUS_DP + 8) * density
             if (hypot(x - closeButtonCenterX, y - closeButtonCenterY) <= touchRadius) {
                 return TouchTarget.CloseButton
+            }
+            if (hypot(x - saveButtonCenterX, y - saveButtonCenterY) <= touchRadius) {
+                return TouchTarget.SaveButton
             }
         }
         return hitRects.lastOrNull { (rect, _) -> rect.contains(x, y) }
@@ -260,7 +309,13 @@ class TranslationOverlayView(context: Context) : View(context) {
                         blocks.remove(selectedBlock)
                         selectedBlock = null
                     }
-                    is TouchTarget.Block -> selectedBlock = target.block
+                    is TouchTarget.SaveButton -> {
+                        selectedBlock?.let { onSaveBlock?.invoke(it) }
+                    }
+                    is TouchTarget.Block -> {
+                        // Second tap on the same block toggles back to the translation
+                        selectedBlock = if (target.block === selectedBlock) null else target.block
+                    }
                 }
                 invalidate()
                 performClick()

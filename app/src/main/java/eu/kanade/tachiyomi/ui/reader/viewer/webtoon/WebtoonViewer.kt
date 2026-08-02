@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import androidx.core.app.ActivityCompat
+import androidx.core.view.children
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
@@ -49,7 +50,8 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
 
     /**
      * Routes a translate-area selection (in the viewer's coordinate space) to
-     * the page holder under the selection center. Accounts for the recycler's
+     * every page holder it intersects, so a selection spanning the seam
+     * between two strip images translates both. Accounts for the recycler's
      * zoom/pan transform.
      */
     fun translateRegionAt(rect: android.graphics.RectF) {
@@ -63,19 +65,21 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
         )
         inverse.mapPoints(points)
 
-        val centerX = (points[0] + points[2]) / 2
-        val centerY = (points[1] + points[3]) / 2
-        val child = recycler.findChildViewUnder(centerX, centerY) ?: return
-        val holder = recycler.getChildViewHolder(child) as? WebtoonPageHolder ?: return
-
-        holder.translateRegion(
-            android.graphics.RectF(
+        val minSize = 24 * recycler.resources.displayMetrics.density
+        recycler.children.forEach { child ->
+            val holder = recycler.getChildViewHolder(child) as? WebtoonPageHolder ?: return@forEach
+            val local = android.graphics.RectF(
                 points[0] - child.left - child.translationX,
                 points[1] - child.top - child.translationY,
                 points[2] - child.left - child.translationX,
                 points[3] - child.top - child.translationY,
-            ),
-        )
+            )
+            if (!local.intersect(android.graphics.RectF(0f, 0f, child.width.toFloat(), child.height.toFloat()))) {
+                return@forEach
+            }
+            if (local.width() < minSize || local.height() < minSize) return@forEach
+            holder.translateRegion(local)
+        }
     }
 
     /**

@@ -79,8 +79,18 @@ invents words. Do not remove this step.
 - Text size is chosen by binary search: the **largest** size in 11–40sp that fits.
 - If the text cannot fit even at 11sp, the box grows (up to 1.6× wider, taller as
   needed) and is clamped to stay on screen.
-- Tap a box → it is selected and shows an X; tap the X → the box is removed. Taps
-  outside any box return `false` from `onTouchEvent`, so page gestures still work.
+- Tap a box → selected: the box turns warm-tinted and **shows the original text**,
+  with an X (top-right, removes it) and a green + (top-left, sends the pair to
+  words-app via `WordsAppBridge` / `wordsapp://add?word=…&translation=…`). Tapping
+  the box again toggles back to the translation. Taps outside any box return
+  `false` from `onTouchEvent`, so page gestures still work.
+
+## Caching
+
+Two layers in `TextTranslator`: an in-memory LRU (1000 entries) and a 4 MB
+`DiskLruCache` in `cacheDir/translations` (key = SHA-1 of `from:to:text`). The disk
+layer makes re-reading a chapter instant and offline. Region OCR itself is not
+cached — only text→translation pairs.
 
 ## Settings
 

@@ -401,6 +401,8 @@
     <string name="translate_selection_hint">Drag to select the area to translate</string>
     <string name="translate_selection_no_text">No text recognized in the selected area</string>
     <string name="translate_selection_failed">Translation failed — check the translation service in settings</string>
+    <string name="translate_in_progress">Translating…</string>
+    <string name="translate_save_no_app">Words app is not installed</string>
     <string name="pref_flash_page">Flash on page change</string>
     <string name="pref_flash_page_summ">Reduces ghosting on e-ink displays</string>
     <string name="pref_flash_duration">Flash duration</string>
