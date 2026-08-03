@@ -1,10 +1,16 @@
 # Feature: Translation
 
 Manual, user-triggered translation of a selected area of a manga page:
-**select area → OCR on device → translate → draw an overlay pinned to the image**.
+**select area → OCR on device → translate → show the result** (overlay boxes on
+the page, or the bottom panel).
 
-There is deliberately **no automatic whole-page translation** — see
-`context/decisions.md`.
+Two deliberate non-goals — see `context/decisions.md`:
+
+- **no automatic whole-page translation** (there is an explicit long-press
+  "translate everything on screen" instead);
+- **no vocabulary/word-saving.** It existed and was removed: the app is a reader
+  with convenient translation, not a study tool. The inspector panel is pure
+  lookup; nothing is persisted except the translation caches.
 
 ## Files (all fork-only unless noted)
 
@@ -14,8 +20,9 @@ There is deliberately **no automatic whole-page translation** — see
 | `mihon/feature/translate/PageTextRecognizer.kt` | ML Kit OCR; one cached recognizer per source language |
 | `mihon/feature/translate/TextTranslator.kt` | Translation backends, text normalization, LRU cache, instance backoff |
 | `mihon/feature/translate/PageTranslator.kt` | Orchestration: decode region → OCR → merge blocks → translate; also `warmUp()` |
-| `mihon/feature/translate/TranslationOverlayView.kt` | Draws the boxes; tap-to-select, X-to-dismiss |
+| `mihon/feature/translate/TranslationOverlayView.kt` | Draws the boxes; tap-to-select, X-to-dismiss, word/phrase picking |
 | `mihon/feature/translate/TranslateSelectionView.kt` | Full-screen rubber-band selector |
+| `mihon/feature/translate/WordInspectorView.kt` | Bottom panel: tappable original text + variant chips, swipe-down to dismiss |
 | `presentation/reader/settings/TranslationSettingsPage.kt` | The reader dialog's Translation tab |
 
 Upstream call-outs are listed in `context/fork-vs-upstream.md`.
@@ -80,14 +87,18 @@ invents words. Do not remove this step.
 - If the text cannot fit even at 11sp, the box grows (up to 1.6× wider, taller as
   needed) and is clamped to stay on screen.
 - Tap a box → selected: the box turns warm-tinted and **shows the original text**,
-  with an X (top-right, removes it) and a green + (top-left, sends the pair to
-  words-app via `WordsAppBridge` / `wordsapp://add?word=…&translation=…`).
-- **Word tap:** tapping a single word inside the selected block's original text
-  sends just that word to words-app (no translation param — its editor looks the
-  word up itself). Word boundaries come from `StaticLayout` hit-testing
-  (`wordAt()`), not OCR boxes, so they match the rendered text. A tap that misses
-  a word toggles back to the translation. Taps outside any box return `false`
-  from `onTouchEvent`, so page gestures still work.
+  with an X (top-right) to remove it. A green + appears only for *untranslated*
+  blocks (original-first mode) and translates that block in place.
+- **Word/phrase pick:** tapping words inside the selected block's original text
+  picks a word and extends to a phrase (blue highlight); the pick is sent to
+  `ReaderActivity` which shows variants in the inspector panel. Word boundaries
+  come from `StaticLayout` hit-testing (`wordRangeAt()`), not OCR boxes, so they
+  match the rendered text. A tap that misses a word toggles back to the
+  translation. Taps outside any box return `false` from `onTouchEvent`, so page
+  gestures still work.
+- **Panel dismissal:** the inspector hides on page change, after webtoon
+  scrolling of about a third of a screen (`ReaderActivity.onReaderScrolled`),
+  on swipe-down, and via its Cancel button.
 - **Full-page translate:** long-pressing the bottom-bar translate button routes a
   screen-sized rect through the normal selection path
   (`ReaderActivity.translateFullPage`).

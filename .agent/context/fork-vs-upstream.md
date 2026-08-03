@@ -20,7 +20,7 @@ we added.
 
 | What | Value | Where |
 |------|-------|-------|
-| App name | `Mihon Lingo` (ex `Mihon TL`) | `i18n/.../base/strings.xml` → `app_name` |
+| App name | `Mihon TL` (briefly `Mihon Lingo`/`Mihon Translate`) | `i18n/.../base/strings.xml` → `app_name` |
 | Application id | `app.mihon.tl` | `app/build.gradle.kts` → `defaultConfig.applicationId` |
 
 The changed `applicationId` is what lets the fork be installed **alongside** the
@@ -60,8 +60,9 @@ conflict when syncing with upstream.
 | `app/build.gradle.kts` | `applicationId`, ML Kit dependency bundle |
 | `app/proguard-rules.pro` | ML Kit keep rules (R8 strips its reflectively-loaded components in release builds) |
 | `app/src/main/AndroidManifest.xml` | `<queries>` for Mihon-family packages (migrate-from-app detection) |
-| `presentation/more/MoreScreen.kt`, `ui/more/MoreTab.kt` | Saved words + Migrate from another app rows |
-| `ui/reader/viewer/ViewerNavigation.kt` | tap-zone size scaling (`navigationTapZoneSize`, fork default 80%) |
+| `presentation/more/MoreScreen.kt`, `ui/more/MoreTab.kt` | Migrate from another app row |
+| `ui/reader/viewer/ViewerNavigation.kt` | per-axis tap-zone scaling (`navigationTapZoneWidth` 65%, `navigationTapZoneHeight` 50%) |
+| `res/values/colors.xml`, `res/drawable/ic_launcher_*.xml` | the debug-flavor icon palette applied to all build types |
 | `gradle/libs.versions.toml` | `mlkit-text` version, 4 libraries, `mlkit-text` bundle |
 | `i18n/.../moko-resources/base/strings.xml` | `app_name` + translation strings |
 | `di/AppModule.kt` | registers `PageTranslator` singleton |

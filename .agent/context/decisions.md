@@ -15,6 +15,17 @@ resolution. The user asked for it to be removed.
 **Don't:** Re-add a background per-page pipeline without agreeing it first. The
 plumbing that made it possible (page cache, per-page keys) was deleted deliberately.
 
+## Vocabulary saving was built, then removed
+
+**What:** There is no way to save words. `VocabularyStore`, the Saved words
+screen, known-word highlighting and the words-app deep-link bridge all existed
+and were deleted (see `git log -- app/src/main/java/mihon/feature/translate`).
+**Why:** The owner's call after using it: people reach for this app to *read*
+with easy translation, not to build a study deck, and nobody revisits saved
+words. Keeping a half-used feature meant extra buttons on every bubble.
+**Don't:** Re-add saving without agreeing it first — the panel is intentionally
+a read-only lookup. The code is recoverable from git history if that changes.
+
 ## A fork, not a Mihon extension
 
 **What:** The feature is compiled into the app.
