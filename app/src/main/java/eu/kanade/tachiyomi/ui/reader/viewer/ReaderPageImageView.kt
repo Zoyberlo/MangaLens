@@ -80,6 +80,15 @@ open class ReaderPageImageView @JvmOverloads constructor(
     var onTranslationBlocksChanged: ((List<TranslatedBlock>) -> Unit)? = null
     var onTranslationPhraseSelected: ((String?) -> Unit)? = null
     var onTranslationBlockTranslateRequested: ((TranslatedBlock) -> Unit)? = null
+    var onTranslationBlockEditRequested: ((TranslatedBlock) -> Unit)? = null
+    var onTranslationBlockCloudRetryRequested: ((TranslatedBlock) -> Unit)? = null
+
+    /** Offers the cloud re-recognition button on selected blocks. */
+    var translationCloudRetryAvailable: Boolean = false
+        set(value) {
+            field = value
+            translationOverlay?.cloudRetryAvailable = value
+        }
 
     /**
      * For automatic background. Will be set as background color when [onImageLoaded] is called.
@@ -127,6 +136,11 @@ open class ReaderPageImageView @JvmOverloads constructor(
             it.ssivProvider = { pageView as? SubsamplingScaleImageView }
             // Original-first mode: + on an untranslated block translates it
             it.onTranslateBlock = { block -> onTranslationBlockTranslateRequested?.invoke(block) }
+            // Pencil: send the recognized text to the panel to be corrected
+            it.onEditBlock = { block -> onTranslationBlockEditRequested?.invoke(block) }
+            // Refresh: read this block again with the paid cloud recognizer
+            it.onCloudRetryBlock = { block -> onTranslationBlockCloudRetryRequested?.invoke(block) }
+            it.cloudRetryAvailable = translationCloudRetryAvailable
             it.onPhraseSelected = { phrase -> onTranslationPhraseSelected?.invoke(phrase) }
             it.onBlocksChanged = { blocks -> onTranslationBlocksChanged?.invoke(blocks) }
             translationOverlay = it

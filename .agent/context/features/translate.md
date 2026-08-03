@@ -24,7 +24,7 @@ Two deliberate non-goals — see `context/decisions.md`:
 | `mihon/feature/translate/PageTranslator.kt` | Orchestration: decode region → OCR → merge blocks → translate; also `warmUp()` |
 | `mihon/feature/translate/TranslationOverlayView.kt` | Draws the boxes; tap-to-select, X-to-dismiss, word/phrase picking |
 | `mihon/feature/translate/TranslateSelectionView.kt` | Full-screen rubber-band selector |
-| `mihon/feature/translate/WordInspectorView.kt` | Bottom panel: tappable original text + variant chips, swipe-down to dismiss |
+| `mihon/feature/translate/WordInspectorView.kt` | Bottom panel: tappable original text + variant chips, the text editor, swipe-down to dismiss |
 | `presentation/reader/settings/TranslationSettingsPage.kt` | The reader dialog's Translation tab |
 
 Upstream call-outs are listed in `context/fork-vs-upstream.md`.
@@ -89,8 +89,14 @@ invents words. Do not remove this step.
 - If the text cannot fit even at 11sp, the box grows (up to 1.6× wider, taller as
   needed) and is clamped to stay on screen.
 - Tap a box → selected: the box turns warm-tinted and **shows the original text**,
-  with an X (top-right) to remove it. A green + appears only for *untranslated*
-  blocks (original-first mode) and translates that block in place.
+  plus up to four corner buttons:
+
+  | Corner | Button | Shown when |
+  |--------|--------|------------|
+  | top-right | grey ✕ — remove this block | always |
+  | top-left | green + — translate in place | block is untranslated (original-first mode) |
+  | bottom-left | blue pencil — open the text in the editor | always |
+  | bottom-right | purple ↻ — re-read with Cloud Vision | a Vision key is set |
 - **Word/phrase pick:** tapping words inside the selected block's original text
   picks a word and extends to a phrase (blue highlight); the pick is sent to
   `ReaderActivity` which shows variants in the inspector panel. Word boundaries
@@ -116,14 +122,42 @@ Two layers in `TextTranslator`: an in-memory LRU (1000 entries) and a 4 MB
 layer makes re-reading a chapter instant and offline. Region OCR itself is not
 cached — only text→translation pairs.
 
-## Cloud OCR (optional)
+## Text editor and manual input
 
-On-device ML Kit is the default and the only path that works without a key. When
-`ReaderPreferences.visionApiKey` is set, `PageTranslator.recognizeBest()` tries
-`CloudTextRecognizer` (Google Cloud Vision `images:annotate`,
-`DOCUMENT_TEXT_DETECTION`) **first** and silently falls back to ML Kit on any
-failure — network error, bad key, quota spent. Stylised comic lettering is where
-it pays off; ML Kit's ceiling on it is the reason this exists.
+The bottom panel has a second mode: the text becomes an `EditText` with a mic
+button and a Translate button. It is reached three ways:
+
+- **pencil on a selected overlay block** — the recognized text opens in the
+  editor, and the result of translating it replaces that block in place
+  (`PageTranslator.updateOverlayBlock(…, sourceText = …)`);
+- **pencil in the panel itself** — panel display mode, correcting the text that
+  was just recognized;
+- **keyboard button in the reader's bottom bar** — an empty editor, for text
+  that is not on the page at all.
+
+Dictation goes through the system recognizer
+(`RecognizerIntent.ACTION_RECOGNIZE_SPEECH`, in the configured source language);
+its result is dropped into the editor rather than translated directly, so it can
+be corrected first. Devices without a recognizer just get a toast.
+
+The panel raises the keyboard itself and pads for
+`WindowInsetsCompat.Type.ime()`. `ReaderActivity` sets `SOFT_INPUT_ADJUST_RESIZE`
+purely so the IME reports insets below API 30 — layout is inset-driven, not
+resize-driven. Swipe-to-dismiss and the webtoon scroll-dismissal are both
+disabled while editing (`isEditingText`), so nothing yanks the panel away
+mid-sentence.
+
+## Cloud OCR (opt-in, per block)
+
+On-device ML Kit does **all** automatic recognition. Cloud Vision is billed per
+request, so it never runs on its own: it is the purple ↻ button on a selected
+block, for the cases where ML Kit garbles stylised lettering.
+`PageTranslator.retryBlockWithCloud()` crops that one block from the original
+image, sends it to `images:annotate` (`DOCUMENT_TEXT_DETECTION`), re-translates
+the result and writes both back into the block. The crop is sent **unmodified** —
+the grayscale/contrast treatment in `enhanceForOcr` exists for ML Kit and only
+degrades what Vision sees. On failure or spent quota the on-device result is
+left alone.
 
 Blocks come from `fullTextAnnotation.pages[].blocks[].paragraphs[].words[].symbols[]`;
 paragraph bounding boxes map onto the same `RecognizedBlock` shape as ML Kit, so
@@ -136,7 +170,7 @@ mechanics live in `TranslationQuota.kt` and are identical for each:
 
 | | Cloud Vision | DeepL |
 |---|---|---|
-| Billed by | requests | characters |
+| Billed by | requests (one per manual retry) | characters |
 | Free tier | 1 000/month | 500 000/month |
 | Limit pref | `visionMonthlyLimit` (default 900) | `deeplMonthlyCharLimit` (default 450 000) |
 | Usage prefs | `visionUsageCount` / `visionUsagePeriod` | `deeplUsageChars` / `deeplUsagePeriod` |
@@ -148,9 +182,9 @@ mechanics live in `TranslationQuota.kt` and are identical for each:
 - Crossing `QUOTA_APPROACHING_RATIO` (90%) emits `APPROACHING`; a call refused
   for being over the limit emits `REACHED`. `ReaderActivity` collects
   `QuotaNotifier.events` and toasts the matching string.
-- Over the limit, Vision falls back to on-device OCR and DeepL falls back to the
-  `AUTO` provider chain, so translation keeps working — it just stops costing
-  money.
+- Over the limit, a Vision retry is refused (the on-device result stays) and
+  DeepL falls back to the `AUTO` provider chain, so translation keeps working —
+  it just stops costing money.
 
 Usage is recorded **after** a successful response only, so failed calls are not
 counted against the user.

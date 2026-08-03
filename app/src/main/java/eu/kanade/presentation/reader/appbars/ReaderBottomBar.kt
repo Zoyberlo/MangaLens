@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.Icon
@@ -33,6 +34,7 @@ fun ReaderBottomBar(
     onClickCropBorder: () -> Unit,
     onClickTranslateSelection: (() -> Unit)?,
     onLongClickTranslateSelection: (() -> Unit)?,
+    onClickManualTranslate: (() -> Unit)?,
     onClickSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -78,6 +80,15 @@ fun ReaderBottomBar(
                 Icon(
                     imageVector = Icons.Outlined.Translate,
                     contentDescription = stringResource(MR.strings.action_translate_selection),
+                )
+            }
+        }
+
+        if (onClickManualTranslate != null) {
+            IconButton(onClick = onClickManualTranslate) {
+                Icon(
+                    imageVector = Icons.Outlined.Keyboard,
+                    contentDescription = stringResource(MR.strings.action_manual_translate),
                 )
             }
         }

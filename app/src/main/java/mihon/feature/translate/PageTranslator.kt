@@ -23,22 +23,8 @@ class PageTranslator(
     private val readerPreferences: ReaderPreferences,
 ) {
 
-    /**
-     * Recognizes with Google Cloud Vision when the user configured it, since
-     * the on-device model struggles with stylised comic lettering, and falls
-     * back to on-device whenever the cloud is unavailable or out of quota.
-     */
-    private suspend fun recognizeBest(
-        bitmap: android.graphics.Bitmap,
-        language: TranslationSourceLanguage,
-    ): RecognitionResult {
-        if (cloudRecognizer.isConfigured) {
-            cloudRecognizer.recognize(bitmap, language)
-                ?.takeIf { it.isNotEmpty() }
-                ?.let { return RecognitionResult(it, language) }
-        }
-        return recognizer.recognize(bitmap, language)
-    }
+    /** True when the user configured a Google Cloud Vision key. */
+    val isCloudOcrConfigured: Boolean get() = cloudRecognizer.isConfigured
 
     /**
      * The backend that served the most recent AUTO-mode translation.
@@ -139,7 +125,9 @@ class PageTranslator(
         val bitmap = if (upscale > 1f) enhanceForOcr(decoded, upscale) else decoded
 
         val recognition = try {
-            recognizeBest(bitmap, from)
+            // On-device only. Cloud OCR is billed per request, so it stays a
+            // per-block escape hatch the user triggers themselves.
+            recognizer.recognize(bitmap, from)
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Text recognition failed" }
             return RegionTranslateResult.NoText
@@ -234,8 +222,6 @@ class PageTranslator(
             val scale = (TARGET_BLOCK_HEIGHT / decoded.height.toFloat()).coerceIn(1f, MAX_BLOCK_UPSCALE)
             val prepared = enhanceForOcr(decoded, scale)
             val text = try {
-                // On-device only: the cloud pass already read the whole region
-                // and a per-block request would spend quota for little gain
                 recognizer.recognize(prepared, language).blocks.joinToString(" ") { it.text }.trim()
             } finally {
                 prepared.recycle()
@@ -323,6 +309,63 @@ class PageTranslator(
     }
 
     /**
+     * Re-reads one block through Google Cloud Vision and re-translates it.
+     * On-device OCR is the default everywhere else precisely because the cloud
+     * is billed per request, so this only ever spends quota when the user taps
+     * the retry button on a block the cheap recognizer garbled.
+     *
+     * The crop is sent unmodified: the contrast/upscale treatment exists to
+     * help ML Kit and only degrades what Vision sees.
+     */
+    suspend fun retryBlockWithCloud(imageBytes: ByteArray, block: TranslatedBlock): CloudRetryResult {
+        if (!cloudRecognizer.isConfigured) return CloudRetryResult.NotConfigured
+        val from = readerPreferences.autoTranslateSourceLanguage.get()
+        val to = readerPreferences.autoTranslateTargetLanguage.get()
+
+        val bounds = block.bounds
+        if (bounds.width() <= 0 || bounds.height() <= 0) return CloudRetryResult.NoText
+
+        val text = try {
+            val padX = (bounds.width() * BLOCK_PADDING).toInt().coerceAtLeast(6)
+            val padY = (bounds.height() * BLOCK_PADDING).toInt().coerceAtLeast(6)
+            val crop = android.graphics.Rect(bounds).apply { inset(-padX, -padY) }
+
+            val info = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, info)
+            if (!crop.intersect(android.graphics.Rect(0, 0, info.outWidth, info.outHeight))) {
+                return CloudRetryResult.NoText
+            }
+
+            @Suppress("DEPRECATION")
+            val decoder = android.graphics.BitmapRegionDecoder
+                .newInstance(imageBytes, 0, imageBytes.size, false)
+            val decoded = try {
+                decoder.decodeRegion(crop, BitmapFactory.Options())
+            } finally {
+                decoder.recycle()
+            } ?: return CloudRetryResult.NoText
+
+            try {
+                cloudRecognizer.recognize(decoded, from)?.joinToString(" ") { it.text }?.trim()
+            } finally {
+                decoded.recycle()
+            }
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Cloud re-recognition failed" }
+            null
+        } ?: return CloudRetryResult.Failed
+
+        if (text.isBlank()) return CloudRetryResult.NoText
+        val translated = try {
+            translator.translate(text, from.langCode, to)
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Translation failed after cloud re-recognition" }
+            null
+        } ?: return CloudRetryResult.Failed
+        return CloudRetryResult.Success(text, translated)
+    }
+
+    /**
      * Translates one block's text with the configured language pair; used by
      * the on-demand path of original-first mode.
      */
@@ -340,13 +383,19 @@ class PageTranslator(
 
     /**
      * Writes a block's translation into the stored overlay for [pageKey] and
-     * returns the updated overlay.
+     * returns the updated overlay. [sourceText] differs from the block's own
+     * when the user corrected the recognized text before re-translating.
      */
-    fun updateOverlayBlock(pageKey: String, block: TranslatedBlock, translation: String): PageTranslation? {
+    fun updateOverlayBlock(
+        pageKey: String,
+        block: TranslatedBlock,
+        translation: String,
+        sourceText: String = block.sourceText,
+    ): PageTranslation? {
         val existing = overlayCache.get(pageKey) ?: return null
         val updated = existing.blocks.map {
             if (it === block || (it.sourceText == block.sourceText && it.bounds == block.bounds)) {
-                it.copy(translatedText = translation)
+                it.copy(sourceText = sourceText, translatedText = translation)
             } else {
                 it
             }

@@ -38,6 +38,21 @@ class TranslationOverlayView(context: Context) : View(context) {
     var onTranslateBlock: ((TranslatedBlock) -> Unit)? = null
 
     /**
+     * Called when the user taps the pencil button of a selected block to fix
+     * its recognized text in the bottom panel.
+     */
+    var onEditBlock: ((TranslatedBlock) -> Unit)? = null
+
+    /**
+     * Called when the user taps the retry button of a selected block to read
+     * it again with the paid cloud recognizer.
+     */
+    var onCloudRetryBlock: ((TranslatedBlock) -> Unit)? = null
+
+    /** Whether the cloud-retry button is offered; false without an API key. */
+    var cloudRetryAvailable = false
+
+    /**
      * Called with the currently picked word/phrase (taps on further words
      * extend the range), or null when the pick is cleared.
      */
@@ -113,6 +128,10 @@ class TranslationOverlayView(context: Context) : View(context) {
     private var closeButtonCenterY = 0f
     private var translateButtonCenterX = 0f
     private var translateButtonCenterY = 0f
+    private var editButtonCenterX = 0f
+    private var editButtonCenterY = 0f
+    private var retryButtonCenterX = 0f
+    private var retryButtonCenterY = 0f
     private var closeButtonVisible = false
     private var translateButtonVisible = false
 
@@ -134,6 +153,16 @@ class TranslationOverlayView(context: Context) : View(context) {
 
     private val translateCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFF2E7D32.toInt()
+        style = Paint.Style.FILL
+    }
+
+    private val editCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF1565C0.toInt()
+        style = Paint.Style.FILL
+    }
+
+    private val retryCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF6A1B9A.toInt()
         style = Paint.Style.FILL
     }
 
@@ -212,6 +241,10 @@ class TranslationOverlayView(context: Context) : View(context) {
                 closeButtonCenterY = drawnRect.top
                 translateButtonCenterX = drawnRect.left
                 translateButtonCenterY = drawnRect.top
+                editButtonCenterX = drawnRect.left
+                editButtonCenterY = drawnRect.bottom
+                retryButtonCenterX = drawnRect.right
+                retryButtonCenterY = drawnRect.bottom
                 closeButtonVisible = true
                 // The + (translate-in-place) button only applies to blocks
                 // that are still untranslated (original-first mode)
@@ -257,7 +290,53 @@ class TranslationOverlayView(context: Context) : View(context) {
                     closeCrossPaint,
                 )
             }
+
+            drawEditButton(canvas, radius, arm)
+            if (cloudRetryAvailable) drawRetryButton(canvas, radius, arm)
         }
+    }
+
+    /**
+     * Edit button on the selected block's bottom-left corner: a blue circle
+     * with a pencil over a baseline, i.e. "fix this recognized text".
+     */
+    private fun drawEditButton(canvas: Canvas, radius: Float, arm: Float) {
+        canvas.drawCircle(editButtonCenterX, editButtonCenterY, radius, editCirclePaint)
+        canvas.drawLine(
+            editButtonCenterX - arm,
+            editButtonCenterY + arm * 0.9f,
+            editButtonCenterX + arm,
+            editButtonCenterY + arm * 0.9f,
+            closeCrossPaint,
+        )
+        canvas.drawLine(
+            editButtonCenterX - arm * 0.7f,
+            editButtonCenterY + arm * 0.3f,
+            editButtonCenterX + arm * 0.7f,
+            editButtonCenterY - arm * 0.9f,
+            closeCrossPaint,
+        )
+    }
+
+    /**
+     * Cloud re-recognition button on the selected block's bottom-right corner:
+     * a purple circle with a refresh arrow, i.e. "read this again, properly".
+     */
+    private fun drawRetryButton(canvas: Canvas, radius: Float, arm: Float) {
+        canvas.drawCircle(retryButtonCenterX, retryButtonCenterY, radius, retryCirclePaint)
+        val arcRect = RectF(
+            retryButtonCenterX - arm,
+            retryButtonCenterY - arm,
+            retryButtonCenterX + arm,
+            retryButtonCenterY + arm,
+        )
+        canvas.drawArc(arcRect, 40f, 280f, false, closeCrossPaint)
+        // Arrowhead closing the open end of the arc
+        val head = arm * 0.5f
+        val tipX = retryButtonCenterX + arm * 0.77f
+        val tipY = retryButtonCenterY - arm * 0.64f
+        canvas.drawLine(tipX, tipY, tipX - head, tipY - head * 0.2f, closeCrossPaint)
+        canvas.drawLine(tipX, tipY, tipX + head * 0.2f, tipY + head, closeCrossPaint)
     }
 
     /**
@@ -371,6 +450,8 @@ class TranslationOverlayView(context: Context) : View(context) {
     private sealed interface TouchTarget {
         data object CloseButton : TouchTarget
         data object TranslateButton : TouchTarget
+        data object EditButton : TouchTarget
+        data object RetryButton : TouchTarget
         data class Block(val block: TranslatedBlock) : TouchTarget
     }
 
@@ -384,6 +465,14 @@ class TranslationOverlayView(context: Context) : View(context) {
                 hypot(x - translateButtonCenterX, y - translateButtonCenterY) <= touchRadius
             ) {
                 return TouchTarget.TranslateButton
+            }
+            if (hypot(x - editButtonCenterX, y - editButtonCenterY) <= touchRadius) {
+                return TouchTarget.EditButton
+            }
+            if (cloudRetryAvailable &&
+                hypot(x - retryButtonCenterX, y - retryButtonCenterY) <= touchRadius
+            ) {
+                return TouchTarget.RetryButton
             }
         }
         return hitRects.lastOrNull { (rect, _) -> rect.contains(x, y) }
@@ -457,6 +546,12 @@ class TranslationOverlayView(context: Context) : View(context) {
                     }
                     is TouchTarget.TranslateButton -> {
                         selectedBlock?.let { onTranslateBlock?.invoke(it) }
+                    }
+                    is TouchTarget.EditButton -> {
+                        selectedBlock?.let { onEditBlock?.invoke(it) }
+                    }
+                    is TouchTarget.RetryButton -> {
+                        selectedBlock?.let { onCloudRetryBlock?.invoke(it) }
                     }
                     is TouchTarget.Block -> {
                         if (target.block === selectedBlock) {

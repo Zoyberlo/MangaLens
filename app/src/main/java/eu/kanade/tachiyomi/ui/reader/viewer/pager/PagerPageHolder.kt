@@ -76,6 +76,9 @@ class PagerPageHolder(
         onTranslationBlocksChanged = { blocks -> pageTranslator.replaceOverlay(pageKey, blocks) }
         onTranslationPhraseSelected = { phrase -> viewer.activity.onTranslatePhraseSelected(phrase) }
         onTranslationBlockTranslateRequested = { block -> translateBlock(block) }
+        onTranslationBlockEditRequested = { block -> editBlock(block) }
+        onTranslationBlockCloudRetryRequested = { block -> cloudRetryBlock(block) }
+        translationCloudRetryAvailable = pageTranslator.isCloudOcrConfigured
         loadJob = scope.launch { loadPageAndProcessStatus() }
     }
 
@@ -90,6 +93,52 @@ class PagerPageHolder(
                     viewer.activity.toast(MR.strings.translate_selection_failed)
                 }
             }
+        }
+    }
+
+    /**
+     * Opens the block's recognized text in the bottom panel; whatever the user
+     * translates there replaces this block in place.
+     */
+    private fun editBlock(block: mihon.feature.translate.TranslatedBlock) {
+        val key = pageKey
+        viewer.activity.openTextEditor(block.sourceText) { source, translation ->
+            pageTranslator.updateOverlayBlock(key, block, translation, source)?.let { setTranslation(it) }
+        }
+    }
+
+    /** Reads one block again with the paid cloud recognizer, on request. */
+    private fun cloudRetryBlock(block: mihon.feature.translate.TranslatedBlock) {
+        val key = pageKey
+        val streamFn = page.stream ?: return
+        viewer.activity.toast(MR.strings.cloud_ocr_in_progress)
+        scope.launchIO {
+            val result = try {
+                val bytes = streamFn().use { process(item, Buffer().readFrom(it)) }.readByteArray()
+                pageTranslator.retryBlockWithCloud(bytes, block)
+            } catch (e: Exception) {
+                logcat(LogPriority.WARN, e)
+                mihon.feature.translate.CloudRetryResult.Failed
+            }
+            withUIContext { applyCloudRetry(key, block, result) }
+        }
+    }
+
+    private fun applyCloudRetry(
+        key: String,
+        block: mihon.feature.translate.TranslatedBlock,
+        result: mihon.feature.translate.CloudRetryResult,
+    ) {
+        when (result) {
+            is mihon.feature.translate.CloudRetryResult.Success ->
+                pageTranslator.updateOverlayBlock(key, block, result.translation, result.sourceText)
+                    ?.let { setTranslation(it) }
+            mihon.feature.translate.CloudRetryResult.NoText ->
+                viewer.activity.toast(MR.strings.translate_selection_no_text)
+            mihon.feature.translate.CloudRetryResult.NotConfigured ->
+                viewer.activity.toast(MR.strings.cloud_ocr_not_configured)
+            mihon.feature.translate.CloudRetryResult.Failed ->
+                viewer.activity.toast(MR.strings.translate_selection_failed)
         }
     }
 

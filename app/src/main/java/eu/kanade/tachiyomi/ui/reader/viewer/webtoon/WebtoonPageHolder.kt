@@ -98,6 +98,46 @@ class WebtoonPageHolder(
     }
 
     /**
+     * Opens the block's recognized text in the bottom panel; whatever the user
+     * translates there replaces this block in place.
+     */
+    private fun editBlock(block: mihon.feature.translate.TranslatedBlock) {
+        val key = pageKey ?: return
+        viewer.activity.openTextEditor(block.sourceText) { source, translation ->
+            pageTranslator.updateOverlayBlock(key, block, translation, source)?.let { frame.setTranslation(it) }
+        }
+    }
+
+    /** Reads one block again with the paid cloud recognizer, on request. */
+    private fun cloudRetryBlock(block: mihon.feature.translate.TranslatedBlock) {
+        val key = pageKey ?: return
+        val streamFn = page?.stream ?: return
+        viewer.activity.toast(MR.strings.cloud_ocr_in_progress)
+        scope.launchIO {
+            val result = try {
+                val bytes = streamFn().use { process(Buffer().readFrom(it)) }.readByteArray()
+                pageTranslator.retryBlockWithCloud(bytes, block)
+            } catch (e: Exception) {
+                logcat(LogPriority.WARN, e)
+                mihon.feature.translate.CloudRetryResult.Failed
+            }
+            withUIContext {
+                when (result) {
+                    is mihon.feature.translate.CloudRetryResult.Success ->
+                        pageTranslator.updateOverlayBlock(key, block, result.translation, result.sourceText)
+                            ?.let { frame.setTranslation(it) }
+                    mihon.feature.translate.CloudRetryResult.NoText ->
+                        viewer.activity.toast(MR.strings.translate_selection_no_text)
+                    mihon.feature.translate.CloudRetryResult.NotConfigured ->
+                        viewer.activity.toast(MR.strings.cloud_ocr_not_configured)
+                    mihon.feature.translate.CloudRetryResult.Failed ->
+                        viewer.activity.toast(MR.strings.translate_selection_failed)
+                }
+            }
+        }
+    }
+
+    /**
      * Job for loading the page.
      */
     private var loadJob: Job? = null
@@ -124,6 +164,9 @@ class WebtoonPageHolder(
         }
         frame.onTranslationPhraseSelected = { phrase -> viewer.activity.onTranslatePhraseSelected(phrase) }
         frame.onTranslationBlockTranslateRequested = { block -> translateBlock(block) }
+        frame.onTranslationBlockEditRequested = { block -> editBlock(block) }
+        frame.onTranslationBlockCloudRetryRequested = { block -> cloudRetryBlock(block) }
+        frame.translationCloudRetryAvailable = pageTranslator.isCloudOcrConfigured
         loadJob?.cancel()
         loadJob = scope.launch { loadPageAndProcessStatus() }
         refreshLayoutParams()

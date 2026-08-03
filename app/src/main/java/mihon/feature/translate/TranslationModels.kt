@@ -98,3 +98,14 @@ sealed interface RegionTranslateResult {
     data object NoText : RegionTranslateResult
     data object Failed : RegionTranslateResult
 }
+
+/**
+ * Outcome of re-reading one block through the paid cloud recognizer, which
+ * additionally has to report "the user never set a key up".
+ */
+sealed interface CloudRetryResult {
+    data class Success(val sourceText: String, val translation: String) : CloudRetryResult
+    data object NoText : CloudRetryResult
+    data object NotConfigured : CloudRetryResult
+    data object Failed : CloudRetryResult
+}

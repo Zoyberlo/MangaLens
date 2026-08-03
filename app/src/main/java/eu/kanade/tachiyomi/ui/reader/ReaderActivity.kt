@@ -145,6 +145,23 @@ class ReaderActivity : BaseActivity() {
 
     private var wordInspectorView: WordInspectorView? = null
     private var inspectorLookupJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * Set while the panel's editor was opened from an overlay block, so the
+     * corrected text and its translation can be written back into that block.
+     */
+    private var pendingEditTarget: ((String, String) -> Unit)? = null
+
+    private val speechRecognitionLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val spoken = result.data
+            ?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull()
+            ?.takeIf { it.isNotBlank() }
+            ?: return@registerForActivityResult
+        wordInspectorView?.setEditorText(spoken)
+    }
     private var readingModeToast: Toast? = null
     private val displayRefreshHost = DisplayRefreshHost()
 
@@ -176,6 +193,9 @@ class ReaderActivity : BaseActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        // Layout is driven by insets, but this is what makes the keyboard
+        // report them at all below API 30 — the translation editor needs that
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
 
         super.onCreate(savedInstanceState)
 
@@ -578,6 +598,7 @@ class ReaderActivity : BaseActivity() {
             },
             onClickTranslateSelection = ::startTranslateSelection.takeIf { state.viewer != null },
             onLongClickTranslateSelection = ::translateFullPage.takeIf { state.viewer != null },
+            onClickManualTranslate = ::startManualTranslate.takeIf { state.viewer != null },
             onClickSettings = viewModel::openSettingsDialog,
         )
     }
@@ -592,6 +613,7 @@ class ReaderActivity : BaseActivity() {
             hideWordInspector()
             return
         }
+        pendingEditTarget = null
         val inspector = ensureWordInspector()
         inspectorScrollAccum = 0f
         inspector.showLoading(phrase)
@@ -620,6 +642,7 @@ class ReaderActivity : BaseActivity() {
             .mapNotNull { it.translatedText.takeIf(String::isNotBlank) }
             .joinToString("\n\n")
         if (original.isBlank() || translated.isBlank()) return
+        pendingEditTarget = null
         val inspector = ensureWordInspector()
         inspectorScrollAccum = 0f
         inspector.showResult(original, translated)
@@ -627,10 +650,78 @@ class ReaderActivity : BaseActivity() {
         inspector.bringToFront()
     }
 
+    /**
+     * Opens the bottom panel's text editor on [initial] — empty for typing or
+     * dictating from scratch. [onTranslated] is called with the final text and
+     * its translation when the editor is confirmed, so the caller can write the
+     * result back (e.g. into the overlay block the text came from).
+     */
+    fun openTextEditor(initial: String, onTranslated: ((String, String) -> Unit)? = null) {
+        pendingEditTarget = onTranslated
+        val inspector = ensureWordInspector()
+        inspectorLookupJob?.cancel()
+        inspectorScrollAccum = 0f
+        inspector.visibility = View.VISIBLE
+        inspector.bringToFront()
+        inspector.startEditing(initial)
+    }
+
+    /**
+     * Manual entry: opens the editor with nothing in it, for typing or
+     * dictating text that is not on the page (or that OCR cannot read).
+     */
+    private fun startManualTranslate() {
+        setMenuVisibility(false)
+        openTextEditor("")
+    }
+
+    /** Translates whatever the user typed, dictated or corrected. */
+    private fun onEditorTextSubmitted(text: String) {
+        val inspector = wordInspectorView ?: return
+        inspector.showTranslating()
+        inspectorLookupJob?.cancel()
+        inspectorLookupJob = lifecycleScope.launchIO {
+            val translated = Injekt.get<PageTranslator>().translateSingle(text)
+            withUIContext {
+                if (translated.isNullOrBlank()) {
+                    toast(MR.strings.translate_selection_failed)
+                    inspector.startEditing(text)
+                } else {
+                    inspector.showResult(text, translated)
+                    pendingEditTarget?.invoke(text, translated)
+                }
+            }
+        }
+    }
+
+    /**
+     * Hands off to the system's speech recognizer, dictating in the configured
+     * source language. Its result lands back in the editor.
+     */
+    private fun startVoiceInput() {
+        val language = readerPreferences.autoTranslateSourceLanguage.get().langCode
+        val intent = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(
+                android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
+            )
+            if (language.isNotBlank() && language != "auto") {
+                putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, language)
+            }
+        }
+        try {
+            speechRecognitionLauncher.launch(intent)
+        } catch (_: android.content.ActivityNotFoundException) {
+            toast(MR.strings.voice_input_unavailable)
+        }
+    }
+
     private fun ensureWordInspector(): WordInspectorView {
         return wordInspectorView ?: WordInspectorView(this).also { view ->
             view.onDismiss = { hideWordInspector() }
             view.onPhraseTap = { phrase -> lookupVariantsInto(view, phrase) }
+            view.onTextSubmitted = { text -> onEditorTextSubmitted(text) }
+            view.onVoiceInput = { startVoiceInput() }
             wordInspectorView = view
             binding.readerContainer.addView(
                 view,
@@ -645,6 +736,8 @@ class ReaderActivity : BaseActivity() {
 
     private fun hideWordInspector() {
         inspectorLookupJob?.cancel()
+        pendingEditTarget = null
+        wordInspectorView?.onHidden()
         wordInspectorView?.visibility = View.GONE
     }
 
@@ -657,6 +750,8 @@ class ReaderActivity : BaseActivity() {
     fun onReaderScrolled(dy: Int) {
         val inspector = wordInspectorView ?: return
         if (inspector.visibility != View.VISIBLE) return
+        // Never yank the panel away mid-edit
+        if (inspector.isEditingText) return
         inspectorScrollAccum += kotlin.math.abs(dy)
         if (inspectorScrollAccum > binding.readerContainer.height / 3f) {
             hideWordInspector()
