@@ -140,6 +140,8 @@ sealed class Preference {
             override val subtitle: String? = "%s",
             override val enabled: Boolean = true,
             override val onValueChanged: suspend (value: String) -> Boolean = { true },
+            /** Shows a help button next to the row; for values a user has to go and fetch. */
+            val onHelpClick: (() -> Unit)? = null,
         ) : PreferenceItem<String, Boolean>() {
             override val icon: ImageVector? = null
         }

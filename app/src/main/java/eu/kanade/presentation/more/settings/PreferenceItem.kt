@@ -166,6 +166,7 @@ internal fun PreferenceItem(
                         if (accepted) item.preference.set(it)
                         accepted
                     },
+                    onHelpClick = item.onHelpClick,
                 )
             }
             is Preference.PreferenceItem.TrackerPreference -> {

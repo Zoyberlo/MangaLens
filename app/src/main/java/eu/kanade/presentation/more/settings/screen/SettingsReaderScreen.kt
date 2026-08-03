@@ -4,7 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalView
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -89,6 +91,8 @@ object SettingsReaderScreen : SearchableSettings {
         val deeplLimit by readerPreferences.deeplMonthlyCharLimit.collectAsState()
         val textTranslator = remember { Injekt.get<TextTranslator>() }
         val deeplUsed = remember(deeplApiKey, deeplLimit) { textTranslator.deeplUsedThisMonth() }
+        var guide by remember { mutableStateOf<ApiKeyGuide?>(null) }
+        guide?.let { ApiKeyGuideDialog(guide = it, onDismissRequest = { guide = null }) }
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_category_auto_translate),
             preferenceItems = listOf(
@@ -115,6 +119,7 @@ object SettingsReaderScreen : SearchableSettings {
                     preference = readerPreferences.deeplApiKey,
                     title = stringResource(MR.strings.pref_deepl_api_key),
                     subtitle = stringResource(MR.strings.pref_deepl_api_key_summary),
+                    onHelpClick = { guide = ApiKeyGuide.DEEPL },
                 ),
                 Preference.PreferenceItem.SliderPreference(
                     // Stepped in thousands: character budgets are large numbers

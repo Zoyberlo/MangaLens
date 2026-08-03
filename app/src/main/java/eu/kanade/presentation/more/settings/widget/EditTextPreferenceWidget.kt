@@ -2,6 +2,7 @@ package eu.kanade.presentation.more.settings.widget
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.AlertDialog
@@ -32,6 +33,7 @@ fun EditTextPreferenceWidget(
     icon: ImageVector?,
     value: String,
     onConfirm: suspend (String) -> Boolean,
+    onHelpClick: (() -> Unit)? = null,
 ) {
     var isDialogShown by remember { mutableStateOf(false) }
 
@@ -39,6 +41,18 @@ fun EditTextPreferenceWidget(
         title = title,
         subtitle = subtitle?.format(value),
         icon = icon,
+        // API keys are fetched from somewhere else entirely, so the row carries
+        // its own "where do I get this?" affordance
+        widget = onHelpClick?.let {
+            {
+                IconButton(onClick = it) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
+                        contentDescription = stringResource(MR.strings.action_help),
+                    )
+                }
+            }
+        },
         onPreferenceClick = { isDialogShown = true },
     )
 

@@ -4,7 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.system.LocaleHelper
@@ -34,6 +36,9 @@ object SettingsRecognitionScreen : SearchableSettings {
     @Composable
     override fun getPreferences(): List<Preference> {
         val readerPreferences = remember { Injekt.get<ReaderPreferences>() }
+        var guide by remember { mutableStateOf<ApiKeyGuide?>(null) }
+        guide?.let { ApiKeyGuideDialog(guide = it, onDismissRequest = { guide = null }) }
+        val showGuide: (ApiKeyGuide) -> Unit = { guide = it }
         return listOf(
             Preference.PreferenceItem.InfoPreference(
                 stringResource(MR.strings.pref_recognition_info),
@@ -50,9 +55,9 @@ object SettingsRecognitionScreen : SearchableSettings {
                 MR.strings.pref_category_recognition_retry_per_language,
                 OcrEngine.entries,
             ),
-            getVisionGroup(readerPreferences),
-            getAzureGroup(readerPreferences),
-            getGeminiGroup(readerPreferences),
+            getVisionGroup(readerPreferences, showGuide),
+            getAzureGroup(readerPreferences, showGuide),
+            getGeminiGroup(readerPreferences, showGuide),
         )
     }
 
@@ -117,7 +122,10 @@ object SettingsRecognitionScreen : SearchableSettings {
     }
 
     @Composable
-    private fun getVisionGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
+    private fun getVisionGroup(
+        readerPreferences: ReaderPreferences,
+        showGuide: (ApiKeyGuide) -> Unit,
+    ): Preference.PreferenceGroup {
         val key by readerPreferences.visionApiKey.collectAsState()
         val limit by readerPreferences.visionMonthlyLimit.collectAsState()
         val used = rememberUsage(OcrEngine.GOOGLE_VISION, key, limit)
@@ -128,6 +136,7 @@ object SettingsRecognitionScreen : SearchableSettings {
                     preference = readerPreferences.visionApiKey,
                     title = stringResource(MR.strings.pref_vision_api_key),
                     subtitle = stringResource(MR.strings.pref_vision_api_key_summary),
+                    onHelpClick = { showGuide(ApiKeyGuide.GOOGLE_VISION) },
                 ),
                 Preference.PreferenceItem.SliderPreference(
                     value = limit,
@@ -143,7 +152,10 @@ object SettingsRecognitionScreen : SearchableSettings {
     }
 
     @Composable
-    private fun getAzureGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
+    private fun getAzureGroup(
+        readerPreferences: ReaderPreferences,
+        showGuide: (ApiKeyGuide) -> Unit,
+    ): Preference.PreferenceGroup {
         val key by readerPreferences.azureApiKey.collectAsState()
         val limit by readerPreferences.azureMonthlyLimit.collectAsState()
         val used = rememberUsage(OcrEngine.AZURE_READ, key, limit)
@@ -154,11 +166,13 @@ object SettingsRecognitionScreen : SearchableSettings {
                     preference = readerPreferences.azureEndpoint,
                     title = stringResource(MR.strings.pref_azure_endpoint),
                     subtitle = stringResource(MR.strings.pref_azure_endpoint_summary),
+                    onHelpClick = { showGuide(ApiKeyGuide.AZURE) },
                 ),
                 Preference.PreferenceItem.EditTextPreference(
                     preference = readerPreferences.azureApiKey,
                     title = stringResource(MR.strings.pref_azure_api_key),
                     subtitle = stringResource(MR.strings.pref_azure_api_key_summary),
+                    onHelpClick = { showGuide(ApiKeyGuide.AZURE) },
                 ),
                 Preference.PreferenceItem.SliderPreference(
                     value = limit,
@@ -174,7 +188,10 @@ object SettingsRecognitionScreen : SearchableSettings {
     }
 
     @Composable
-    private fun getGeminiGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
+    private fun getGeminiGroup(
+        readerPreferences: ReaderPreferences,
+        showGuide: (ApiKeyGuide) -> Unit,
+    ): Preference.PreferenceGroup {
         val key by readerPreferences.geminiApiKey.collectAsState()
         val limit by readerPreferences.geminiMonthlyLimit.collectAsState()
         val used = rememberUsage(OcrEngine.GEMINI, key, limit)
@@ -185,6 +202,7 @@ object SettingsRecognitionScreen : SearchableSettings {
                     preference = readerPreferences.geminiApiKey,
                     title = stringResource(MR.strings.pref_gemini_api_key),
                     subtitle = stringResource(MR.strings.pref_gemini_api_key_summary),
+                    onHelpClick = { showGuide(ApiKeyGuide.GEMINI) },
                 ),
                 Preference.PreferenceItem.EditTextPreference(
                     preference = readerPreferences.geminiModel,

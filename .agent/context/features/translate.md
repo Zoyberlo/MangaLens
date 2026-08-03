@@ -186,6 +186,14 @@ engine (`isRetryEngineUsable`), so it never appears as a dead control.
 Everything lives in **Settings → Reader → Text recognition**
 (`SettingsRecognitionScreen`), off the translation group.
 
+Every key field carries a **?** button (`EditTextPreference.onHelpClick` →
+`ApiKeyGuideDialog`) with the steps to obtain that key and a button that opens
+the right console. `ApiKeyGuide` holds one entry per service, including DeepL's,
+which lives on the reader screen. The guides deliberately spell out the parts
+people trip over: Vision needs a billing account even for its free tier, DeepL
+free keys must keep their `:fx` suffix, Azure needs the endpoint as well as the
+key, and Gemini's free tier is not private.
+
 ### Not implemented: on-device neural engines
 
 PaddleOCR PP-OCRv5 mobile and manga-ocr would both beat ML Kit *offline*, but
