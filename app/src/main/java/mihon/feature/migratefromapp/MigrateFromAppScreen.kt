@@ -1,7 +1,9 @@
 package mihon.feature.migratefromapp
 
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
@@ -22,20 +24,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.hippo.unifile.UniFile
 import eu.kanade.presentation.components.AppBar
-import eu.kanade.presentation.more.settings.screen.data.RestoreBackupScreen
 import eu.kanade.presentation.util.Screen
+import kotlinx.coroutines.launch
+import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
+import java.io.File
 import java.text.DateFormat
 import java.util.Date
 
@@ -69,6 +75,8 @@ class MigrateFromAppScreen : Screen() {
 
         var backups by remember { mutableStateOf<List<FoundBackup>>(emptyList()) }
         var scanned by remember { mutableStateOf(false) }
+        var scanning by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
 
         val folderPicker = rememberLauncherForActivityResult(
             ActivityResultContracts.OpenDocumentTree(),
@@ -138,10 +146,40 @@ class MigrateFromAppScreen : Screen() {
                 }
                 item {
                     Button(
-                        onClick = { folderPicker.launch(null) },
+                        enabled = !scanning,
+                        onClick = {
+                            if (hasAllFilesAccess()) {
+                                scanning = true
+                                scope.launch {
+                                    backups = withIOContext { scanSharedStorage() }
+                                    scanning = false
+                                    scanned = true
+                                }
+                            } else {
+                                requestAllFilesAccess(context)
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 12.dp),
+                    ) {
+                        Text(
+                            stringResource(
+                                when {
+                                    scanning -> MR.strings.migrate_from_app_scanning
+                                    hasAllFilesAccess() -> MR.strings.migrate_from_app_scan_device
+                                    else -> MR.strings.migrate_from_app_scan_needs_permission
+                                },
+                            ),
+                        )
+                    }
+                }
+                item {
+                    Button(
+                        onClick = { folderPicker.launch(null) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
                     ) {
                         Text(stringResource(MR.strings.migrate_from_app_find_backups))
                     }
@@ -170,11 +208,62 @@ class MigrateFromAppScreen : Screen() {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        IconButton(onClick = { navigator.push(RestoreBackupScreen(backup.uri)) }) {
+                        IconButton(onClick = { navigator.push(MigrateRestoreScreen(backup.uri)) }) {
                             Icon(imageVector = Icons.Outlined.Restore, contentDescription = null)
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * All-files access lets the screen search storage on its own instead of
+     * making the user find the backup folder. Optional: the folder picker
+     * remains available without any permission.
+     */
+    private fun hasAllFilesAccess(): Boolean {
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            android.os.Environment.isExternalStorageManager()
+        } else {
+            false
+        }
+    }
+
+    private fun requestAllFilesAccess(context: Context) {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) return
+        val intent = Intent(
+            android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+            "package:${context.packageName}".toUri(),
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            context.startActivity(
+                Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+    }
+
+    /** Walks shared storage for backup files (needs all-files access). */
+    private fun scanSharedStorage(): List<FoundBackup> {
+        val found = mutableListOf<FoundBackup>()
+        val root = android.os.Environment.getExternalStorageDirectory() ?: return emptyList()
+        scanDirectory(root, depth = 0, found = found)
+        return found.sortedByDescending { it.lastModified }.take(20)
+    }
+
+    private fun scanDirectory(dir: File, depth: Int, found: MutableList<FoundBackup>) {
+        if (depth > MAX_SCAN_DEPTH || found.size >= MAX_SCAN_RESULTS) return
+        // Android/ holds per-app sandboxes; nothing user-visible lives there
+        if (dir.name == "Android" || dir.name.startsWith(".")) return
+        dir.listFiles()?.forEach { file ->
+            if (found.size >= MAX_SCAN_RESULTS) return
+            when {
+                file.isDirectory -> scanDirectory(file, depth + 1, found)
+                file.name.endsWith(".tachibk") || file.name.endsWith(".proto.gz") ->
+                    found += FoundBackup(file.name, Uri.fromFile(file).toString(), file.lastModified())
             }
         }
     }

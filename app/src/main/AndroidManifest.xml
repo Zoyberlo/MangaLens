@@ -33,6 +33,12 @@
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
+    <!-- Optional: lets the migrate screen search storage for backups itself.
+         Never required — the folder picker works without it. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
     <!-- Mihon-family apps the migrate-from-app screen can detect (Android 11+ package visibility) -->
     <queries>
         <package android:name="app.mihon" />

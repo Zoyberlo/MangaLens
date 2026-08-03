@@ -411,6 +411,14 @@
     <string name="migrate_from_app_info">Apps can\'t read each other\'s data directly, so migration works through backup files. Open the detected app, create a backup (Settings → Data and storage), then find it below and restore it.</string>
     <string name="migrate_from_app_find_backups">Find backup files…</string>
     <string name="migrate_from_app_none_found">No backup files found in that folder</string>
+    <string name="migrate_from_app_scan_device">Scan device automatically</string>
+    <string name="migrate_from_app_scan_needs_permission">Needs all-files access to search storage for backups</string>
+    <string name="migrate_from_app_scanning">Searching for backups…</string>
+    <string name="migrate_restore_title">Import backup</string>
+    <string name="migrate_restore_summary">This backup has %1$d entries: %2$d are new to your library, %3$d you already have.</string>
+    <string name="migrate_restore_conflict">Entries you already have</string>
+    <string name="migrate_restore_only_new">Skip them</string>
+    <string name="migrate_restore_add_and_update">Update them</string>
     <string name="pref_nav_tap_zone_width">Side tap zones width</string>
     <string name="pref_nav_tap_zone_height">Top and bottom tap zones height</string>
     <string name="pref_nav_tap_zone_size_summary">Smaller zones leave more room in the center for opening the menu</string>
