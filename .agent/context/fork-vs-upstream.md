@@ -16,6 +16,15 @@ Work happens on `feature/auto-translate`. The base commit the fork branched from
 the parent of the first fork commit; `git log upstream/main..HEAD` lists everything
 we added.
 
+## Licensing
+
+Upstream is Apache 2.0, so this fork and everything derived from it stays Apache
+2.0 — `LICENSE` is upstream's and must not be replaced. Apache 2.0 §4(b) requires
+distributed modifications to be stated: that is what `NOTICE` and the fork banner
+at the top of `README.md` are for. **Keep `NOTICE` current when the fork gains or
+drops a feature.** The license grants no trademark rights: the Mihon name and
+logo belong to the Mihon project.
+
 ## Rebrand
 
 | What | Value | Where |

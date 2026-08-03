@@ -1,0 +1,31 @@
+Mihon TL
+Copyright 2026 Mihon TL contributors
+
+This product is a modified version of Mihon (https://github.com/mihonapp/mihon),
+Copyright 2024-2026 The Mihon Open Source Project, licensed under the Apache
+License, Version 2.0. A copy of that license is provided in the LICENSE file.
+
+Mihon itself derives from Tachiyomi, Copyright 2015-2024 Javier Tomás and
+contributors, also licensed under the Apache License, Version 2.0.
+
+Modifications made in this fork (per Apache License 2.0, Section 4b)
+-------------------------------------------------------------------
+
+Added:
+  * On-device translation of manga pages: ML Kit text recognition, translation
+    backends (Google, DeepL, Lingva, MyMemory), an overlay that draws results
+    pinned to the page, a rubber-band area selector, and a word/phrase lookup
+    panel. Source: app/src/main/java/mihon/feature/translate/
+  * Migration helper that detects other Mihon-family apps and imports their
+    backup files selectively. Source: app/src/main/java/mihon/feature/migratefromapp/
+  * Reader additions: adjustable page-turn tap zones, webtoon auto-detection.
+
+Modified:
+  * Application name ("Mihon TL") and application ID ("app.mihon.tl") so this
+    fork installs alongside the official app.
+  * Reader classes, settings screens and dependency wiring were extended to
+    host the features above. The affected upstream files are listed in
+    .agent/context/fork-vs-upstream.md.
+
+This fork is not affiliated with, endorsed by, or supported by the Mihon
+project. Please do not report issues with this build to Mihon.

@@ -1,3 +1,13 @@
+> ### This is a fork
+>
+> **Mihon TL** — an unofficial fork of [Mihon](https://github.com/mihonapp/mihon)
+> that adds on-device translation of manga pages and a migration helper.
+> Modified files and the full list of changes are described in [NOTICE](/NOTICE);
+> the original Apache 2.0 license applies (see [LICENSE](/LICENSE)).
+>
+> Not affiliated with or endorsed by the Mihon project — do not report issues
+> with this build to them. The upstream README follows.
+
 <div align="center">
 
 <a href="https://mihon.app">
