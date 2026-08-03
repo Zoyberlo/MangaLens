@@ -4,6 +4,7 @@
 
     <!-- Fork palette, taken from the launcher artwork in brand/icon-source.png -->
     <color name="accent_blue">#6BA9F7</color>
-    <!-- The artwork is drawn for a light backdrop, so the icon plate is white -->
-    <color name="icon_background">#FFFFFF</color>
+    <color name="icon_background">#2E3943</color>
+    <!-- Launcher plate: mostly transparent, just enough to seat the artwork -->
+    <color name="launcher_background">#59121A24</color>
 </resources>
