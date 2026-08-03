@@ -402,6 +402,7 @@
     <string name="translate_selection_no_text">No text recognized in the selected area</string>
     <string name="translate_selection_failed">Translation failed — check the translation service in settings</string>
     <string name="translate_in_progress">Translating…</string>
+    <string name="onboarding_translation_info">Pick the languages you read in. In the reader, select an area of a page to translate it — you can change this later in Settings → Reader.</string>
     <string name="pref_translate_original_first">Show original text first</string>
     <string name="pref_translate_original_first_summary">Selections show recognized text untranslated; tap a block\'s + to translate it, tap words to look them up</string>
     <string name="pref_translate_result_display">Translation display</string>
