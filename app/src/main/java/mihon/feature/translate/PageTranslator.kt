@@ -108,11 +108,17 @@ class PageTranslator(
 
         @Suppress("DEPRECATION")
         val decoder = android.graphics.BitmapRegionDecoder.newInstance(imageBytes, 0, imageBytes.size, false)
-        val bitmap = try {
+        val decoded = try {
             decoder.decodeRegion(padded, BitmapFactory.Options().apply { inSampleSize = sampleSize })
         } finally {
             decoder.recycle()
         } ?: return RegionTranslateResult.NoText
+
+        // Comic lettering is stylised and often small on the page; enlarging
+        // and hardening the contrast before OCR is what turns "swolos manshe"
+        // back into "swordsmanship"
+        val upscale = ocrUpscaleFor(decoded)
+        val bitmap = if (upscale > 1f) enhanceForOcr(decoded, upscale) else decoded
 
         val recognition = try {
             recognizer.recognize(bitmap, from)
@@ -120,7 +126,8 @@ class PageTranslator(
             logcat(LogPriority.WARN, e) { "Text recognition failed" }
             return RegionTranslateResult.NoText
         } finally {
-            bitmap.recycle()
+            if (bitmap !== decoded) bitmap.recycle()
+            decoded.recycle()
         }
         // The recognizer may have fallen back to another script's model; the
         // translation has to follow it, not the configured setting
@@ -128,14 +135,16 @@ class PageTranslator(
         val recognized = recognition.blocks
         if (recognizedLanguage.langCode == to) return RegionTranslateResult.Failed
 
+        // Map block bounds back through the upscale and the decode sampling
+        val toImage = sampleSize / upscale
         val inSelection = recognized
             .map { block ->
                 block.copy(
                     bounds = android.graphics.Rect(
-                        padded.left + block.bounds.left * sampleSize,
-                        padded.top + block.bounds.top * sampleSize,
-                        padded.left + block.bounds.right * sampleSize,
-                        padded.top + block.bounds.bottom * sampleSize,
+                        padded.left + (block.bounds.left * toImage).toInt(),
+                        padded.top + (block.bounds.top * toImage).toInt(),
+                        padded.left + (block.bounds.right * toImage).toInt(),
+                        padded.top + (block.bounds.bottom * toImage).toInt(),
                     ),
                 )
             }
@@ -159,6 +168,64 @@ class PageTranslator(
         if (blocks.isEmpty()) return RegionTranslateResult.Failed
 
         return RegionTranslateResult.Success(PageTranslation(bounds.outWidth, bounds.outHeight, blocks))
+    }
+
+    /**
+     * How much to enlarge a region before OCR. Small selections carry too few
+     * pixels per glyph for stylised lettering; the cap keeps the bitmap within
+     * what ML Kit handles well.
+     */
+    private fun ocrUpscaleFor(bitmap: android.graphics.Bitmap): Float {
+        val maxDim = maxOf(bitmap.width, bitmap.height)
+        if (maxDim <= 0) return 1f
+        val wanted = when {
+            maxDim < 700 -> 3f
+            maxDim < 1200 -> 2f
+            maxDim < 1800 -> 1.5f
+            else -> 1f
+        }
+        return minOf(wanted, MAX_OCR_DIMENSION.toFloat() / maxDim).coerceAtLeast(1f)
+    }
+
+    /**
+     * Returns an enlarged, grey, contrast-boosted copy: manga bubbles are dark
+     * lettering on a light fill, so pushing them apart helps the recognizer
+     * far more than the extra pixels alone.
+     */
+    private fun enhanceForOcr(source: android.graphics.Bitmap, scale: Float): android.graphics.Bitmap {
+        val width = (source.width * scale).toInt().coerceAtLeast(1)
+        val height = (source.height * scale).toInt().coerceAtLeast(1)
+        val result = android.graphics.Bitmap.createBitmap(
+            width,
+            height,
+            android.graphics.Bitmap.Config.ARGB_8888,
+        )
+        val canvas = android.graphics.Canvas(result)
+        val contrast = 1.6f
+        val translate = -(0.5f * contrast - 0.5f) * 255f
+        val matrix = android.graphics.ColorMatrix().apply {
+            setSaturation(0f)
+            postConcat(
+                android.graphics.ColorMatrix(
+                    floatArrayOf(
+                        contrast, 0f, 0f, 0f, translate,
+                        0f, contrast, 0f, 0f, translate,
+                        0f, 0f, contrast, 0f, translate,
+                        0f, 0f, 0f, 1f, 0f,
+                    ),
+                ),
+            )
+        }
+        val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG).apply {
+            colorFilter = android.graphics.ColorMatrixColorFilter(matrix)
+        }
+        canvas.drawBitmap(
+            source,
+            null,
+            android.graphics.Rect(0, 0, width, height),
+            paint,
+        )
+        return result
     }
 
     /**
