@@ -158,7 +158,7 @@ class SupportUsScreen : Screen() {
     }
 }
 
-private const val FORK_REPO_URL = "https://github.com/Zoyberlo/mihon"
+private const val FORK_REPO_URL = "https://github.com/Zoyberlo/MangaLens"
 
 /**
  * Tip link for the fork's own work (monobank jar, Ko-fi, Patreon…). Leave

@@ -9,7 +9,7 @@ a small rebrand. Read this before editing anything — it tells you which files 
 
 | Remote | Points at |
 |--------|-----------|
-| `origin` | the fork (`Zoyberlo/mihon`) |
+| `origin` | the fork (`Zoyberlo/MangaLens`) |
 | `upstream` | `mihonapp/mihon` |
 
 Work happens on `feature/auto-translate`. The base commit the fork branched from is

@@ -13,7 +13,7 @@ $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
 location not found" while the file clearly exists, that is the BOM — rewrite it:
 
 ```powershell
-[System.IO.File]::WriteAllText("A:\Projects\mihon\local.properties", "sdk.dir=C\:\\Users\\zoybe\\AppData\\Local\\Android\\Sdk`n")
+[System.IO.File]::WriteAllText("A:\Projects\MangaLens\local.properties", "sdk.dir=C\:\\Users\\zoybe\\AppData\\Local\\Android\\Sdk`n")
 ```
 
 ## 2. Build
