@@ -114,7 +114,7 @@ class PageTranslator(
             decoder.recycle()
         } ?: return RegionTranslateResult.NoText
 
-        val recognized = try {
+        val recognition = try {
             recognizer.recognize(bitmap, from)
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Text recognition failed" }
@@ -122,6 +122,11 @@ class PageTranslator(
         } finally {
             bitmap.recycle()
         }
+        // The recognizer may have fallen back to another script's model; the
+        // translation has to follow it, not the configured setting
+        val recognizedLanguage = recognition.language
+        val recognized = recognition.blocks
+        if (recognizedLanguage.langCode == to) return RegionTranslateResult.Failed
 
         val inSelection = recognized
             .map { block ->
@@ -136,7 +141,7 @@ class PageTranslator(
             }
             .filter { android.graphics.Rect.intersects(it.bounds, clamped) }
 
-        val candidates = mergeBlocks(inSelection, from)
+        val candidates = mergeBlocks(inSelection, recognizedLanguage)
             .filter { block -> block.text.length >= 2 && block.text.any { it.isLetter() } }
             .take(MAX_BLOCKS_PER_PAGE)
         if (candidates.isEmpty()) return RegionTranslateResult.NoText
@@ -150,7 +155,7 @@ class PageTranslator(
             return RegionTranslateResult.Success(PageTranslation(bounds.outWidth, bounds.outHeight, blocks))
         }
 
-        val blocks = translateBlocks(candidates, from, to)
+        val blocks = translateBlocks(candidates, recognizedLanguage, to)
         if (blocks.isEmpty()) return RegionTranslateResult.Failed
 
         return RegionTranslateResult.Success(PageTranslation(bounds.outWidth, bounds.outHeight, blocks))

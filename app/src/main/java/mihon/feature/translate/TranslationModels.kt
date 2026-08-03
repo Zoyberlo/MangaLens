@@ -61,6 +61,15 @@ data class RecognizedBlock(
 )
 
 /**
+ * Recognized blocks plus the language whose model actually produced them,
+ * which is not always the configured one — see [PageTextRecognizer.recognize].
+ */
+data class RecognitionResult(
+    val blocks: List<RecognizedBlock>,
+    val language: TranslationSourceLanguage,
+)
+
+/**
  * A recognized block together with its translation.
  */
 data class TranslatedBlock(
