@@ -78,7 +78,7 @@ class PagerPageHolder(
         onTranslationBlockTranslateRequested = { block -> translateBlock(block) }
         onTranslationBlockEditRequested = { block -> editBlock(block) }
         onTranslationBlockCloudRetryRequested = { block -> cloudRetryBlock(block) }
-        translationCloudRetryAvailable = pageTranslator.isCloudOcrConfigured
+        translationCloudRetryAvailable = pageTranslator.isRetryEngineUsable
         loadJob = scope.launch { loadPageAndProcessStatus() }
     }
 

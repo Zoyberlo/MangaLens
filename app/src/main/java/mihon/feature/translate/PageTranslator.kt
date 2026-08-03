@@ -23,8 +23,33 @@ class PageTranslator(
     private val readerPreferences: ReaderPreferences,
 ) {
 
-    /** True when the user configured a Google Cloud Vision key. */
-    val isCloudOcrConfigured: Boolean get() = cloudRecognizer.isConfigured
+    /**
+     * The engine that reads a fresh selection, for [language]. A per-language
+     * override wins over the global setting; an engine that is not set up, or
+     * cannot produce block geometry, falls back to on-device so the automatic
+     * path never silently stops working.
+     */
+    fun primaryEngineFor(language: TranslationSourceLanguage): OcrEngine {
+        val engine = readerPreferences.ocrEngineOverrides.get().ocrOverrideFor(language)
+            ?: readerPreferences.ocrEngine.get()
+        return engine.takeIf { it.canDetectLayout && cloudRecognizer.isConfigured(it) } ?: OcrEngine.ON_DEVICE
+    }
+
+    /** The engine the retry button on a block runs, for [language]. */
+    fun retryEngineFor(language: TranslationSourceLanguage): OcrEngine =
+        readerPreferences.ocrRetryEngineOverrides.get().ocrOverrideFor(language)
+            ?: readerPreferences.ocrRetryEngine.get()
+
+    /**
+     * Whether the retry button is worth offering at all: it is not, when the
+     * configured retry engine would just re-run the on-device model that
+     * already produced the text.
+     */
+    val isRetryEngineUsable: Boolean
+        get() = TranslationSourceLanguage.entries.any { language ->
+            val engine = retryEngineFor(language)
+            engine.isCloud && cloudRecognizer.isConfigured(engine)
+        }
 
     /**
      * The backend that served the most recent AUTO-mode translation.
@@ -125,9 +150,13 @@ class PageTranslator(
         val bitmap = if (upscale > 1f) enhanceForOcr(decoded, upscale) else decoded
 
         val recognition = try {
-            // On-device only. Cloud OCR is billed per request, so it stays a
-            // per-block escape hatch the user triggers themselves.
-            recognizer.recognize(bitmap, from)
+            // Defaults to on-device: a cloud engine here bills for every
+            // selection, so choosing one is a deliberate act in settings.
+            val engine = primaryEngineFor(from)
+            cloudRecognizer.recognize(engine, bitmap, from)
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { RecognitionResult(it, from) }
+                ?: recognizer.recognize(bitmap, from)
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Text recognition failed" }
             return RegionTranslateResult.NoText
@@ -309,18 +338,19 @@ class PageTranslator(
     }
 
     /**
-     * Re-reads one block through Google Cloud Vision and re-translates it.
-     * On-device OCR is the default everywhere else precisely because the cloud
-     * is billed per request, so this only ever spends quota when the user taps
-     * the retry button on a block the cheap recognizer garbled.
+     * Re-reads one block with the configured retry engine and re-translates
+     * it. Every other path defaults to on-device precisely because the cloud
+     * engines are billed per request, so this only spends quota when the user
+     * taps retry on a block the cheap recognizer garbled.
      *
      * The crop is sent unmodified: the contrast/upscale treatment exists to
-     * help ML Kit and only degrades what Vision sees.
+     * help ML Kit and only degrades what the cloud engines see.
      */
     suspend fun retryBlockWithCloud(imageBytes: ByteArray, block: TranslatedBlock): CloudRetryResult {
-        if (!cloudRecognizer.isConfigured) return CloudRetryResult.NotConfigured
         val from = readerPreferences.autoTranslateSourceLanguage.get()
         val to = readerPreferences.autoTranslateTargetLanguage.get()
+        val engine = retryEngineFor(from)
+        if (!engine.isCloud || !cloudRecognizer.isConfigured(engine)) return CloudRetryResult.NotConfigured
 
         val bounds = block.bounds
         if (bounds.width() <= 0 || bounds.height() <= 0) return CloudRetryResult.NoText
@@ -346,7 +376,7 @@ class PageTranslator(
             } ?: return CloudRetryResult.NoText
 
             try {
-                cloudRecognizer.recognize(decoded, from)?.joinToString(" ") { it.text }?.trim()
+                cloudRecognizer.recognize(engine, decoded, from)?.joinToString(" ") { it.text }?.trim()
             } finally {
                 decoded.recycle()
             }

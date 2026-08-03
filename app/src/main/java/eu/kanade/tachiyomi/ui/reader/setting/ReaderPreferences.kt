@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.ui.reader.setting
 import android.os.Build
 import androidx.compose.ui.graphics.BlendMode
 import dev.icerock.moko.resources.StringResource
+import mihon.feature.translate.OcrEngine
 import mihon.feature.translate.TranslateResultDisplay
 import mihon.feature.translate.TranslationProvider
 import mihon.feature.translate.TranslationSourceLanguage
@@ -110,6 +111,24 @@ class ReaderPreferences(
 
     val deeplUsagePeriod: Preference<String> = preferenceStore.getString("pref_deepl_usage_period", "")
 
+    // region Text recognition
+
+    // The engine every automatic pass uses. On-device is free and offline, so
+    // it stays the default; a cloud engine here bills for every selection.
+    val ocrEngine: Preference<OcrEngine> = preferenceStore.getEnum("pref_ocr_engine", OcrEngine.ON_DEVICE)
+
+    // What the retry button on a block runs. Gemini reads stylised lettering
+    // best and its free tier is per-day rather than per-month, which suits an
+    // occasional "this one came out wrong" retry.
+    val ocrRetryEngine: Preference<OcrEngine> = preferenceStore.getEnum("pref_ocr_retry_engine", OcrEngine.GEMINI)
+
+    // `LANGUAGE=ENGINE` entries; a language with no entry follows the global
+    // setting above. Scripts differ enough that one engine rarely wins for all.
+    val ocrEngineOverrides: Preference<Set<String>> = preferenceStore.getStringSet("pref_ocr_engine_overrides")
+
+    val ocrRetryEngineOverrides: Preference<Set<String>> =
+        preferenceStore.getStringSet("pref_ocr_retry_engine_overrides")
+
     // Cloud text recognition (Google Cloud Vision). Off unless a key is set;
     // the limit guards the user's own billing, and defaults below Google's
     // free monthly tier of 1000 requests.
@@ -120,6 +139,34 @@ class ReaderPreferences(
     val visionUsageCount: Preference<Int> = preferenceStore.getInt("pref_vision_usage_count", 0)
 
     val visionUsagePeriod: Preference<String> = preferenceStore.getString("pref_vision_usage_period", "")
+
+    // Azure AI Vision. Its free tier is 5000 transactions a month — five times
+    // Google's — so the default limit sits just under that.
+    val azureApiKey: Preference<String> = preferenceStore.getString("pref_azure_api_key", "")
+
+    val azureEndpoint: Preference<String> = preferenceStore.getString("pref_azure_endpoint", "")
+
+    val azureMonthlyLimit: Preference<Int> = preferenceStore.getInt("pref_azure_monthly_limit", 4500)
+
+    val azureUsageCount: Preference<Int> = preferenceStore.getInt("pref_azure_usage_count", 0)
+
+    val azureUsagePeriod: Preference<String> = preferenceStore.getString("pref_azure_usage_period", "")
+
+    // Gemini. Its free tier is metered per day, not per month, so the monthly
+    // limit here is only a backstop against an accidental billing account.
+    val geminiApiKey: Preference<String> = preferenceStore.getString("pref_gemini_api_key", "")
+
+    // Google renames these often enough that pinning it in code would strand
+    // users on a dead model with no way out
+    val geminiModel: Preference<String> = preferenceStore.getString("pref_gemini_model", "gemini-2.5-flash-lite")
+
+    val geminiMonthlyLimit: Preference<Int> = preferenceStore.getInt("pref_gemini_monthly_limit", 3000)
+
+    val geminiUsageCount: Preference<Int> = preferenceStore.getInt("pref_gemini_usage_count", 0)
+
+    val geminiUsagePeriod: Preference<String> = preferenceStore.getString("pref_gemini_usage_period", "")
+
+    // endregion
 
     val translateShowOriginalFirst: Preference<Boolean> = preferenceStore.getBoolean(
         "pref_translate_original_first",

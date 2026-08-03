@@ -6,13 +6,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalView
+import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderOrientation
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import eu.kanade.tachiyomi.util.system.hasDisplayCutout
-import mihon.feature.translate.CloudTextRecognizer
 import mihon.feature.translate.PageTranslator
 import mihon.feature.translate.TARGET_LANGUAGES
 import mihon.feature.translate.TextTranslator
@@ -83,10 +84,8 @@ object SettingsReaderScreen : SearchableSettings {
         val pageTranslator = remember { Injekt.get<PageTranslator>() }
         val lastAutoProvider by pageTranslator.lastAutoProvider.collectAsState()
         val deeplApiKey by readerPreferences.deeplApiKey.collectAsState()
-        val visionKey by readerPreferences.visionApiKey.collectAsState()
-        val visionLimit by readerPreferences.visionMonthlyLimit.collectAsState()
-        val cloudRecognizer = remember { Injekt.get<CloudTextRecognizer>() }
-        val visionUsed = remember(visionKey, visionLimit) { cloudRecognizer.usedThisMonth() }
+        val retryEngine by readerPreferences.ocrRetryEngine.collectAsState()
+        val navigator = LocalNavigator.currentOrThrow
         val deeplLimit by readerPreferences.deeplMonthlyCharLimit.collectAsState()
         val textTranslator = remember { Injekt.get<TextTranslator>() }
         val deeplUsed = remember(deeplApiKey, deeplLimit) { textTranslator.deeplUsedThisMonth() }
@@ -135,27 +134,10 @@ object SettingsReaderScreen : SearchableSettings {
                     },
                     onValueChanged = { readerPreferences.deeplMonthlyCharLimit.set(it * 1000) },
                 ),
-                Preference.PreferenceItem.EditTextPreference(
-                    preference = readerPreferences.visionApiKey,
-                    title = stringResource(MR.strings.pref_vision_api_key),
-                    subtitle = stringResource(MR.strings.pref_vision_api_key_summary),
-                ),
-                Preference.PreferenceItem.SliderPreference(
-                    value = visionLimit,
-                    valueRange = 0..2000,
-                    steps = 39,
-                    title = stringResource(MR.strings.pref_vision_monthly_limit),
-                    subtitle = if (visionKey.isBlank()) {
-                        stringResource(MR.strings.pref_vision_monthly_limit_summary)
-                    } else {
-                        stringResource(MR.strings.pref_vision_usage, visionUsed, visionLimit)
-                    },
-                    valueString = if (visionLimit == 0) {
-                        stringResource(MR.strings.pref_vision_no_limit)
-                    } else {
-                        "$visionLimit"
-                    },
-                    onValueChanged = { readerPreferences.visionMonthlyLimit.set(it) },
+                Preference.PreferenceItem.TextPreference(
+                    title = stringResource(MR.strings.pref_category_recognition),
+                    subtitle = stringResource(MR.strings.pref_recognition_summary, retryEngine.displayName),
+                    onClick = { navigator.push(SettingsRecognitionScreen) },
                 ),
             ),
         )

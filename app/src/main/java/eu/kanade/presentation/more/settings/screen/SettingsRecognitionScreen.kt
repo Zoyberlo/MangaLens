@@ -1,0 +1,229 @@
+package eu.kanade.presentation.more.settings.screen
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import eu.kanade.presentation.more.settings.Preference
+import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
+import eu.kanade.tachiyomi.util.system.LocaleHelper
+import mihon.feature.translate.CloudTextRecognizer
+import mihon.feature.translate.OcrEngine
+import mihon.feature.translate.TranslationSourceLanguage
+import mihon.feature.translate.ocrOverrideFor
+import mihon.feature.translate.withOcrOverride
+import tachiyomi.i18n.MR
+import tachiyomi.presentation.core.i18n.stringResource
+import tachiyomi.presentation.core.util.collectAsState
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
+import tachiyomi.core.common.preference.Preference as PreferenceData
+
+/**
+ * Which engine reads text off the page, and with whose account. Deliberately
+ * a screen of its own: the defaults are what almost everyone should use, and
+ * every alternative here spends the user's own money.
+ */
+object SettingsRecognitionScreen : SearchableSettings {
+
+    @ReadOnlyComposable
+    @Composable
+    override fun getTitleRes() = MR.strings.pref_category_recognition
+
+    @Composable
+    override fun getPreferences(): List<Preference> {
+        val readerPreferences = remember { Injekt.get<ReaderPreferences>() }
+        return listOf(
+            Preference.PreferenceItem.InfoPreference(
+                stringResource(MR.strings.pref_recognition_info),
+            ),
+            getEngineGroup(readerPreferences),
+            getPerLanguageGroup(
+                readerPreferences.ocrEngineOverrides,
+                MR.strings.pref_category_recognition_per_language,
+                // The automatic pass needs block geometry, which Gemini has none of
+                OcrEngine.entries.filter { it.canDetectLayout },
+            ),
+            getPerLanguageGroup(
+                readerPreferences.ocrRetryEngineOverrides,
+                MR.strings.pref_category_recognition_retry_per_language,
+                OcrEngine.entries,
+            ),
+            getVisionGroup(readerPreferences),
+            getAzureGroup(readerPreferences),
+            getGeminiGroup(readerPreferences),
+        )
+    }
+
+    @Composable
+    private fun getEngineGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
+        return Preference.PreferenceGroup(
+            title = stringResource(MR.strings.pref_category_recognition_engines),
+            preferenceItems = listOf(
+                Preference.PreferenceItem.ListPreference(
+                    preference = readerPreferences.ocrEngine,
+                    entries = OcrEngine.entries
+                        .filter { it.canDetectLayout }
+                        .associateWith { it.displayName },
+                    title = stringResource(MR.strings.pref_ocr_engine),
+                    subtitleProvider = { value, entries ->
+                        "${entries[value]}\n${stringResource(MR.strings.pref_ocr_engine_summary)}"
+                    },
+                ),
+                Preference.PreferenceItem.ListPreference(
+                    preference = readerPreferences.ocrRetryEngine,
+                    entries = OcrEngine.entries.associateWith { it.displayName },
+                    title = stringResource(MR.strings.pref_ocr_retry_engine),
+                    subtitleProvider = { value, entries ->
+                        "${entries[value]}\n${stringResource(MR.strings.pref_ocr_retry_engine_summary)}"
+                    },
+                ),
+            ),
+        )
+    }
+
+    /**
+     * One dropdown per source language, backed by the `LANGUAGE=ENGINE` set.
+     * Scripts differ enough that the engine that wins for Japanese rarely wins
+     * for stylised English lettering.
+     */
+    @Composable
+    private fun getPerLanguageGroup(
+        overrides: PreferenceData<Set<String>>,
+        titleRes: dev.icerock.moko.resources.StringResource,
+        engines: List<OcrEngine>,
+    ): Preference.PreferenceGroup {
+        val current by overrides.collectAsState()
+        val followsGlobal = stringResource(MR.strings.pref_ocr_engine_default)
+        val entries = buildMap {
+            put("", followsGlobal)
+            engines.forEach { put(it.name, it.displayName) }
+        }
+        return Preference.PreferenceGroup(
+            title = stringResource(titleRes),
+            preferenceItems = TranslationSourceLanguage.entries.map { language ->
+                Preference.PreferenceItem.BasicListPreference(
+                    value = current.ocrOverrideFor(language)?.name.orEmpty(),
+                    entries = entries,
+                    title = LocaleHelper.getDisplayName(language.langCode),
+                    onValueChanged = { value ->
+                        val engine = OcrEngine.entries.firstOrNull { it.name == value }
+                        overrides.set(current.withOcrOverride(language, engine))
+                    },
+                )
+            },
+        )
+    }
+
+    @Composable
+    private fun getVisionGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
+        val key by readerPreferences.visionApiKey.collectAsState()
+        val limit by readerPreferences.visionMonthlyLimit.collectAsState()
+        val used = rememberUsage(OcrEngine.GOOGLE_VISION, key, limit)
+        return Preference.PreferenceGroup(
+            title = OcrEngine.GOOGLE_VISION.displayName,
+            preferenceItems = listOf(
+                Preference.PreferenceItem.EditTextPreference(
+                    preference = readerPreferences.visionApiKey,
+                    title = stringResource(MR.strings.pref_vision_api_key),
+                    subtitle = stringResource(MR.strings.pref_vision_api_key_summary),
+                ),
+                Preference.PreferenceItem.SliderPreference(
+                    value = limit,
+                    valueRange = 0..2000,
+                    steps = 39,
+                    title = stringResource(MR.strings.pref_vision_monthly_limit),
+                    subtitle = usageSubtitle(key, used, limit, MR.strings.pref_vision_monthly_limit_summary),
+                    valueString = limitLabel(limit),
+                    onValueChanged = { readerPreferences.visionMonthlyLimit.set(it) },
+                ),
+            ),
+        )
+    }
+
+    @Composable
+    private fun getAzureGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
+        val key by readerPreferences.azureApiKey.collectAsState()
+        val limit by readerPreferences.azureMonthlyLimit.collectAsState()
+        val used = rememberUsage(OcrEngine.AZURE_READ, key, limit)
+        return Preference.PreferenceGroup(
+            title = OcrEngine.AZURE_READ.displayName,
+            preferenceItems = listOf(
+                Preference.PreferenceItem.EditTextPreference(
+                    preference = readerPreferences.azureEndpoint,
+                    title = stringResource(MR.strings.pref_azure_endpoint),
+                    subtitle = stringResource(MR.strings.pref_azure_endpoint_summary),
+                ),
+                Preference.PreferenceItem.EditTextPreference(
+                    preference = readerPreferences.azureApiKey,
+                    title = stringResource(MR.strings.pref_azure_api_key),
+                    subtitle = stringResource(MR.strings.pref_azure_api_key_summary),
+                ),
+                Preference.PreferenceItem.SliderPreference(
+                    value = limit,
+                    valueRange = 0..10000,
+                    steps = 39,
+                    title = stringResource(MR.strings.pref_azure_monthly_limit),
+                    subtitle = usageSubtitle(key, used, limit, MR.strings.pref_azure_monthly_limit_summary),
+                    valueString = limitLabel(limit),
+                    onValueChanged = { readerPreferences.azureMonthlyLimit.set(it) },
+                ),
+            ),
+        )
+    }
+
+    @Composable
+    private fun getGeminiGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
+        val key by readerPreferences.geminiApiKey.collectAsState()
+        val limit by readerPreferences.geminiMonthlyLimit.collectAsState()
+        val used = rememberUsage(OcrEngine.GEMINI, key, limit)
+        return Preference.PreferenceGroup(
+            title = OcrEngine.GEMINI.displayName,
+            preferenceItems = listOf(
+                Preference.PreferenceItem.EditTextPreference(
+                    preference = readerPreferences.geminiApiKey,
+                    title = stringResource(MR.strings.pref_gemini_api_key),
+                    subtitle = stringResource(MR.strings.pref_gemini_api_key_summary),
+                ),
+                Preference.PreferenceItem.EditTextPreference(
+                    preference = readerPreferences.geminiModel,
+                    title = stringResource(MR.strings.pref_gemini_model),
+                    subtitle = stringResource(MR.strings.pref_gemini_model_summary),
+                ),
+                Preference.PreferenceItem.SliderPreference(
+                    value = limit,
+                    valueRange = 0..10000,
+                    steps = 39,
+                    title = stringResource(MR.strings.pref_gemini_monthly_limit),
+                    subtitle = usageSubtitle(key, used, limit, MR.strings.pref_gemini_monthly_limit_summary),
+                    valueString = limitLabel(limit),
+                    onValueChanged = { readerPreferences.geminiMonthlyLimit.set(it) },
+                ),
+            ),
+        )
+    }
+
+    /** Re-read whenever the key or limit changes, which is when it can matter. */
+    @Composable
+    private fun rememberUsage(engine: OcrEngine, key: String, limit: Int): Int {
+        val recognizer = remember { Injekt.get<CloudTextRecognizer>() }
+        return remember(engine, key, limit) { recognizer.usedThisMonth(engine) }
+    }
+
+    @Composable
+    private fun usageSubtitle(
+        key: String,
+        used: Int,
+        limit: Int,
+        emptyRes: dev.icerock.moko.resources.StringResource,
+    ): String = if (key.isBlank()) {
+        stringResource(emptyRes)
+    } else {
+        stringResource(MR.strings.pref_vision_usage, used, limit)
+    }
+
+    @Composable
+    private fun limitLabel(limit: Int): String =
+        if (limit == 0) stringResource(MR.strings.pref_vision_no_limit) else "$limit"
+}

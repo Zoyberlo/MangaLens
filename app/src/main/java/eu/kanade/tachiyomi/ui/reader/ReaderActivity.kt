@@ -48,6 +48,7 @@ import androidx.lifecycle.lifecycleScope
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
 import com.google.android.material.transition.platform.MaterialContainerTransform
 import com.hippo.unifile.UniFile
+import dev.icerock.moko.resources.StringResource
 import eu.kanade.core.util.ifSourcesLoaded
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.presentation.reader.DisplayRefreshHost
@@ -98,6 +99,10 @@ import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
 import logcat.LogPriority
 import mihon.feature.translate.PageTranslator
+import mihon.feature.translate.QuotaEvent
+import mihon.feature.translate.QuotaKind
+import mihon.feature.translate.QuotaLevel
+import mihon.feature.translate.QuotaNotifier
 import mihon.feature.translate.TextTranslator
 import mihon.feature.translate.TranslateSelectionView
 import mihon.feature.translate.WordInspectorView
@@ -209,30 +214,8 @@ class ReaderActivity : BaseActivity() {
 
         // Surface metered-service quota news where the user will see it: those
         // services bill their account, not ours
-        Injekt.get<mihon.feature.translate.QuotaNotifier>().events
-            .onEach { event ->
-                toast(
-                    when (event.kind to event.level) {
-                        mihon.feature.translate.QuotaKind.CLOUD_OCR to
-                            mihon.feature.translate.QuotaLevel.APPROACHING,
-                        ->
-                            MR.strings.cloud_ocr_approaching_limit
-                        mihon.feature.translate.QuotaKind.CLOUD_OCR to
-                            mihon.feature.translate.QuotaLevel.REACHED,
-                        ->
-                            MR.strings.cloud_ocr_limit_reached
-                        mihon.feature.translate.QuotaKind.DEEPL to
-                            mihon.feature.translate.QuotaLevel.APPROACHING,
-                        ->
-                            MR.strings.deepl_approaching_limit
-                        mihon.feature.translate.QuotaKind.DEEPL to
-                            mihon.feature.translate.QuotaLevel.REACHED,
-                        ->
-                            MR.strings.deepl_limit_reached
-                        else -> MR.strings.cloud_ocr_failed
-                    },
-                )
-            }
+        Injekt.get<QuotaNotifier>().events
+            .onEach { event -> toast(quotaMessage(event)) }
             .launchIn(lifecycleScope)
 
         // The word-inspector panel is tied to what's on screen: hide it when
@@ -601,6 +584,29 @@ class ReaderActivity : BaseActivity() {
             onClickManualTranslate = ::startManualTranslate.takeIf { state.viewer != null },
             onClickSettings = viewModel::openSettingsDialog,
         )
+    }
+
+    private fun quotaMessage(event: QuotaEvent): StringResource = when (event.kind) {
+        QuotaKind.CLOUD_OCR -> when (event.level) {
+            QuotaLevel.APPROACHING -> MR.strings.cloud_ocr_approaching_limit
+            QuotaLevel.REACHED -> MR.strings.cloud_ocr_limit_reached
+            QuotaLevel.FAILED -> MR.strings.cloud_ocr_failed
+        }
+        QuotaKind.AZURE_OCR -> when (event.level) {
+            QuotaLevel.APPROACHING -> MR.strings.azure_ocr_approaching_limit
+            QuotaLevel.REACHED -> MR.strings.azure_ocr_limit_reached
+            QuotaLevel.FAILED -> MR.strings.azure_ocr_failed
+        }
+        QuotaKind.GEMINI_OCR -> when (event.level) {
+            QuotaLevel.APPROACHING -> MR.strings.gemini_ocr_approaching_limit
+            QuotaLevel.REACHED -> MR.strings.gemini_ocr_limit_reached
+            QuotaLevel.FAILED -> MR.strings.gemini_ocr_failed
+        }
+        QuotaKind.DEEPL -> when (event.level) {
+            QuotaLevel.APPROACHING -> MR.strings.deepl_approaching_limit
+            QuotaLevel.REACHED -> MR.strings.deepl_limit_reached
+            QuotaLevel.FAILED -> MR.strings.translate_selection_failed
+        }
     }
 
     /**

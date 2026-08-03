@@ -18,8 +18,9 @@ Two deliberate non-goals — see `context/decisions.md`:
 |------|------|
 | `mihon/feature/translate/TranslationModels.kt` | `TranslationSourceLanguage`, `TranslationProvider`, `TARGET_LANGUAGES`, `RecognizedBlock`, `TranslatedBlock`, `PageTranslation`, `RegionTranslateResult` |
 | `mihon/feature/translate/PageTextRecognizer.kt` | ML Kit OCR; one cached recognizer per source language |
-| `mihon/feature/translate/CloudTextRecognizer.kt` | Optional Google Cloud Vision OCR (user's own key), quota-capped |
-| `mihon/feature/translate/TranslationQuota.kt` | Shared quota plumbing: `QuotaKind`, `QuotaLevel`, `QuotaNotifier`, `currentQuotaPeriod()` |
+| `mihon/feature/translate/CloudTextRecognizer.kt` | The cloud OCR engines (Google Vision, Azure, Gemini), each on the user's own key and quota |
+| `mihon/feature/translate/TranslationQuota.kt` | Shared quota plumbing: `QuotaKind`, `QuotaLevel`, `QuotaNotifier`, `QuotaTracker` |
+| `presentation/more/settings/screen/SettingsRecognitionScreen.kt` | The engine picker, per-language overrides and every key/limit |
 | `mihon/feature/translate/TextTranslator.kt` | Translation backends, text normalization, LRU cache, instance backoff |
 | `mihon/feature/translate/PageTranslator.kt` | Orchestration: decode region → OCR → merge blocks → translate; also `warmUp()` |
 | `mihon/feature/translate/TranslationOverlayView.kt` | Draws the boxes; tap-to-select, X-to-dismiss, word/phrase picking |
@@ -147,34 +148,61 @@ resize-driven. Swipe-to-dismiss and the webtoon scroll-dismissal are both
 disabled while editing (`isEditingText`), so nothing yanks the panel away
 mid-sentence.
 
-## Cloud OCR (opt-in, per block)
+## Recognition engines (`OcrEngine`)
 
-On-device ML Kit does **all** automatic recognition. Cloud Vision is billed per
-request, so it never runs on its own: it is the purple ↻ button on a selected
-block, for the cases where ML Kit garbles stylised lettering.
-`PageTranslator.retryBlockWithCloud()` crops that one block from the original
-image, sends it to `images:annotate` (`DOCUMENT_TEXT_DETECTION`), re-translates
-the result and writes both back into the block. The crop is sent **unmodified** —
-the grayscale/contrast treatment in `enhanceForOcr` exists for ML Kit and only
-degrades what Vision sees. On failure or spent quota the on-device result is
-left alone.
+| Engine | Where it runs | Notes |
+|--------|---------------|-------|
+| `ON_DEVICE` | ML Kit, offline | Free, the default for everything, and the fallback whenever anything else fails |
+| `GOOGLE_VISION` | `vision.googleapis.com/v1/images:annotate` | `DOCUMENT_TEXT_DETECTION`; blocks from `fullTextAnnotation.pages[].blocks[]` |
+| `AZURE_READ` | `{endpoint}/computervision/imageanalysis:analyze?features=read` | Image Analysis 4.0 — synchronous, posts raw bytes; returns **lines**, which merge into bubbles downstream like ML Kit's |
+| `GEMINI` | `generativelanguage.googleapis.com/…:generateContent` | Reads for meaning, so it handles stylised lettering best — but returns no usable geometry |
 
-Blocks come from `fullTextAnnotation.pages[].blocks[].paragraphs[].words[].symbols[]`;
-paragraph bounding boxes map onto the same `RecognizedBlock` shape as ML Kit, so
-everything downstream is unchanged.
+`OcrEngine.canDetectLayout` is false for Gemini, which is why it is offered for
+block retries only: the automatic pass needs per-bubble boxes, and Gemini's
+result is one block spanning the whole crop.
+
+Two settings decide who runs, each with a per-source-language override stored as
+`LANGUAGE=ENGINE` entries in a string set (`ocrOverrideFor` / `withOcrOverride`):
+
+- **`ocrEngine`** — the automatic pass, i.e. every area the user selects.
+  Default `ON_DEVICE`, because a cloud engine here bills on every selection.
+  `PageTranslator.primaryEngineFor()` silently drops back to on-device when the
+  chosen engine is unconfigured or cannot do layout.
+- **`ocrRetryEngine`** — the purple ↻ button on a selected block. Default
+  `GEMINI`. `retryBlockWithCloud()` crops that one block from the original
+  image, re-reads it, re-translates and writes both back. The crop is sent
+  **unmodified** — the grayscale/contrast treatment in `enhanceForOcr` exists
+  for ML Kit and only degrades what the cloud engines see. On failure or spent
+  quota the on-device result is left alone.
+
+The ↻ button is hidden entirely when no language resolves to a configured cloud
+engine (`isRetryEngineUsable`), so it never appears as a dead control.
+
+Everything lives in **Settings → Reader → Text recognition**
+(`SettingsRecognitionScreen`), off the translation group.
+
+### Not implemented: on-device neural engines
+
+PaddleOCR PP-OCRv5 mobile and manga-ocr would both beat ML Kit *offline*, but
+each needs an ONNX Runtime dependency plus model files that are too big to
+bundle — so they need a download-and-manage story first. See
+`context/deferred-work.md`.
 
 ## Quotas
 
-Both paid services are metered so a user cannot silently run up a bill. The
-mechanics live in `TranslationQuota.kt` and are identical for each:
+Every paid service is metered so a user cannot silently run up a bill. One
+`QuotaTracker` per service holds the whole mechanic — nobody re-implements
+rollover or the warning thresholds:
 
-| | Cloud Vision | DeepL |
-|---|---|---|
-| Billed by | requests (one per manual retry) | characters |
-| Free tier | 1 000/month | 500 000/month |
-| Limit pref | `visionMonthlyLimit` (default 900) | `deeplMonthlyCharLimit` (default 450 000) |
-| Usage prefs | `visionUsageCount` / `visionUsagePeriod` | `deeplUsageChars` / `deeplUsagePeriod` |
-| `QuotaKind` | `CLOUD_OCR` | `DEEPL` |
+| | Google Vision | Azure | Gemini | DeepL |
+|---|---|---|---|---|
+| Billed by | requests | requests | requests | characters |
+| Free tier | 1 000/month | 5 000/month | resets **daily** | 500 000/month |
+| Limit default | 900 | 4 500 | 3 000 | 450 000 |
+| `QuotaKind` | `CLOUD_OCR` | `AZURE_OCR` | `GEMINI_OCR` | `DEEPL` |
+
+Gemini's free tier is per-day, so its monthly number is only a backstop against
+an attached billing account rather than a real match for the free tier.
 
 - The period is `"YYYY-MM"` from `currentQuotaPeriod()`; a mismatch on read
   resets the counter (rollover happens lazily, no scheduler).
@@ -182,7 +210,7 @@ mechanics live in `TranslationQuota.kt` and are identical for each:
 - Crossing `QUOTA_APPROACHING_RATIO` (90%) emits `APPROACHING`; a call refused
   for being over the limit emits `REACHED`. `ReaderActivity` collects
   `QuotaNotifier.events` and toasts the matching string.
-- Over the limit, a Vision retry is refused (the on-device result stays) and
+- Over the limit, a cloud OCR call is refused (the on-device result stays) and
   DeepL falls back to the `AUTO` provider chain, so translation keeps working —
   it just stops costing money.
 

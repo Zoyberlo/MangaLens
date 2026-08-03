@@ -166,7 +166,7 @@ class WebtoonPageHolder(
         frame.onTranslationBlockTranslateRequested = { block -> translateBlock(block) }
         frame.onTranslationBlockEditRequested = { block -> editBlock(block) }
         frame.onTranslationBlockCloudRetryRequested = { block -> cloudRetryBlock(block) }
-        frame.translationCloudRetryAvailable = pageTranslator.isCloudOcrConfigured
+        frame.translationCloudRetryAvailable = pageTranslator.isRetryEngineUsable
         loadJob?.cancel()
         loadJob = scope.launch { loadPageAndProcessStatus() }
         refreshLayoutParams()

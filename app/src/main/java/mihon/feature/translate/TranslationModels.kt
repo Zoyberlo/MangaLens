@@ -15,6 +15,44 @@ enum class TranslationSourceLanguage(val langCode: String) {
 }
 
 /**
+ * Which engine reads text off the page.
+ *
+ * [ON_DEVICE] is free, offline and the default everywhere. The rest are the
+ * user's own paid accounts, metered against a monthly limit they set.
+ */
+enum class OcrEngine(val displayName: String) {
+    ON_DEVICE("On-device"),
+    GOOGLE_VISION("Google Cloud Vision"),
+    AZURE_READ("Azure AI Vision"),
+    GEMINI("Gemini"),
+    ;
+
+    /**
+     * Whether the engine returns per-bubble boxes. Gemini transcribes what it
+     * is given but cannot be trusted for layout, so it can only re-read a
+     * block whose bounds are already known — never drive the automatic pass.
+     */
+    val canDetectLayout: Boolean get() = this != GEMINI
+
+    val isCloud: Boolean get() = this != ON_DEVICE
+}
+
+/**
+ * Per-source-language engine overrides, stored as `LANGUAGE=ENGINE` entries so
+ * a plain string set covers the whole mapping. A missing entry means "use the
+ * global setting".
+ */
+fun Set<String>.ocrOverrideFor(language: TranslationSourceLanguage): OcrEngine? =
+    firstOrNull { it.startsWith("${language.name}=") }
+        ?.substringAfter('=')
+        ?.let { name -> OcrEngine.entries.firstOrNull { it.name == name } }
+
+fun Set<String>.withOcrOverride(language: TranslationSourceLanguage, engine: OcrEngine?): Set<String> {
+    val rest = filterNot { it.startsWith("${language.name}=") }.toSet()
+    return if (engine == null) rest else rest + "${language.name}=${engine.name}"
+}
+
+/**
  * Which backend performs the translation. AUTO tries Google, then Lingva,
  * then MyMemory. DEEPL requires an API key set in reader settings.
  */

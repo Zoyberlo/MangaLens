@@ -22,6 +22,30 @@ packages, `.tachibk` folder scan → `RestoreBackupScreen`).
 
 ## Discussed, not built
 
+- **On-device neural OCR engines.** `OcrEngine` was built to take them, but both
+  candidates need model files that cannot be bundled, so they need a
+  download-manage-delete story (and an ONNX Runtime dependency, ~10–15 MB)
+  before either is worth starting:
+  - **PaddleOCR PP-OCRv5 mobile** — the one that would improve the *default,
+    offline* path. Recognition is only ~2M parameters and there is an
+    English-specific variant; v5 targets exactly our weak spots (handwriting,
+    vertical text, unusual glyphs). Needs the full PP-OCR pipeline: DB detection
+    with unclip post-processing, CTC decode, charset dictionaries. Roughly
+    +25–30 MB and a day or two of careful numeric work that cannot be verified
+    without a device.
+  - **manga-ocr** — best-in-class for Japanese manga specifically, and reads a
+    whole multi-line bubble in one pass, which is where ML Kit fails. Japanese
+    only, no detection stage (fine — our crops come from the user's selection),
+    but ~110M parameters, so ~100 MB+ even quantized: an explicit opt-in
+    download, like an offline translation pack.
+
+- **Gemini doing OCR and translation in one call.** It currently only
+  transcribes, so the user's chosen translation provider still applies. Letting
+  it translate directly would read for context (onomatopoeia, ALL-CAPS, split
+  bubbles) but breaks the uniform "engine returns source text" contract and
+  bypasses the translation cache. Worth revisiting once the transcription path
+  has been used in anger.
+
 - **CI secrets are pending a human step.** `.github/workflows/build-fork.yml`
   expects `STORE_FILE_BASE64` / `STORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` in
   the repo secrets; the owner uploads them with
