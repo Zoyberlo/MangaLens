@@ -149,6 +149,9 @@ class WebtoonPageHolder(
         loadJob = null
 
         removeErrorLayout()
+        // Drop the overlay with the image: the view is about to be reused for
+        // another page, and a stale one would briefly draw over it
+        frame.setTranslation(null)
         frame.recycle()
         progressIndicator.setProgress(0)
         progressContainer.isVisible = true
