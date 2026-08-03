@@ -150,10 +150,22 @@ class PageTranslator(
             }
             .filter { android.graphics.Rect.intersects(it.bounds, clamped) }
 
-        val candidates = mergeBlocks(inSelection, recognizedLanguage)
+        val merged = mergeBlocks(inSelection, recognizedLanguage)
             .filter { block -> block.text.length >= 2 && block.text.any { it.isLetter() } }
             .take(MAX_BLOCKS_PER_PAGE)
-        if (candidates.isEmpty()) return RegionTranslateResult.NoText
+        if (merged.isEmpty()) return RegionTranslateResult.NoText
+
+        // Second pass: each bubble is re-read on its own at full resolution.
+        // Scaling by the whole selection means a generous selection shrinks the
+        // lettering; per-block scaling gives every bubble the same glyph size.
+        val candidates = merged.map { block ->
+            val refined = refineBlockText(imageBytes, block, recognizedLanguage)
+            if (refined != null && textQuality(refined) > textQuality(block.text)) {
+                block.copy(text = refined)
+            } else {
+                block
+            }
+        }
 
         // Original-first mode (overlay display only): show the recognized text
         // untranslated; each block is translated on demand via translateSingle
@@ -168,6 +180,68 @@ class PageTranslator(
         if (blocks.isEmpty()) return RegionTranslateResult.Failed
 
         return RegionTranslateResult.Success(PageTranslation(bounds.outWidth, bounds.outHeight, blocks))
+    }
+
+    /**
+     * Re-reads one recognized block from the original image, cropped tight and
+     * scaled so its lettering is large regardless of how much the user
+     * selected. Returns null when the crop or recognition fails.
+     */
+    private suspend fun refineBlockText(
+        imageBytes: ByteArray,
+        block: RecognizedBlock,
+        language: TranslationSourceLanguage,
+    ): String? {
+        return try {
+            val bounds = block.bounds
+            if (bounds.width() <= 0 || bounds.height() <= 0) return null
+
+            val padX = (bounds.width() * BLOCK_PADDING).toInt().coerceAtLeast(6)
+            val padY = (bounds.height() * BLOCK_PADDING).toInt().coerceAtLeast(6)
+            val crop = android.graphics.Rect(bounds).apply { inset(-padX, -padY) }
+
+            val info = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, info)
+            if (!crop.intersect(android.graphics.Rect(0, 0, info.outWidth, info.outHeight))) return null
+
+            @Suppress("DEPRECATION")
+            val decoder = android.graphics.BitmapRegionDecoder
+                .newInstance(imageBytes, 0, imageBytes.size, false)
+            val decoded = try {
+                decoder.decodeRegion(crop, BitmapFactory.Options())
+            } finally {
+                decoder.recycle()
+            } ?: return null
+
+            val scale = (TARGET_BLOCK_HEIGHT / decoded.height.toFloat()).coerceIn(1f, MAX_BLOCK_UPSCALE)
+            val prepared = enhanceForOcr(decoded, scale)
+            val text = try {
+                recognizer.recognize(prepared, language).blocks.joinToString(" ") { it.text }.trim()
+            } finally {
+                prepared.recycle()
+                decoded.recycle()
+            }
+            text.takeIf { it.isNotBlank() }
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Block refinement failed" }
+            null
+        }
+    }
+
+    /**
+     * Rough share of tokens that look like real words, used to decide whether
+     * a second recognition pass actually improved on the first. Garbled OCR
+     * shows up as tokens with stray punctuation, digits or no vowels.
+     */
+    private fun textQuality(text: String): Float {
+        val tokens = text.split(Regex("\\s+")).filter { it.any(Char::isLetter) }
+        if (tokens.isEmpty()) return 0f
+        val good = tokens.count { token ->
+            val letters = token.filter { it.isLetter() }
+            letters.length >= token.trim('.', ',', '!', '?', '"', '\'', '-', '…').length &&
+                (letters.length <= 2 || letters.any { it.lowercaseChar() in "aeiouyаеєиіїоуюя" })
+        }
+        return good.toFloat() / tokens.size
     }
 
     /**
@@ -407,5 +481,11 @@ class PageTranslator(
 
         // ML Kit accuracy degrades on very large inputs and huge bitmaps waste memory
         private const val MAX_OCR_DIMENSION = 2560
+
+        // Second-pass settings: crop margin around a block, the height its
+        // crop is scaled to, and the ceiling on that scaling
+        private const val BLOCK_PADDING = 0.14f
+        private const val TARGET_BLOCK_HEIGHT = 640f
+        private const val MAX_BLOCK_UPSCALE = 4f
     }
 }
