@@ -1,0 +1,70 @@
+name: Release MangaLens
+
+# Publishes the GitHub release that the in-app updater reads. Upstream's
+# release.yml is disabled outside mihonapp/mihon, so this fork has its own.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to release (e.g. v1.0.1)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          # getLatestCommitCount() walks the history
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # -Penable-updater switches on the in-app update checker, which reads
+      # the releases this workflow publishes
+      - name: Build signed release APKs
+        run: ./gradlew assembleRelease -Penable-updater
+        env:
+          MIHON_GITHUB_RELEASE: "true"
+          storeFileBase64: ${{ secrets.STORE_FILE_BASE64 }}
+          storePassword: ${{ secrets.STORE_PASSWORD }}
+          keyAlias: ${{ secrets.KEY_ALIAS }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+
+      # The updater picks an asset by matching "-<abi>" in its file name
+      - name: Name the APKs after the release
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          cd app/build/outputs/apk/release
+          for abi in arm64-v8a armeabi-v7a x86_64 x86 universal; do
+            if [ -f "app-$abi-release.apk" ]; then
+              mv "app-$abi-release.apk" "mangalens-$TAG-$abi.apk"
+            fi
+          done
+          ls -la
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          gh release create "$TAG" \
+            app/build/outputs/apk/release/mangalens-*.apk \
+            --title "MangaLens $TAG" \
+            --generate-notes

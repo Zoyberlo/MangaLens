@@ -56,6 +56,16 @@ Plus fork-only files outside that package:
 - `.github/workflows/build-fork.yml` — CI building signed release APKs (upstream's
   own workflows are untouched)
 
+## Releases and the in-app updater
+
+Tagging `v<version>` runs `.github/workflows/release-fork.yml`, which builds
+signed APKs with `-Penable-updater`, renames them to `mangalens-<tag>-<abi>.apk`
+(the updater matches assets by `-<abi>`) and publishes a GitHub release.
+`versionName`/`versionCode` in `app/build.gradle.kts` are the fork's own —
+`GetApplicationRelease` compares the running `versionName` against the release
+tag, so the two must move together. Upstream's `release.yml` is untouched; it is
+gated on `github.repository == 'mihonapp/mihon'` and never fires here.
+
 ## Signing
 
 `keystore.properties` (gitignored) points at the owner's keystore
@@ -77,6 +87,9 @@ conflict when syncing with upstream.
 | `app/src/main/AndroidManifest.xml` | `<queries>` for Mihon-family packages (migrate-from-app detection) |
 | `presentation/more/MoreScreen.kt`, `ui/more/MoreTab.kt` | Migrate from another app row |
 | `ui/reader/viewer/ViewerNavigation.kt` | per-axis tap-zone scaling (`navigationTapZoneWidth` 65%, `navigationTapZoneHeight` 50%) |
+| `data/updater/AppUpdateChecker.kt` | `GITHUB_REPO` points at this fork; upstream builds are signed with another key and cannot install over ours |
+| `res/drawable/ic_mihon.xml`, `ic_mihon_splash.xml`, `ic_launcher_*` | our mark and launcher artwork; the `ic_mihon` file names are kept so the many references stay untouched |
+| `presentation/more/onboarding/OnboardingScreen.kt` | adds `TranslationStep` (fork-only file) to first-run setup |
 | `res/values/colors.xml`, `res/drawable/ic_launcher_*.xml` | the debug-flavor icon palette applied to all build types |
 | `gradle/libs.versions.toml` | `mlkit-text` version, 4 libraries, `mlkit-text` bundle |
 | `i18n/.../moko-resources/base/strings.xml` | `app_name` + translation strings |

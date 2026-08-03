@@ -34,13 +34,9 @@ class AppUpdateChecker {
     }
 }
 
-val GITHUB_REPO: String by lazy {
-    if (isPreviewBuildType) {
-        "mihonapp/mihon-preview"
-    } else {
-        "mihonapp/mihon"
-    }
-}
+// Fork: updates come from this fork's releases, never upstream's — their
+// builds are signed with a different key and would fail to install over ours.
+val GITHUB_REPO: String = "Zoyberlo/mihon"
 
 val RELEASE_TAG: String by lazy {
     if (isPreviewBuildType) {

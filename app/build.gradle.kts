@@ -32,8 +32,10 @@ android {
     defaultConfig {
         applicationId = "app.mangalens"
 
-        versionCode = 27
-        versionName = "0.20.2"
+        // Fork versioning, independent of upstream: release tags are "v<name>"
+        // and the in-app updater compares against them
+        versionCode = 100
+        versionName = "1.0.0"
 
         buildConfigField("String", "COMMIT_COUNT", "\"${getLatestCommitCount()}\"")
         buildConfigField("String", "COMMIT_SHA", "\"${getLatestCommitSha()}\"")
