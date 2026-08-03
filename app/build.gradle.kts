@@ -45,9 +45,10 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Emulator-only ABIs are dropped from every APK, which is what makes
-        // the universal build small enough to hand out as the single download.
-        // Pass -Pall-abis when an x86 emulator is actually needed.
+        // Both ARM architectures ship; only the emulator-only x86 ABIs are
+        // dropped, which is what keeps the single universal APK reasonable
+        // (106 MB -> 55 MB). Keeping 32-bit ARM costs ~16 MB and keeps old
+        // phones supported. Pass -Pall-abis to build x86 too.
         if (!project.hasProperty("all-abis")) {
             ndk {
                 abiFilters += listOf("arm64-v8a", "armeabi-v7a")

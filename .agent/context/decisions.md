@@ -26,6 +26,19 @@ words. Keeping a half-used feature meant extra buttons on every bubble.
 **Don't:** Re-add saving without agreeing it first — the panel is intentionally
 a read-only lookup. The code is recoverable from git history if that changes.
 
+## One universal APK, ARM only
+
+**What:** ABI splits are off by default; `assembleRelease` produces a single
+universal APK, and `ndk.abiFilters` keeps `arm64-v8a` + `armeabi-v7a` only.
+**Why:** Distribution is a GitHub release link, not a store that slices builds
+per device, so every extra file becomes a "which one do I download?" question.
+Dropping the emulator-only x86 ABIs took the universal APK from 106 MB to
+55 MB, which is close enough to an arm64-only build (39 MB) to be worth it.
+32-bit ARM is kept deliberately: the owner values old-phone support over the
+~16 MB it costs.
+**Don't:** Drop `armeabi-v7a` to save size. Use `-Pall-abis` when an x86
+emulator or per-ABI splits are genuinely needed.
+
 ## A fork, not a Mihon extension
 
 **What:** The feature is compiled into the app.
