@@ -1,5 +1,5 @@
 <!--
-  MangaLens mark: a comic page with a speech bubble, as a white silhouette.
+  MangaLens mark: a lens over a comic page, as a white silhouette.
   Used by the splash screen, the More/About header and notification icons,
   all of which need a single-colour shape. The file name is upstream's so the
   references stay untouched; only the artwork is ours (no Mihon branding left).
@@ -10,26 +10,35 @@
     android:viewportWidth="192"
     android:viewportHeight="192">
 
-  <!-- Page, hollowed out so the mark still reads at notification size -->
+  <!-- Page outline -->
   <path
       android:fillColor="#FFFFFFFF"
       android:fillType="evenOdd"
-      android:pathData="M28,10h84a14,14 0 0 1 14,14v144a14,14 0 0 1 -14,14h-84a14,14 0 0 1 -14,-14v-144a14,14 0 0 1 14,-14zM30,26v140h80v-140z"/>
+      android:pathData="M20,14h56a10,10 0 0 1 10,10v104a10,10 0 0 1 -10,10h-56a10,10 0 0 1 -10,-10v-104a10,10 0 0 1 10,-10zM22,28v96h52v-96z"/>
 
-  <!-- Lines of text on the page -->
+  <!-- Panel divider -->
   <path
       android:fillColor="#FFFFFFFF"
-      android:pathData="M44,44h52v12h-52z"/>
-  <path
-      android:fillColor="#FFFFFFFF"
-      android:pathData="M44,68h52v12h-52z"/>
-  <path
-      android:fillColor="#FFFFFFFF"
-      android:pathData="M44,92h30v12h-30z"/>
+      android:pathData="M22,72h52v8h-52z"/>
 
-  <!-- Speech bubble overlapping the page -->
+  <!-- Lens rim -->
   <path
       android:fillColor="#FFFFFFFF"
       android:fillType="evenOdd"
-      android:pathData="M104,88h60a14,14 0 0 1 14,14v44a14,14 0 0 1 -14,14h-24l-24,20v-20h-12a14,14 0 0 1 -14,-14v-44a14,14 0 0 1 14,-14zM118,106h32v10h-32zM118,126h20v10h-20z"/>
+      android:pathData="M76,116a40,40 0 1 0 80,0a40,40 0 1 0 -80,0zM86,116a30,30 0 1 1 60,0a30,30 0 1 1 -60,0z"/>
+
+  <!-- Translated lines inside the lens -->
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M98,108h36v8h-36z"/>
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M98,122h26v8h-26z"/>
+
+  <!-- Handle -->
+  <path
+      android:pathData="M144,144L164,164"
+      android:strokeColor="#FFFFFFFF"
+      android:strokeWidth="16"
+      android:strokeLineCap="round"/>
 </vector>
