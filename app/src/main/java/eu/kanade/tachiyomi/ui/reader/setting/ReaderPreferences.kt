@@ -102,6 +102,17 @@ class ReaderPreferences(
 
     val deeplApiKey: Preference<String> = preferenceStore.getString("pref_deepl_api_key", "")
 
+    // Cloud text recognition (Google Cloud Vision). Off unless a key is set;
+    // the limit guards the user's own billing, and defaults below Google's
+    // free monthly tier of 1000 requests.
+    val visionApiKey: Preference<String> = preferenceStore.getString("pref_vision_api_key", "")
+
+    val visionMonthlyLimit: Preference<Int> = preferenceStore.getInt("pref_vision_monthly_limit", 900)
+
+    val visionUsageCount: Preference<Int> = preferenceStore.getInt("pref_vision_usage_count", 0)
+
+    val visionUsagePeriod: Preference<String> = preferenceStore.getString("pref_vision_usage_period", "")
+
     val translateShowOriginalFirst: Preference<Boolean> = preferenceStore.getBoolean(
         "pref_translate_original_first",
         false,

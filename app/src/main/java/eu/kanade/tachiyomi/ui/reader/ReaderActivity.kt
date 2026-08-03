@@ -187,6 +187,23 @@ class ReaderActivity : BaseActivity() {
         // path so the first "translate area" action is fast
         lifecycleScope.launchIO { Injekt.get<PageTranslator>().warmUp() }
 
+        // Surface cloud-recognition quota problems where the user will see
+        // them: they pay for that quota
+        Injekt.get<mihon.feature.translate.CloudTextRecognizer>().warnings
+            .onEach { warning ->
+                toast(
+                    when (warning) {
+                        mihon.feature.translate.CloudOcrWarning.APPROACHING_LIMIT ->
+                            MR.strings.cloud_ocr_approaching_limit
+                        mihon.feature.translate.CloudOcrWarning.LIMIT_REACHED ->
+                            MR.strings.cloud_ocr_limit_reached
+                        mihon.feature.translate.CloudOcrWarning.FAILED ->
+                            MR.strings.cloud_ocr_failed
+                    },
+                )
+            }
+            .launchIn(lifecycleScope)
+
         // The word-inspector panel is tied to what's on screen: hide it when
         // the user moves on to another page
         viewModel.state

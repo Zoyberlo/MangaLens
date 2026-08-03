@@ -18,9 +18,27 @@ import tachiyomi.core.common.util.system.logcat
  */
 class PageTranslator(
     private val recognizer: PageTextRecognizer,
+    private val cloudRecognizer: CloudTextRecognizer,
     private val translator: TextTranslator,
     private val readerPreferences: ReaderPreferences,
 ) {
+
+    /**
+     * Recognizes with Google Cloud Vision when the user configured it, since
+     * the on-device model struggles with stylised comic lettering, and falls
+     * back to on-device whenever the cloud is unavailable or out of quota.
+     */
+    private suspend fun recognizeBest(
+        bitmap: android.graphics.Bitmap,
+        language: TranslationSourceLanguage,
+    ): RecognitionResult {
+        if (cloudRecognizer.isConfigured) {
+            cloudRecognizer.recognize(bitmap, language)
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return RecognitionResult(it, language) }
+        }
+        return recognizer.recognize(bitmap, language)
+    }
 
     /**
      * The backend that served the most recent AUTO-mode translation.
@@ -121,7 +139,7 @@ class PageTranslator(
         val bitmap = if (upscale > 1f) enhanceForOcr(decoded, upscale) else decoded
 
         val recognition = try {
-            recognizer.recognize(bitmap, from)
+            recognizeBest(bitmap, from)
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Text recognition failed" }
             return RegionTranslateResult.NoText
@@ -216,6 +234,8 @@ class PageTranslator(
             val scale = (TARGET_BLOCK_HEIGHT / decoded.height.toFloat()).coerceIn(1f, MAX_BLOCK_UPSCALE)
             val prepared = enhanceForOcr(decoded, scale)
             val text = try {
+                // On-device only: the cloud pass already read the whole region
+                // and a per-block request would spend quota for little gain
                 recognizer.recognize(prepared, language).blocks.joinToString(" ") { it.text }.trim()
             } finally {
                 prepared.recycle()

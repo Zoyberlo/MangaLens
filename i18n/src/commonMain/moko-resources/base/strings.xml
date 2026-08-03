@@ -397,6 +397,15 @@
     <string name="pref_translation_provider">Translation service</string>
     <string name="pref_deepl_api_key">DeepL API key</string>
     <string name="pref_deepl_api_key_summary">Required only for the DeepL service (free key at deepl.com/pro-api)</string>
+    <string name="pref_vision_api_key">Cloud text recognition key</string>
+    <string name="pref_vision_api_key_summary">Google Cloud Vision reads stylised lettering far better than the on-device model. Leave empty to stay fully offline.</string>
+    <string name="pref_vision_monthly_limit">Cloud requests per month</string>
+    <string name="pref_vision_monthly_limit_summary">Google bills beyond its free tier of 1000 per month, so this caps usage on your behalf</string>
+    <string name="pref_vision_usage">Used %1$d of %2$d this month</string>
+    <string name="pref_vision_no_limit">No limit</string>
+    <string name="cloud_ocr_approaching_limit">Cloud recognition is close to your monthly limit</string>
+    <string name="cloud_ocr_limit_reached">Monthly cloud limit reached — using on-device recognition</string>
+    <string name="cloud_ocr_failed">Cloud recognition failed — using on-device recognition</string>
     <string name="action_translate_selection">Translate area</string>
     <string name="translate_selection_hint">Drag to select the area to translate</string>
     <string name="translate_selection_no_text">No text recognized in the selected area</string>
