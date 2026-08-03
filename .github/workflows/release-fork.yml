@@ -35,11 +35,13 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
 
       # -Penable-updater switches on the in-app update checker, which reads
       # the releases this workflow publishes
       - name: Build signed release APKs
-        run: ./gradlew assembleRelease -Penable-updater
+        run: ./gradlew assembleRelease -Penable-updater --build-cache
         env:
           MIHON_GITHUB_RELEASE: "true"
           storeFileBase64: ${{ secrets.STORE_FILE_BASE64 }}

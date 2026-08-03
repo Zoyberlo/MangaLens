@@ -132,7 +132,14 @@ android {
             isEnable = true
             isUniversalApk = true
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            // x86/x86_64 are emulator-only for this app; skipping them cuts
+            // two APKs (and their native library packaging) off every build.
+            // Pass -Pall-abis to get the full set back.
+            if (project.hasProperty("all-abis")) {
+                include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            } else {
+                include("armeabi-v7a", "arm64-v8a")
+            }
         }
     }
 

@@ -3,6 +3,9 @@ name: Build MangaLens
 on:
   push:
     branches: [feature/auto-translate]
+    # A tagged commit is built by release-fork.yml; running both makes them
+    # fight over the runner and doubles the wait
+    tags-ignore: ['**']
   workflow_dispatch:
 
 concurrency:
@@ -24,9 +27,12 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          # Reuse task outputs (R8, Compose compilation) across runs
+          cache-read-only: false
 
       - name: Build signed release APKs
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease --build-cache
         env:
           MIHON_GITHUB_RELEASE: "true"
           storeFileBase64: ${{ secrets.STORE_FILE_BASE64 }}
