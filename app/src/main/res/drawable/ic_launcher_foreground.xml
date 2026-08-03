@@ -1,4 +1,8 @@
-<!-- A comic page with a translated speech bubble over it. -->
+<!--
+  A comic page with a translated speech bubble over it.
+  Artwork is kept inside the adaptive-icon safe zone (roughly 136..296 of the
+  432 viewport, centred on 216,216) so launcher masks leave breathing room.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -7,32 +11,32 @@
 
   <!-- Page -->
   <path
-      android:pathData="M136,100h132a16,16 0 0 1 16,16v200a16,16 0 0 1 -16,16h-132a16,16 0 0 1 -16,-16v-200a16,16 0 0 1 16,-16z"
+      android:pathData="M148,132h96a14,14 0 0 1 14,14v140a14,14 0 0 1 -14,14h-96a14,14 0 0 1 -14,-14v-140a14,14 0 0 1 14,-14z"
       android:fillColor="#FFFFFF"/>
 
   <!-- Lines of the untranslated page -->
   <path
-      android:pathData="M152,138h100v14h-100z"
-      android:fillColor="#C3D0DE"/>
+      android:pathData="M158,162h76v14h-76z"
+      android:fillColor="#B9C7D6"/>
   <path
-      android:pathData="M152,170h100v14h-100z"
-      android:fillColor="#C3D0DE"/>
+      android:pathData="M158,192h76v14h-76z"
+      android:fillColor="#B9C7D6"/>
   <path
-      android:pathData="M152,202h58v14h-58z"
-      android:fillColor="#C3D0DE"/>
+      android:pathData="M158,222h44v14h-44z"
+      android:fillColor="#B9C7D6"/>
 
   <!-- Speech bubble, outlined in the background colour to lift it off the page -->
   <path
-      android:pathData="M214,208h104a24,24 0 0 1 24,24v62a24,24 0 0 1 -24,24h-46l-36,30v-30h-22a24,24 0 0 1 -24,-24v-62a24,24 0 0 1 24,-24z"
+      android:pathData="M222,206h62a18,18 0 0 1 18,18v50a18,18 0 0 1 -18,18h-26l-26,22v-22h-10a18,18 0 0 1 -18,-18v-50a18,18 0 0 1 18,-18z"
       android:fillColor="@color/accent_blue"
       android:strokeColor="@color/icon_background"
-      android:strokeWidth="16"/>
+      android:strokeWidth="14"/>
 
   <!-- Translated lines inside the bubble -->
   <path
-      android:pathData="M238,240h62v14h-62z"
+      android:pathData="M238,230h40v12h-40z"
       android:fillColor="@color/icon_background"/>
   <path
-      android:pathData="M238,270h38v14h-38z"
+      android:pathData="M238,254h26v12h-26z"
       android:fillColor="@color/icon_background"/>
 </vector>

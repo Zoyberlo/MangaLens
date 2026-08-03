@@ -9,19 +9,19 @@
   <path
       android:fillColor="#FFFFFFFF"
       android:fillType="evenOdd"
-      android:pathData="M136,100h132a16,16 0 0 1 16,16v200a16,16 0 0 1 -16,16h-132a16,16 0 0 1 -16,-16v-200a16,16 0 0 1 16,-16zM152,124v184h100v-184z"/>
+      android:pathData="M148,132h96a14,14 0 0 1 14,14v140a14,14 0 0 1 -14,14h-96a14,14 0 0 1 -14,-14v-140a14,14 0 0 1 14,-14zM152,152v128h88v-128z"/>
 
   <!-- Lines on the page -->
   <path
       android:fillColor="#FFFFFFFF"
-      android:pathData="M168,146h68v14h-68z"/>
+      android:pathData="M166,168h58v12h-58z"/>
   <path
       android:fillColor="#FFFFFFFF"
-      android:pathData="M168,178h68v14h-68z"/>
+      android:pathData="M166,196h58v12h-58z"/>
 
   <!-- Speech bubble -->
   <path
       android:fillColor="#FFFFFFFF"
       android:fillType="evenOdd"
-      android:pathData="M214,208h104a24,24 0 0 1 24,24v62a24,24 0 0 1 -24,24h-46l-36,30v-30h-22a24,24 0 0 1 -24,-24v-62a24,24 0 0 1 24,-24zM238,240h62v14h-62zM238,270h38v14h-38z"/>
+      android:pathData="M222,206h62a18,18 0 0 1 18,18v50a18,18 0 0 1 -18,18h-26l-26,22v-22h-10a18,18 0 0 1 -18,-18v-50a18,18 0 0 1 18,-18zM238,230h40v12h-40zM238,254h26v12h-26z"/>
 </vector>
