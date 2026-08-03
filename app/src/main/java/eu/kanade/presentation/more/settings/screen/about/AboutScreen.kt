@@ -41,7 +41,6 @@ import eu.kanade.tachiyomi.util.system.toast
 import eu.kanade.tachiyomi.util.system.updaterEnabled
 import kotlinx.coroutines.launch
 import logcat.LogPriority
-import tachiyomi.core.common.Constants
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.logcat
@@ -52,16 +51,14 @@ import tachiyomi.presentation.core.components.ScrollbarLazyColumn
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.icons.CustomIcons
-import tachiyomi.presentation.core.icons.Discord
-import tachiyomi.presentation.core.icons.Facebook
 import tachiyomi.presentation.core.icons.Github
-import tachiyomi.presentation.core.icons.Reddit
-import tachiyomi.presentation.core.icons.X
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+
+private const val FORK_REPO_URL = "https://github.com/Zoyberlo/MangaLens"
 
 object AboutScreen : Screen() {
 
@@ -158,13 +155,19 @@ object AboutScreen : Screen() {
                     )
                 }
 
+                // States what this fork is and where it came from, as Apache
+                // 2.0 section 4b requires of distributed modifications
                 item {
                     TextPreferenceWidget(
-                        title = stringResource(MR.strings.privacy_policy),
-                        onPreferenceClick = { uriHandler.openUri("https://mihon.app/privacy/") },
+                        title = stringResource(MR.strings.about_fork_notice_title),
+                        subtitle = stringResource(MR.strings.about_fork_notice_summary),
+                        onPreferenceClick = { uriHandler.openUri("$FORK_REPO_URL/blob/main/NOTICE") },
                     )
                 }
 
+                // This fork has no site, no accounts and no analytics, so the
+                // upstream social row and privacy policy are replaced by the
+                // two links that actually belong to it.
                 item {
                     Row(
                         modifier = Modifier
@@ -173,34 +176,14 @@ object AboutScreen : Screen() {
                         horizontalArrangement = Arrangement.Center,
                     ) {
                         LinkIcon(
-                            label = stringResource(MR.strings.website),
-                            icon = Icons.Outlined.Public,
-                            url = "https://mihon.app",
-                        )
-                        LinkIcon(
-                            label = "Discord",
-                            icon = CustomIcons.Discord,
-                            url = Constants.URL_DISCORD,
-                        )
-                        LinkIcon(
-                            label = "X",
-                            icon = CustomIcons.X,
-                            url = "https://x.com/mihonapp",
-                        )
-                        LinkIcon(
-                            label = "Facebook",
-                            icon = CustomIcons.Facebook,
-                            url = "https://facebook.com/mihonapp",
-                        )
-                        LinkIcon(
-                            label = "Reddit",
-                            icon = CustomIcons.Reddit,
-                            url = "https://www.reddit.com/r/mihonapp",
-                        )
-                        LinkIcon(
                             label = "GitHub",
                             icon = CustomIcons.Github,
-                            url = "https://github.com/mihonapp",
+                            url = FORK_REPO_URL,
+                        )
+                        LinkIcon(
+                            label = stringResource(MR.strings.about_upstream_project),
+                            icon = Icons.Outlined.Public,
+                            url = "https://mihon.app",
                         )
                     }
                 }

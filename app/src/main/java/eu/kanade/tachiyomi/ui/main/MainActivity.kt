@@ -261,7 +261,9 @@ class MainActivity : BaseActivity() {
                 if (!isBenchmarkBuildType) {
                     CheckForUpdates()
                     ShowOnboarding()
-                    ShowDonationCampaign()
+                    // Upstream's donation campaign sheet is not shown in this
+                    // fork: it asks for money on behalf of a project we are
+                    // not, and this app collects nothing.
                 }
             }
         }
