@@ -42,7 +42,8 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
     private val wordView = TextView(context).apply {
         setTextColor(Color.WHITE)
         textSize = 17f
-        maxLines = 8
+        maxLines = 12
+        // LinkMovementMethod also scrolls the text when it outgrows the panel
         movementMethod = LinkMovementMethod.getInstance()
         highlightColor = Color.TRANSPARENT
     }
@@ -55,8 +56,12 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
         orientation = HORIZONTAL
     }
 
-    private val closeButton = Button(context).apply {
-        text = context.stringResource(MR.strings.action_cancel)
+    private val closeButton = TextView(context).apply {
+        text = "✕"
+        setTextColor(0xB3FFFFFF.toInt())
+        textSize = 18f
+        setPadding((12 * dp).toInt(), (4 * dp).toInt(), (4 * dp).toInt(), (8 * dp).toInt())
+        contentDescription = context.stringResource(MR.strings.action_close)
         setOnClickListener { onDismiss?.invoke() }
     }
 
@@ -92,7 +97,32 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
         }
         isClickable = true // consume touches so they don't reach the page
 
-        addView(wordView)
+        // Keep content clear of the navigation bar while the panel itself
+        // stays flush with the bottom of the screen
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
+            val bottom = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars()).bottom
+            view.setPadding(
+                (16 * dp).toInt(),
+                (16 * dp).toInt(),
+                (16 * dp).toInt(),
+                (16 * dp).toInt() + bottom,
+            )
+            insets
+        }
+
+        // Original text with the close affordance in its top-right corner, so
+        // the panel spends its height on content instead of a button row
+        addView(
+            LinearLayout(context).apply {
+                orientation = HORIZONTAL
+                addView(
+                    wordView,
+                    LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f),
+                )
+                addView(closeButton, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
+            },
+            LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
+        )
         addView(progress, LayoutParams((24 * dp).toInt(), (24 * dp).toInt()).apply { topMargin = (8 * dp).toInt() })
         addView(
             HorizontalScrollView(context).apply {
@@ -100,14 +130,6 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
                 addView(chipsRow)
             },
             LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = (8 * dp).toInt() },
-        )
-        addView(
-            LinearLayout(context).apply {
-                orientation = HORIZONTAL
-                gravity = Gravity.END
-                addView(closeButton)
-            },
-            LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
         )
     }
 

@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -63,28 +64,48 @@ private data class BackupEntry(
 )
 
 /**
- * Backup file names are `<package>_<date>.tachibk`, so the owning app can be
- * resolved from the prefix and shown with its real name and icon instead of a
- * raw file name.
+ * Names of apps that produce Mihon-format backups, for prefixes whose app is
+ * not installed (or never was, e.g. Tachiyomi). Keyed by the file-name prefix,
+ * which is the package name — except legacy Tachiyomi, which used a plain name.
+ */
+private val KNOWN_BACKUP_SOURCES = mapOf(
+    "app.mihon" to "Mihon",
+    "app.mihon.debug" to "Mihon (debug)",
+    "app.mihon.preview" to "Mihon Preview",
+    "app.mihon.foss" to "Mihon FOSS",
+    "tachiyomi" to "Tachiyomi",
+    "eu.kanade.tachiyomi" to "Tachiyomi",
+    "eu.kanade.tachiyomi.debug" to "Tachiyomi (debug)",
+    "eu.kanade.tachiyomi.j2k" to "Tachiyomi J2K",
+    "xyz.jmir.tachiyomi.mi" to "TachiyomiSY",
+    "xyz.jmir.tachiyomi.mi.sy" to "TachiyomiSY",
+    "komikku.app" to "Komikku",
+)
+
+/**
+ * Backup file names are `<prefix>_<date>.tachibk`, where the prefix is the
+ * producing app's package (legacy Tachiyomi used its plain name). Resolve it to
+ * a real app name and icon so the list reads like apps, not file names.
  */
 private fun FoundBackup.toEntry(context: Context, ownPackage: String): BackupEntry {
-    val pkg = name.substringBefore('_').takeIf { it.contains('.') }
-    var label = pkg ?: name
+    val prefix = name.substringBefore('_').takeIf { it.isNotBlank() && it != name }
+    var label: String? = KNOWN_BACKUP_SOURCES[prefix]
     var icon: ImageBitmap? = null
-    if (pkg != null) {
+    if (prefix != null && prefix.contains('.')) {
         try {
-            val info = context.packageManager.getApplicationInfo(pkg, 0)
+            val info = context.packageManager.getApplicationInfo(prefix, 0)
             label = context.packageManager.getApplicationLabel(info).toString()
             icon = context.packageManager.getApplicationIcon(info).toBitmap(96, 96).asImageBitmap()
         } catch (_: PackageManager.NameNotFoundException) {
-            // App no longer installed: the package name is the best label we have
+            // Not installed: fall back to the known-source name, or the prefix
         }
     }
     return BackupEntry(
         backup = this,
-        appLabel = label,
+        appLabel = label ?: prefix ?: name,
         icon = icon,
-        isOwnBackup = pkg != null && (pkg == ownPackage || ownPackage.startsWith("$pkg.")),
+        // Exact match only: app.mihon.tl.dev and app.mihon are different installs
+        isOwnBackup = prefix == ownPackage,
     )
 }
 
@@ -246,6 +267,16 @@ class MigrateFromAppScreen : Screen() {
                             Image(
                                 bitmap = entry.icon,
                                 contentDescription = null,
+                                modifier = Modifier
+                                    .padding(end = 12.dp)
+                                    .size(40.dp),
+                            )
+                        } else {
+                            // Uninstalled or unrecognized producer
+                            Icon(
+                                imageVector = Icons.Outlined.Archive,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
                                     .padding(end = 12.dp)
                                     .size(40.dp),
