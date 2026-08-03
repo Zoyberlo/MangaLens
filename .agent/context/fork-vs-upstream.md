@@ -29,13 +29,19 @@ logo belong to the Mihon project.
 
 | What | Value | Where |
 |------|-------|-------|
-| App name | `Mihon TL` (briefly `Mihon Lingo`/`Mihon Translate`) | `i18n/.../base/strings.xml` → `app_name` |
-| Application id | `app.mihon.tl` | `app/build.gradle.kts` → `defaultConfig.applicationId` |
+| App name | `MangaLens` (ex `Mihon TL`) | `i18n/.../base/strings.xml` → `app_name` |
+| Application id | `app.mangalens` (ex `app.mihon.tl`) | `app/build.gradle.kts` → `defaultConfig.applicationId` |
+| Launcher icon | own page-and-bubble mark, no Mihon branding | `app/src/main/res/drawable/ic_launcher_*.xml`, `values/colors.xml` |
 
 The changed `applicationId` is what lets the fork be installed **alongside** the
 official Mihon. Debug builds add `.dev` on top of it (upstream behavior). Package
 names (`eu.kanade.tachiyomi`) and the namespace were deliberately **not** renamed —
 that would cause a merge conflict in every file for no user-visible gain.
+
+The id changed once already (`app.mihon.tl` → `app.mangalens`, 2026-08), so older
+builds live on devices as a separate app; both ids stay listed in the
+migrate-from-app screen and its manifest `<queries>` so their backups are still
+found. Changing it again would orphan installs the same way — avoid.
 
 ## Fork-only code (safe to edit freely)
 

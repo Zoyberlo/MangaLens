@@ -86,6 +86,8 @@ private val KNOWN_BACKUP_SOURCES = mapOf(
     "xyz.jmir.tachiyomi.mi" to "TachiyomiSY",
     "xyz.jmir.tachiyomi.mi.sy" to "TachiyomiSY",
     "komikku.app" to "Komikku",
+    "app.mihon.tl" to "MangaLens (old build)",
+    "app.mihon.tl.dev" to "MangaLens (old dev build)",
 )
 
 /**
@@ -403,6 +405,8 @@ class MigrateFromAppScreen : Screen() {
         val KNOWN_APPS = listOf(
             "app.mihon",
             "app.mihon.debug",
+            // Builds of this fork from before it was renamed to MangaLens
+            "app.mihon.tl",
             "app.mihon.tl.dev",
             "eu.kanade.tachiyomi",
             "xyz.jmir.tachiyomi.mi.sy",

@@ -43,6 +43,7 @@
     <queries>
         <package android:name="app.mihon" />
         <package android:name="app.mihon.debug" />
+        <package android:name="app.mihon.tl" />
         <package android:name="app.mihon.tl.dev" />
         <package android:name="eu.kanade.tachiyomi" />
         <package android:name="xyz.jmir.tachiyomi.mi.sy" />

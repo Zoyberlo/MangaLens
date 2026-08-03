@@ -1,5 +1,5 @@
-Mihon TL
-Copyright 2026 Mihon TL contributors
+MangaLens
+Copyright 2026 MangaLens contributors
 
 This product is a modified version of Mihon (https://github.com/mihonapp/mihon),
 Copyright 2024-2026 The Mihon Open Source Project, licensed under the Apache
@@ -21,8 +21,9 @@ Added:
   * Reader additions: adjustable page-turn tap zones, webtoon auto-detection.
 
 Modified:
-  * Application name ("Mihon TL") and application ID ("app.mihon.tl") so this
-    fork installs alongside the official app.
+  * Application name ("MangaLens"), application ID ("app.mangalens") and the
+    launcher icon, so this fork is distinct from the official app and installs
+    alongside it. No Mihon branding is used.
   * Reader classes, settings screens and dependency wiring were extended to
     host the features above. The affected upstream files are listed in
     .agent/context/fork-vs-upstream.md.
