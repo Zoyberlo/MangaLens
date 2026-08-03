@@ -53,7 +53,13 @@ import java.util.Date
 
 private data class DetectedApp(val packageName: String, val label: String)
 
-private data class FoundBackup(val name: String, val uri: String, val lastModified: Long)
+private data class FoundBackup(
+    val name: String,
+    val uri: String,
+    val lastModified: Long,
+    /** Folder holding the file, relative to shared storage, for display. */
+    val folder: String?,
+)
 
 /** A backup with the owning app resolved for display. */
 private data class BackupEntry(
@@ -296,6 +302,13 @@ class MigrateFromAppScreen : Screen() {
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                            entry.backup.folder?.let { folder ->
+                                Text(
+                                    text = folder,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                         IconButton(onClick = { navigator.push(MigrateRestoreScreen(entry.backup.uri)) }) {
                             Icon(imageVector = Icons.Outlined.Restore, contentDescription = null)
@@ -351,8 +364,15 @@ class MigrateFromAppScreen : Screen() {
             if (found.size >= MAX_SCAN_RESULTS) return
             when {
                 file.isDirectory -> scanDirectory(file, depth + 1, found)
-                file.name.endsWith(".tachibk") || file.name.endsWith(".proto.gz") ->
-                    found += FoundBackup(file.name, Uri.fromFile(file).toString(), file.lastModified())
+                file.name.endsWith(".tachibk") || file.name.endsWith(".proto.gz") -> {
+                    val root = android.os.Environment.getExternalStorageDirectory()?.absolutePath.orEmpty()
+                    found += FoundBackup(
+                        name = file.name,
+                        uri = Uri.fromFile(file).toString(),
+                        lastModified = file.lastModified(),
+                        folder = dir.absolutePath.removePrefix(root).trim('/').ifBlank { null },
+                    )
+                }
             }
         }
     }
@@ -364,7 +384,14 @@ class MigrateFromAppScreen : Screen() {
             if (file.isDirectory) {
                 scanForBackups(file, depth + 1, found)
             } else if (file.name?.endsWith(".tachibk") == true || file.name?.endsWith(".proto.gz") == true) {
-                found += FoundBackup(file.name!!, file.uri.toString(), file.lastModified())
+                // Document-tree URIs end in "primary:Folder/Sub/file.tachibk"
+                val documentPath = Uri.decode(file.uri.lastPathSegment.orEmpty()).substringAfter(':')
+                found += FoundBackup(
+                    name = file.name!!,
+                    uri = file.uri.toString(),
+                    lastModified = file.lastModified(),
+                    folder = documentPath.substringBeforeLast('/', "").trim('/').ifBlank { null },
+                )
             }
         }
     }
