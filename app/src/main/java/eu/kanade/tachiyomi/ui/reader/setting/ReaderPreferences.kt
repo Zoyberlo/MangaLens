@@ -102,6 +102,14 @@ class ReaderPreferences(
 
     val deeplApiKey: Preference<String> = preferenceStore.getString("pref_deepl_api_key", "")
 
+    // DeepL meters characters, not requests; the default sits below its free
+    // tier of 500,000 per month
+    val deeplMonthlyCharLimit: Preference<Int> = preferenceStore.getInt("pref_deepl_char_limit", 450_000)
+
+    val deeplUsageChars: Preference<Int> = preferenceStore.getInt("pref_deepl_usage_chars", 0)
+
+    val deeplUsagePeriod: Preference<String> = preferenceStore.getString("pref_deepl_usage_period", "")
+
     // Cloud text recognition (Google Cloud Vision). Off unless a key is set;
     // the limit guards the user's own billing, and defaults below Google's
     // free monthly tier of 1000 requests.

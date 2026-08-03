@@ -26,6 +26,7 @@ import kotlinx.serialization.protobuf.ProtoBuf
 import mihon.feature.translate.CloudTextRecognizer
 import mihon.feature.translate.PageTextRecognizer
 import mihon.feature.translate.PageTranslator
+import mihon.feature.translate.QuotaNotifier
 import mihon.feature.translate.TextTranslator
 import nl.adaptivity.xmlutil.XmlDeclMode
 import nl.adaptivity.xmlutil.core.XmlVersion
@@ -131,8 +132,9 @@ class AppModule(val app: Application) : InjektModule {
 
         addSingletonFactory { ImageSaver(app) }
 
-        addSingletonFactory { TextTranslator(app, get(), get(), get()) }
-        addSingletonFactory { CloudTextRecognizer(get(), get(), get()) }
+        addSingletonFactory { QuotaNotifier() }
+        addSingletonFactory { TextTranslator(app, get(), get(), get(), get()) }
+        addSingletonFactory { CloudTextRecognizer(get(), get(), get(), get()) }
         addSingletonFactory { PageTranslator(PageTextRecognizer(), get(), get(), get()) }
 
         addSingletonFactory { AndroidStorageFolderProvider(app) }

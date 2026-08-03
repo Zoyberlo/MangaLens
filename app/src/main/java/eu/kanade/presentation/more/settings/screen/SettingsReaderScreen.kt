@@ -15,6 +15,7 @@ import eu.kanade.tachiyomi.util.system.hasDisplayCutout
 import mihon.feature.translate.CloudTextRecognizer
 import mihon.feature.translate.PageTranslator
 import mihon.feature.translate.TARGET_LANGUAGES
+import mihon.feature.translate.TextTranslator
 import mihon.feature.translate.TranslationProvider
 import mihon.feature.translate.TranslationSourceLanguage
 import mihon.feature.translate.labelWithAutoHint
@@ -86,6 +87,9 @@ object SettingsReaderScreen : SearchableSettings {
         val visionLimit by readerPreferences.visionMonthlyLimit.collectAsState()
         val cloudRecognizer = remember { Injekt.get<CloudTextRecognizer>() }
         val visionUsed = remember(visionKey, visionLimit) { cloudRecognizer.usedThisMonth() }
+        val deeplLimit by readerPreferences.deeplMonthlyCharLimit.collectAsState()
+        val textTranslator = remember { Injekt.get<TextTranslator>() }
+        val deeplUsed = remember(deeplApiKey, deeplLimit) { textTranslator.deeplUsedThisMonth() }
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_category_auto_translate),
             preferenceItems = listOf(
@@ -112,6 +116,24 @@ object SettingsReaderScreen : SearchableSettings {
                     preference = readerPreferences.deeplApiKey,
                     title = stringResource(MR.strings.pref_deepl_api_key),
                     subtitle = stringResource(MR.strings.pref_deepl_api_key_summary),
+                ),
+                Preference.PreferenceItem.SliderPreference(
+                    // Stepped in thousands: character budgets are large numbers
+                    value = deeplLimit / 1000,
+                    valueRange = 0..1000,
+                    steps = 39,
+                    title = stringResource(MR.strings.pref_deepl_monthly_limit),
+                    subtitle = if (deeplApiKey.isBlank()) {
+                        stringResource(MR.strings.pref_deepl_monthly_limit_summary)
+                    } else {
+                        stringResource(MR.strings.pref_deepl_usage, deeplUsed, deeplLimit)
+                    },
+                    valueString = if (deeplLimit == 0) {
+                        stringResource(MR.strings.pref_vision_no_limit)
+                    } else {
+                        "${deeplLimit / 1000}k"
+                    },
+                    onValueChanged = { readerPreferences.deeplMonthlyCharLimit.set(it * 1000) },
                 ),
                 Preference.PreferenceItem.EditTextPreference(
                     preference = readerPreferences.visionApiKey,

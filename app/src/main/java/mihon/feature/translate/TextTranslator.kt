@@ -24,7 +24,44 @@ class TextTranslator(
     private val networkHelper: NetworkHelper,
     private val json: Json,
     private val readerPreferences: eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences,
+    private val quotaNotifier: QuotaNotifier,
 ) {
+
+    /** Characters already spent on DeepL this month. */
+    fun deeplUsedThisMonth(): Int {
+        rolloverDeeplIfNewMonth()
+        return readerPreferences.deeplUsageChars.get()
+    }
+
+    private fun rolloverDeeplIfNewMonth() {
+        val period = currentQuotaPeriod()
+        if (readerPreferences.deeplUsagePeriod.get() != period) {
+            readerPreferences.deeplUsagePeriod.set(period)
+            readerPreferences.deeplUsageChars.set(0)
+        }
+    }
+
+    /** True while DeepL still has room in the user's monthly character budget. */
+    private fun deeplWithinQuota(charCount: Int): Boolean {
+        rolloverDeeplIfNewMonth()
+        val limit = readerPreferences.deeplMonthlyCharLimit.get()
+        if (limit <= 0) return true
+        val used = readerPreferences.deeplUsageChars.get()
+        if (used + charCount > limit) {
+            quotaNotifier.report(QuotaKind.DEEPL, QuotaLevel.REACHED)
+            return false
+        }
+        return true
+    }
+
+    private fun recordDeeplUsage(charCount: Int) {
+        val limit = readerPreferences.deeplMonthlyCharLimit.get()
+        val spent = readerPreferences.deeplUsageChars.get() + charCount
+        readerPreferences.deeplUsageChars.set(spent)
+        if (limit > 0 && spent >= (limit * QUOTA_APPROACHING_RATIO).toInt() && spent < limit) {
+            quotaNotifier.report(QuotaKind.DEEPL, QuotaLevel.APPROACHING)
+        }
+    }
 
     // Short call timeout: a dead Lingva instance should fail fast so the
     // fallback chain stays responsive
@@ -100,9 +137,11 @@ class TextTranslator(
 
         val selectedProvider = readerPreferences.translationProvider.get()
             .let {
-                // A DeepL selection left over from before the key was cleared
-                // would never succeed; fall back to the automatic chain
-                if (it == TranslationProvider.DEEPL && readerPreferences.deeplApiKey.get().isBlank()) {
+                // A DeepL selection that cannot run — no key, or the monthly
+                // character budget is spent — falls back to the automatic chain
+                if (it == TranslationProvider.DEEPL &&
+                    (readerPreferences.deeplApiKey.get().isBlank() || !deeplWithinQuota(trimmed.length))
+                ) {
                     TranslationProvider.AUTO
                 } else {
                     it
@@ -227,6 +266,7 @@ class TextTranslator(
             logcat(LogPriority.WARN) { "DeepL selected but no API key is set" }
             return null
         }
+        if (!deeplWithinQuota(text.length)) return null
         return try {
             val host = if (apiKey.endsWith(":fx")) "api-free.deepl.com" else "api.deepl.com"
             val body = FormBody.Builder()
@@ -245,6 +285,7 @@ class TextTranslator(
                 ?.firstOrNull()
                 ?.text
                 ?.takeIf { it.isNotBlank() }
+                ?.also { recordDeeplUsage(text.length) }
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "DeepL translation failed" }
             null

@@ -187,18 +187,29 @@ class ReaderActivity : BaseActivity() {
         // path so the first "translate area" action is fast
         lifecycleScope.launchIO { Injekt.get<PageTranslator>().warmUp() }
 
-        // Surface cloud-recognition quota problems where the user will see
-        // them: they pay for that quota
-        Injekt.get<mihon.feature.translate.CloudTextRecognizer>().warnings
-            .onEach { warning ->
+        // Surface metered-service quota news where the user will see it: those
+        // services bill their account, not ours
+        Injekt.get<mihon.feature.translate.QuotaNotifier>().events
+            .onEach { event ->
                 toast(
-                    when (warning) {
-                        mihon.feature.translate.CloudOcrWarning.APPROACHING_LIMIT ->
+                    when (event.kind to event.level) {
+                        mihon.feature.translate.QuotaKind.CLOUD_OCR to
+                            mihon.feature.translate.QuotaLevel.APPROACHING,
+                        ->
                             MR.strings.cloud_ocr_approaching_limit
-                        mihon.feature.translate.CloudOcrWarning.LIMIT_REACHED ->
+                        mihon.feature.translate.QuotaKind.CLOUD_OCR to
+                            mihon.feature.translate.QuotaLevel.REACHED,
+                        ->
                             MR.strings.cloud_ocr_limit_reached
-                        mihon.feature.translate.CloudOcrWarning.FAILED ->
-                            MR.strings.cloud_ocr_failed
+                        mihon.feature.translate.QuotaKind.DEEPL to
+                            mihon.feature.translate.QuotaLevel.APPROACHING,
+                        ->
+                            MR.strings.deepl_approaching_limit
+                        mihon.feature.translate.QuotaKind.DEEPL to
+                            mihon.feature.translate.QuotaLevel.REACHED,
+                        ->
+                            MR.strings.deepl_limit_reached
+                        else -> MR.strings.cloud_ocr_failed
                     },
                 )
             }

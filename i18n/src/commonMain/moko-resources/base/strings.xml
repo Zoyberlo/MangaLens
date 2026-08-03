@@ -406,6 +406,11 @@
     <string name="cloud_ocr_approaching_limit">Cloud recognition is close to your monthly limit</string>
     <string name="cloud_ocr_limit_reached">Monthly cloud limit reached — using on-device recognition</string>
     <string name="cloud_ocr_failed">Cloud recognition failed — using on-device recognition</string>
+    <string name="pref_deepl_monthly_limit">DeepL characters per month</string>
+    <string name="pref_deepl_monthly_limit_summary">DeepL bills beyond its free tier of 500,000 characters per month</string>
+    <string name="pref_deepl_usage">Used %1$d of %2$d characters this month</string>
+    <string name="deepl_approaching_limit">DeepL is close to your monthly character limit</string>
+    <string name="deepl_limit_reached">Monthly DeepL limit reached — using another service</string>
     <string name="action_translate_selection">Translate area</string>
     <string name="translate_selection_hint">Drag to select the area to translate</string>
     <string name="translate_selection_no_text">No text recognized in the selected area</string>

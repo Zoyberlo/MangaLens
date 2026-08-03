@@ -18,6 +18,8 @@ Two deliberate non-goals — see `context/decisions.md`:
 |------|------|
 | `mihon/feature/translate/TranslationModels.kt` | `TranslationSourceLanguage`, `TranslationProvider`, `TARGET_LANGUAGES`, `RecognizedBlock`, `TranslatedBlock`, `PageTranslation`, `RegionTranslateResult` |
 | `mihon/feature/translate/PageTextRecognizer.kt` | ML Kit OCR; one cached recognizer per source language |
+| `mihon/feature/translate/CloudTextRecognizer.kt` | Optional Google Cloud Vision OCR (user's own key), quota-capped |
+| `mihon/feature/translate/TranslationQuota.kt` | Shared quota plumbing: `QuotaKind`, `QuotaLevel`, `QuotaNotifier`, `currentQuotaPeriod()` |
 | `mihon/feature/translate/TextTranslator.kt` | Translation backends, text normalization, LRU cache, instance backoff |
 | `mihon/feature/translate/PageTranslator.kt` | Orchestration: decode region → OCR → merge blocks → translate; also `warmUp()` |
 | `mihon/feature/translate/TranslationOverlayView.kt` | Draws the boxes; tap-to-select, X-to-dismiss, word/phrase picking |
@@ -114,12 +116,53 @@ Two layers in `TextTranslator`: an in-memory LRU (1000 entries) and a 4 MB
 layer makes re-reading a chapter instant and offline. Region OCR itself is not
 cached — only text→translation pairs.
 
+## Cloud OCR (optional)
+
+On-device ML Kit is the default and the only path that works without a key. When
+`ReaderPreferences.visionApiKey` is set, `PageTranslator.recognizeBest()` tries
+`CloudTextRecognizer` (Google Cloud Vision `images:annotate`,
+`DOCUMENT_TEXT_DETECTION`) **first** and silently falls back to ML Kit on any
+failure — network error, bad key, quota spent. Stylised comic lettering is where
+it pays off; ML Kit's ceiling on it is the reason this exists.
+
+Blocks come from `fullTextAnnotation.pages[].blocks[].paragraphs[].words[].symbols[]`;
+paragraph bounding boxes map onto the same `RecognizedBlock` shape as ML Kit, so
+everything downstream is unchanged.
+
+## Quotas
+
+Both paid services are metered so a user cannot silently run up a bill. The
+mechanics live in `TranslationQuota.kt` and are identical for each:
+
+| | Cloud Vision | DeepL |
+|---|---|---|
+| Billed by | requests | characters |
+| Free tier | 1 000/month | 500 000/month |
+| Limit pref | `visionMonthlyLimit` (default 900) | `deeplMonthlyCharLimit` (default 450 000) |
+| Usage prefs | `visionUsageCount` / `visionUsagePeriod` | `deeplUsageChars` / `deeplUsagePeriod` |
+| `QuotaKind` | `CLOUD_OCR` | `DEEPL` |
+
+- The period is `"YYYY-MM"` from `currentQuotaPeriod()`; a mismatch on read
+  resets the counter (rollover happens lazily, no scheduler).
+- A limit of `0` means **no limit** — the check is skipped entirely.
+- Crossing `QUOTA_APPROACHING_RATIO` (90%) emits `APPROACHING`; a call refused
+  for being over the limit emits `REACHED`. `ReaderActivity` collects
+  `QuotaNotifier.events` and toasts the matching string.
+- Over the limit, Vision falls back to on-device OCR and DeepL falls back to the
+  `AUTO` provider chain, so translation keeps working — it just stops costing
+  money.
+
+Usage is recorded **after** a successful response only, so failed calls are not
+counted against the user.
+
 ## Settings
 
-Language pair, provider and DeepL key live in `ReaderPreferences` and are surfaced
-twice: globally in **Settings → Reader** (`SettingsReaderScreen`) and in-reader in
-the **Translation** tab (`TranslationSettingsPage`). Both edit the same
-preferences. See `context/features/reader-settings.md`.
+Language pair, provider, DeepL key, Vision key and both monthly limits live in
+`ReaderPreferences` and are surfaced twice: globally in **Settings → Reader**
+(`SettingsReaderScreen`) and in-reader in the **Translation** tab
+(`TranslationSettingsPage`). Both edit the same preferences. The limit sliders
+show live usage in their subtitle once the matching key is set. See
+`context/features/reader-settings.md`.
 
 ## Warm-up
 

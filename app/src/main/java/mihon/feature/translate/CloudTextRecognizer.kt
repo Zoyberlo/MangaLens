@@ -8,7 +8,6 @@ import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.network.jsonMime
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
@@ -24,15 +23,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import tachiyomi.core.common.preference.getAndSet
 import tachiyomi.core.common.util.system.logcat
 import java.io.ByteArrayOutputStream
-import java.util.Calendar
 import java.util.concurrent.TimeUnit
-
-/** Things worth telling the reader about the cloud recognizer. */
-enum class CloudOcrWarning {
-    APPROACHING_LIMIT,
-    LIMIT_REACHED,
-    FAILED,
-}
 
 /**
  * Text recognition through Google Cloud Vision — the same model family that
@@ -45,9 +36,8 @@ class CloudTextRecognizer(
     private val networkHelper: NetworkHelper,
     private val json: Json,
     private val readerPreferences: ReaderPreferences,
+    private val quotaNotifier: QuotaNotifier,
 ) {
-
-    val warnings = MutableSharedFlow<CloudOcrWarning>(extraBufferCapacity = 4)
 
     private val client by lazy {
         networkHelper.client.newBuilder()
@@ -79,7 +69,7 @@ class CloudTextRecognizer(
         val used = readerPreferences.visionUsageCount.get()
         val limit = readerPreferences.visionMonthlyLimit.get()
         if (limit in 1..used) {
-            warnings.tryEmit(CloudOcrWarning.LIMIT_REACHED)
+            quotaNotifier.report(QuotaKind.CLOUD_OCR, QuotaLevel.REACHED)
             return null
         }
 
@@ -88,14 +78,14 @@ class CloudTextRecognizer(
             readerPreferences.visionUsageCount.getAndSet { it + 1 }
             val spent = used + 1
             if (limit > 0 && spent >= limit) {
-                warnings.tryEmit(CloudOcrWarning.LIMIT_REACHED)
-            } else if (limit > 0 && spent >= (limit * APPROACHING_RATIO).toInt()) {
-                warnings.tryEmit(CloudOcrWarning.APPROACHING_LIMIT)
+                quotaNotifier.report(QuotaKind.CLOUD_OCR, QuotaLevel.REACHED)
+            } else if (limit > 0 && spent >= (limit * QUOTA_APPROACHING_RATIO).toInt()) {
+                quotaNotifier.report(QuotaKind.CLOUD_OCR, QuotaLevel.APPROACHING)
             }
             blocks
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Cloud text recognition failed" }
-            warnings.tryEmit(CloudOcrWarning.FAILED)
+            quotaNotifier.report(QuotaKind.CLOUD_OCR, QuotaLevel.FAILED)
             null
         }
     }
@@ -173,8 +163,7 @@ class CloudTextRecognizer(
 
     /** Usage is per calendar month, matching how Google's free tier resets. */
     private fun rolloverIfNewMonth() {
-        val calendar = Calendar.getInstance()
-        val period = "%04d-%02d".format(calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1)
+        val period = currentQuotaPeriod()
         if (readerPreferences.visionUsagePeriod.get() != period) {
             readerPreferences.visionUsagePeriod.set(period)
             readerPreferences.visionUsageCount.set(0)
@@ -183,6 +172,5 @@ class CloudTextRecognizer(
 
     private companion object {
         const val JPEG_QUALITY = 90
-        const val APPROACHING_RATIO = 0.9f
     }
 }
