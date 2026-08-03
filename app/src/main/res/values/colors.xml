@@ -2,7 +2,8 @@
 <resources>
     <color name="splash">@color/accent_blue</color>
 
-    <!-- Fork: the debug-flavor icon palette, kept for all build types -->
-    <color name="accent_blue">#7EBBED</color>
-    <color name="icon_background">#2E3943</color>
+    <!-- Fork palette, taken from the launcher artwork in brand/icon-source.png -->
+    <color name="accent_blue">#6BA9F7</color>
+    <!-- The artwork is drawn for a light backdrop, so the icon plate is white -->
+    <color name="icon_background">#FFFFFF</color>
 </resources>

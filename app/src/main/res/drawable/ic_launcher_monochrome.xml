@@ -1,39 +1,29 @@
-<!-- Themed-icon variant: the lens-over-page mark as a single silhouette. -->
+<!--
+  Themed-icon variant: the lens-over-bubble mark as a single silhouette,
+  matching the raster launcher artwork.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="432"
     android:viewportHeight="432">
 
-  <!-- Page outline -->
+  <!-- Speech bubble -->
   <path
       android:fillColor="#FFFFFFFF"
       android:fillType="evenOdd"
-      android:pathData="M124,115h96a14,14 0 0 1 14,14v144a14,14 0 0 1 -14,14h-96a14,14 0 0 1 -14,-14v-144a14,14 0 0 1 14,-14zM126,133v138h92v-138z"/>
-
-  <!-- Panel divider -->
-  <path
-      android:fillColor="#FFFFFFFF"
-      android:pathData="M126,177h92v12h-92z"/>
+      android:pathData="M110,96h126a76,76 0 0 1 76,76v62a76,76 0 0 1 -76,76h-68l-66,58v-58h-8a76,76 0 0 1 -76,-76v-62a76,76 0 0 1 76,-76zM110,126a46,46 0 0 0 -46,46v62a46,46 0 0 0 46,46h38v34l38,-34h50a46,46 0 0 0 46,-46v-62a46,46 0 0 0 -46,-46z"/>
 
   <!-- Lens rim -->
   <path
       android:fillColor="#FFFFFFFF"
       android:fillType="evenOdd"
-      android:pathData="M190,241a56,56 0 1 0 112,0a56,56 0 1 0 -112,0zM204,241a42,42 0 1 1 84,0a42,42 0 1 1 -84,0z"/>
-
-  <!-- Translated lines inside the lens -->
-  <path
-      android:fillColor="#FFFFFFFF"
-      android:pathData="M220,231h52v10h-52z"/>
-  <path
-      android:fillColor="#FFFFFFFF"
-      android:pathData="M220,249h38v10h-38z"/>
+      android:pathData="M180,214a92,92 0 1 0 184,0a92,92 0 1 0 -184,0zM210,214a62,62 0 1 1 124,0a62,62 0 1 1 -124,0z"/>
 
   <!-- Handle -->
   <path
-      android:pathData="M285,280L312,307"
+      android:pathData="M336,280L376,326"
       android:strokeColor="#FFFFFFFF"
-      android:strokeWidth="24"
+      android:strokeWidth="38"
       android:strokeLineCap="round"/>
 </vector>

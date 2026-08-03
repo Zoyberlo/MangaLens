@@ -1,8 +1,8 @@
 <!--
-  MangaLens mark: a lens over a comic page, as a white silhouette.
-  Used by the splash screen, the More/About header and notification icons,
-  all of which need a single-colour shape. The file name is upstream's so the
-  references stay untouched; only the artwork is ours (no Mihon branding left).
+  MangaLens mark as a white silhouette: a lens over a speech bubble, matching
+  the launcher artwork in brand/icon-source.png. Used by the splash screen,
+  the More/About header and notification icons, which all need a single-colour
+  shape. The file name is upstream's so references stay untouched.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="256dp"
@@ -10,35 +10,22 @@
     android:viewportWidth="192"
     android:viewportHeight="192">
 
-  <!-- Page outline -->
+  <!-- Speech bubble, hollow so it reads at notification size -->
   <path
       android:fillColor="#FFFFFFFF"
       android:fillType="evenOdd"
-      android:pathData="M20,14h56a10,10 0 0 1 10,10v104a10,10 0 0 1 -10,10h-56a10,10 0 0 1 -10,-10v-104a10,10 0 0 1 10,-10zM22,28v96h52v-96z"/>
-
-  <!-- Panel divider -->
-  <path
-      android:fillColor="#FFFFFFFF"
-      android:pathData="M22,72h52v8h-52z"/>
+      android:pathData="M44,36h56a34,34 0 0 1 34,34v28a34,34 0 0 1 -34,34h-30l-30,26v-26h-4a34,34 0 0 1 -34,-34v-28a34,34 0 0 1 34,-34zM44,50a20,20 0 0 0 -20,20v28a20,20 0 0 0 20,20h18v16l18,-16h20a20,20 0 0 0 20,-20v-28a20,20 0 0 0 -20,-20z"/>
 
   <!-- Lens rim -->
   <path
       android:fillColor="#FFFFFFFF"
       android:fillType="evenOdd"
-      android:pathData="M76,116a40,40 0 1 0 80,0a40,40 0 1 0 -80,0zM86,116a30,30 0 1 1 60,0a30,30 0 1 1 -60,0z"/>
-
-  <!-- Translated lines inside the lens -->
-  <path
-      android:fillColor="#FFFFFFFF"
-      android:pathData="M98,108h36v8h-36z"/>
-  <path
-      android:fillColor="#FFFFFFFF"
-      android:pathData="M98,122h26v8h-26z"/>
+      android:pathData="M78,96a42,42 0 1 0 84,0a42,42 0 1 0 -84,0zM92,96a28,28 0 1 1 56,0a28,28 0 1 1 -56,0z"/>
 
   <!-- Handle -->
   <path
-      android:pathData="M144,144L164,164"
+      android:pathData="M150,126L170,150"
       android:strokeColor="#FFFFFFFF"
-      android:strokeWidth="16"
+      android:strokeWidth="18"
       android:strokeLineCap="round"/>
 </vector>
