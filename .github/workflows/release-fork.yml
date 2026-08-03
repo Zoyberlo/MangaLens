@@ -49,11 +49,15 @@ jobs:
           keyAlias: ${{ secrets.KEY_ALIAS }}
           keyPassword: ${{ secrets.KEY_PASSWORD }}
 
-      # The updater picks an asset by matching "-<abi>" in its file name
+      # The updater matches an asset by "-<abi>" in its file name and falls
+      # back to the one without an ABI marker, which is the universal build
       - name: Name the APKs after the release
         run: |
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           cd app/build/outputs/apk/release
+          if [ -f "app-release.apk" ]; then
+            mv "app-release.apk" "mangalens-$TAG.apk"
+          fi
           for abi in arm64-v8a armeabi-v7a x86_64 x86 universal; do
             if [ -f "app-$abi-release.apk" ]; then
               mv "app-$abi-release.apk" "mangalens-$TAG-$abi.apk"

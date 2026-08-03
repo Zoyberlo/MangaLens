@@ -44,6 +44,15 @@ android {
         buildConfigField("boolean", "UPDATER_ENABLED", "${Config.enableUpdater}")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Emulator-only ABIs are dropped from every APK, which is what makes
+        // the universal build small enough to hand out as the single download.
+        // Pass -Pall-abis when an x86 emulator is actually needed.
+        if (!project.hasProperty("all-abis")) {
+            ndk {
+                abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            }
+        }
     }
 
     if (System.getenv("MIHON_GITHUB_RELEASE").toBoolean()) {
@@ -129,17 +138,14 @@ android {
 
     splits {
         abi {
-            isEnable = true
+            // One universal APK is the default: with x86 filtered out it is
+            // only ~16 MB heavier than an arm64-only build, and it removes the
+            // "which file do I download" question entirely. Per-ABI splits are
+            // still available via -Pall-abis.
+            isEnable = project.hasProperty("all-abis")
             isUniversalApk = true
             reset()
-            // x86/x86_64 are emulator-only for this app; skipping them cuts
-            // two APKs (and their native library packaging) off every build.
-            // Pass -Pall-abis to get the full set back.
-            if (project.hasProperty("all-abis")) {
-                include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
-            } else {
-                include("armeabi-v7a", "arm64-v8a")
-            }
+            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
         }
     }
 
