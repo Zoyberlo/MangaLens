@@ -402,6 +402,11 @@
     <string name="translate_selection_no_text">No text recognized in the selected area</string>
     <string name="translate_selection_failed">Translation failed — check the translation service in settings</string>
     <string name="translate_in_progress">Translating…</string>
+    <string name="supportUsScreen_forkIntro">MangaLens is a free, unofficial fork of Mihon that adds on-device translation. It asks for nothing and collects nothing — the best way to help is to report what breaks.</string>
+    <string name="supportUsScreen_sourceCode">Source code</string>
+    <string name="supportUsScreen_reportIssue">Report an issue</string>
+    <string name="supportUsScreen_tip">Buy me a coffee</string>
+    <string name="supportUsScreen_upstreamCredit">Everything except the translation features comes from Mihon. If you want to support the app this is built on, donate to them:</string>
     <string name="onboarding_translation_info">Pick the languages you read in. In the reader, select an area of a page to translate it — you can change this later in Settings → Reader.</string>
     <string name="pref_translate_original_first">Show original text first</string>
     <string name="pref_translate_original_first_summary">Selections show recognized text untranslated; tap a block\'s + to translate it, tap words to look them up</string>

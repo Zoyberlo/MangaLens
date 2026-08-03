@@ -10,6 +10,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Coffee
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,10 +36,14 @@ import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.icons.CustomIcons
-import tachiyomi.presentation.core.icons.Discord
 import tachiyomi.presentation.core.icons.OpenCollective
 import tachiyomi.presentation.core.icons.Patreon
 
+/**
+ * Fork version of the screen: MangaLens takes no donations, so this credits
+ * Mihon and points donations at them, and offers the fork's own repository
+ * and issue tracker instead.
+ */
 class SupportUsScreen : Screen() {
 
     @Composable
@@ -81,7 +88,34 @@ class SupportUsScreen : Screen() {
                 Spacer(modifier = Modifier.height(paddingValues.calculateTopPadding()))
 
                 Text(
-                    text = stringResource(MR.strings.supportUsScreen_perks),
+                    text = stringResource(MR.strings.supportUsScreen_forkIntro),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = MaterialTheme.padding.medium),
+                )
+
+                SupportItem(
+                    icon = Icons.Outlined.Code,
+                    title = stringResource(MR.strings.supportUsScreen_sourceCode),
+                    onClick = { uriHandler.openUri(FORK_REPO_URL) },
+                )
+                SupportItem(
+                    icon = Icons.Outlined.BugReport,
+                    title = stringResource(MR.strings.supportUsScreen_reportIssue),
+                    onClick = { uriHandler.openUri("$FORK_REPO_URL/issues") },
+                )
+
+                // Shown only once a tip link is configured, so the screen never
+                // carries a dead button
+                if (TIP_URL.isNotBlank()) {
+                    SupportItem(
+                        icon = Icons.Outlined.Coffee,
+                        title = stringResource(MR.strings.supportUsScreen_tip),
+                        onClick = { uriHandler.openUri(TIP_URL) },
+                    )
+                }
+
+                Text(
+                    text = stringResource(MR.strings.supportUsScreen_upstreamCredit),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = MaterialTheme.padding.medium),
                 )
@@ -95,24 +129,6 @@ class SupportUsScreen : Screen() {
                     icon = CustomIcons.OpenCollective,
                     title = stringResource(MR.strings.supportUsScreen_donationPlatform_opencollective),
                     onClick = { uriHandler.openUri(Constants.URL_DONATE_OPENCOLLECTIVE) },
-                )
-
-                Text(
-                    text = stringResource(MR.strings.supportUsScreen_currentlySupportedBy, 200),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = MaterialTheme.padding.medium),
-                )
-
-                Text(
-                    text = stringResource(MR.strings.supportUsScreen_contactForDetailsMessage),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = MaterialTheme.padding.medium),
-                )
-
-                SupportItem(
-                    icon = CustomIcons.Discord,
-                    title = stringResource(MR.strings.supportUsScreen_contactPlatform),
-                    onClick = { uriHandler.openUri(Constants.URL_DISCORD) },
                 )
 
                 Spacer(modifier = Modifier.height(paddingValues.calculateBottomPadding()))
@@ -141,3 +157,11 @@ class SupportUsScreen : Screen() {
         }
     }
 }
+
+private const val FORK_REPO_URL = "https://github.com/Zoyberlo/mihon"
+
+/**
+ * Tip link for the fork's own work (monobank jar, Ko-fi, Patreon…). Leave
+ * blank to hide the entry entirely.
+ */
+private const val TIP_URL = ""
