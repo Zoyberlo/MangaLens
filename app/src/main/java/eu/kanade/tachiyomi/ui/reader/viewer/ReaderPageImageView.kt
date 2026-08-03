@@ -42,7 +42,6 @@ import eu.kanade.tachiyomi.util.view.isVisibleOnScreen
 import mihon.feature.translate.PageTranslation
 import mihon.feature.translate.TranslatedBlock
 import mihon.feature.translate.TranslationOverlayView
-import mihon.feature.translate.VocabularyStore
 import okio.BufferedSource
 import tachiyomi.core.common.util.system.ImageUtil
 import uy.kohesive.injekt.Injekt
@@ -125,18 +124,10 @@ open class ReaderPageImageView @JvmOverloads constructor(
             return
         }
         val overlay = translationOverlay ?: TranslationOverlayView(context).also {
-            val vocabulary = Injekt.get<VocabularyStore>()
             it.ssivProvider = { pageView as? SubsamplingScaleImageView }
-            it.onSaveBlock = { block ->
-                if (block.translatedText.isBlank()) {
-                    // Original-first mode: + on an untranslated block translates it
-                    onTranslationBlockTranslateRequested?.invoke(block)
-                } else {
-                    vocabulary.saveAsync(block.sourceText, block.translatedText)
-                }
-            }
+            // Original-first mode: + on an untranslated block translates it
+            it.onSaveBlock = { block -> onTranslationBlockTranslateRequested?.invoke(block) }
             it.onPhraseSelected = { phrase -> onTranslationPhraseSelected?.invoke(phrase) }
-            it.savedWordsProvider = { vocabulary.wordSet.value }
             it.onBlocksChanged = { blocks -> onTranslationBlocksChanged?.invoke(blocks) }
             translationOverlay = it
             addView(it, MATCH_PARENT, MATCH_PARENT)

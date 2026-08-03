@@ -32,7 +32,6 @@ import tachiyomi.i18n.MR
 @SuppressLint("ViewConstructor", "SetTextI18n")
 class WordInspectorView(context: Context) : LinearLayout(context) {
 
-    var onSave: ((word: String, translation: String) -> Unit)? = null
     var onDismiss: (() -> Unit)? = null
 
     /** Asked to look up variants whenever the picked word/phrase changes. */
@@ -56,15 +55,6 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
         orientation = HORIZONTAL
     }
 
-    private val saveButton = Button(context).apply {
-        text = context.stringResource(MR.strings.action_add)
-        isEnabled = false
-        setOnClickListener {
-            val translation = selectedVariant ?: return@setOnClickListener
-            onSave?.invoke(currentSelection, translation)
-        }
-    }
-
     private val closeButton = Button(context).apply {
         text = context.stringResource(MR.strings.action_cancel)
         setOnClickListener { onDismiss?.invoke() }
@@ -74,8 +64,24 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
     private var currentSelection: String = ""
     private var selStart = -1
     private var selEnd = -1
-    private var selectedVariant: String? = null
-    private val chipViews = mutableListOf<TextView>()
+
+    // Swipe-down-to-dismiss
+    private var swipeStartY = -1f
+
+    override fun onInterceptTouchEvent(ev: android.view.MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> swipeStartY = ev.y
+            android.view.MotionEvent.ACTION_MOVE -> {
+                if (swipeStartY >= 0 && ev.y - swipeStartY > SWIPE_DISMISS_DP * dp) {
+                    swipeStartY = -1f
+                    onDismiss?.invoke()
+                    return true
+                }
+            }
+            android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> swipeStartY = -1f
+        }
+        return super.onInterceptTouchEvent(ev)
+    }
 
     init {
         orientation = VERTICAL
@@ -100,7 +106,6 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
                 orientation = HORIZONTAL
                 gravity = Gravity.END
                 addView(closeButton)
-                addView(saveButton, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
             },
             LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
         )
@@ -126,14 +131,16 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
         if (selection != currentSelection) return
         progress.isVisible = false
         chipsRow.removeAllViews()
-        chipViews.clear()
         variants.forEach { variant ->
             val chip = TextView(context).apply {
                 text = variant
                 setTextColor(Color.WHITE)
                 textSize = 15f
                 setPadding((12 * dp).toInt(), (8 * dp).toInt(), (12 * dp).toInt(), (8 * dp).toInt())
-                setOnClickListener { select(variant) }
+                background = GradientDrawable().apply {
+                    cornerRadius = 16 * dp
+                    setColor(0x33FFFFFF)
+                }
             }
             chipsRow.addView(
                 chip,
@@ -141,9 +148,7 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
                     marginEnd = (8 * dp).toInt()
                 },
             )
-            chipViews += chip
         }
-        variants.firstOrNull()?.let { select(it) }
     }
 
     private fun setText(text: String) {
@@ -151,7 +156,6 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
         currentSelection = text
         selStart = -1
         selEnd = -1
-        selectedVariant = null
         renderText()
         isVisible = true
     }
@@ -159,9 +163,6 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
     private fun showChipsLoading() {
         progress.isVisible = true
         chipsRow.removeAllViews()
-        chipViews.clear()
-        selectedVariant = null
-        saveButton.isEnabled = false
     }
 
     private fun isWordChar(c: Char) = c.isLetterOrDigit() || c == '\'' || c == '’' || c == '-'
@@ -202,6 +203,10 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
         wordView.text = spannable
     }
 
+    private companion object {
+        const val SWIPE_DISMISS_DP = 56f
+    }
+
     private fun onWordSpanTapped(start: Int, end: Int) {
         if (selStart < 0) {
             selStart = start
@@ -216,16 +221,5 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
         renderText()
         showChipsLoading()
         onPhraseTap?.invoke(phrase)
-    }
-
-    private fun select(variant: String) {
-        selectedVariant = variant
-        saveButton.isEnabled = true
-        chipViews.forEach { chip ->
-            chip.background = GradientDrawable().apply {
-                cornerRadius = 16 * dp
-                setColor(if (chip.text == variant) 0xFF2E7D32.toInt() else 0x33FFFFFF)
-            }
-        }
     }
 }

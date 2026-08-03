@@ -26,7 +26,6 @@ import kotlinx.serialization.protobuf.ProtoBuf
 import mihon.feature.translate.PageTextRecognizer
 import mihon.feature.translate.PageTranslator
 import mihon.feature.translate.TextTranslator
-import mihon.feature.translate.VocabularyStore
 import nl.adaptivity.xmlutil.XmlDeclMode
 import nl.adaptivity.xmlutil.core.XmlVersion
 import nl.adaptivity.xmlutil.serialization.XML
@@ -133,7 +132,6 @@ class AppModule(val app: Application) : InjektModule {
 
         addSingletonFactory { TextTranslator(app, get(), get(), get()) }
         addSingletonFactory { PageTranslator(PageTextRecognizer(), get(), get()) }
-        addSingletonFactory { VocabularyStore(app, get(), get()) }
 
         addSingletonFactory { AndroidStorageFolderProvider(app) }
         addSingletonFactory { LocalSourceFileSystem(get()) }

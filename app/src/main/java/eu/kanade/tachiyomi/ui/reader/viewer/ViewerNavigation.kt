@@ -40,22 +40,23 @@ abstract class ViewerNavigation {
     private val readerPreferences: ReaderPreferences by injectLazy()
 
     /**
-     * Returns regions with the user's tap-zone size applied (regions scale
-     * about the screen center: below 100% they shrink toward the edges,
-     * enlarging the menu area) and inversion applied.
+     * Returns regions with the user's per-axis tap-zone sizes applied
+     * (regions scale about the screen center: below 100% they shrink toward
+     * the edges, enlarging the menu area) and inversion applied.
      */
     fun getRegions(): List<Region> {
-        val sizePercent = readerPreferences.navigationTapZoneSize.get().coerceIn(50, 150)
-        val factor = 100f / sizePercent
+        val widthFactor = 100f / readerPreferences.navigationTapZoneWidth.get().coerceIn(30, 150)
+        val heightFactor = 100f / readerPreferences.navigationTapZoneHeight.get().coerceIn(30, 150)
         return regionList
-            .map { region -> region.copy(rectF = region.rectF.scaleAboutCenter(factor)) }
+            .map { region -> region.copy(rectF = region.rectF.scaleAboutCenter(widthFactor, heightFactor)) }
             .map { it.invert(invertMode) }
     }
 
-    private fun RectF.scaleAboutCenter(factor: Float): RectF {
+    private fun RectF.scaleAboutCenter(widthFactor: Float, heightFactor: Float): RectF {
         // Edges already at the screen border stay pinned to it
-        fun map(v: Float) = if (v <= 0f || v >= 1f) v else (0.5f + (v - 0.5f) * factor).coerceIn(0f, 1f)
-        return RectF(map(left), map(top), map(right), map(bottom))
+        fun map(v: Float, factor: Float) =
+            if (v <= 0f || v >= 1f) v else (0.5f + (v - 0.5f) * factor).coerceIn(0f, 1f)
+        return RectF(map(left, widthFactor), map(top, heightFactor), map(right, widthFactor), map(bottom, heightFactor))
     }
 
     fun getAction(pos: PointF): NavigationRegion {

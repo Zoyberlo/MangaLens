@@ -102,8 +102,6 @@ class ReaderPreferences(
 
     val deeplApiKey: Preference<String> = preferenceStore.getString("pref_deepl_api_key", "")
 
-    val translatedBlockCount: Preference<Int> = preferenceStore.getInt("pref_translated_block_count", 0)
-
     val translateShowOriginalFirst: Preference<Boolean> = preferenceStore.getBoolean(
         "pref_translate_original_first",
         false,
@@ -114,9 +112,12 @@ class ReaderPreferences(
         TranslateResultDisplay.OVERLAY,
     )
 
-    // Percent of the stock page-turn tap zone size; smaller zones leave a
-    // larger center area for toggling the menu (fork default: 80)
-    val navigationTapZoneSize: Preference<Int> = preferenceStore.getInt("pref_nav_tap_zone_size", 80)
+    // Percent of the stock page-turn tap zone size, per axis; smaller zones
+    // leave a larger center area for toggling the menu. Top/bottom bands are
+    // the most intrusive, hence the lower height default.
+    val navigationTapZoneWidth: Preference<Int> = preferenceStore.getInt("pref_nav_tap_zone_width", 65)
+
+    val navigationTapZoneHeight: Preference<Int> = preferenceStore.getInt("pref_nav_tap_zone_height", 50)
 
     // region General (continued)
 

@@ -58,9 +58,6 @@ class TranslationOverlayView(context: Context) : View(context) {
     /** Called after the user removes a block, with the remaining blocks. */
     var onBlocksChanged: ((List<TranslatedBlock>) -> Unit)? = null
 
-    /** Supplies the lowercased saved-word set for known-word highlighting. */
-    var savedWordsProvider: (() -> Set<String>)? = null
-
     // Layout of the currently selected block, kept for word hit-testing
     private var selectedLayout: StaticLayout? = null
     private var selectedLayoutLeft = 0f
@@ -80,6 +77,7 @@ class TranslationOverlayView(context: Context) : View(context) {
     private var saveButtonCenterX = 0f
     private var saveButtonCenterY = 0f
     private var closeButtonVisible = false
+    private var saveButtonVisible = false
 
     private var downTarget: TouchTarget? = null
 
@@ -99,12 +97,6 @@ class TranslationOverlayView(context: Context) : View(context) {
 
     private val saveCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFF2E7D32.toInt()
-        style = Paint.Style.FILL
-    }
-
-    // Marks words already saved to the vocabulary in the original text
-    private val savedWordPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x59FFC107
         style = Paint.Style.FILL
     }
 
@@ -146,6 +138,7 @@ class TranslationOverlayView(context: Context) : View(context) {
         super.onDraw(canvas)
         hitRects.clear()
         closeButtonVisible = false
+        saveButtonVisible = false
         selectedLayout = null
         if (blocks.isEmpty() || imageWidth <= 0 || imageHeight <= 0) return
         val ssiv = ssivProvider?.invoke() ?: return
@@ -183,6 +176,9 @@ class TranslationOverlayView(context: Context) : View(context) {
                 saveButtonCenterX = drawnRect.left
                 saveButtonCenterY = drawnRect.top
                 closeButtonVisible = true
+                // The + (translate-in-place) button only applies to blocks
+                // that are still untranslated (original-first mode)
+                saveButtonVisible = block.translatedText.isBlank()
             }
         }
 
@@ -206,22 +202,24 @@ class TranslationOverlayView(context: Context) : View(context) {
                 closeCrossPaint,
             )
 
-            // Save-to-dictionary button: green circle with a plus
-            canvas.drawCircle(saveButtonCenterX, saveButtonCenterY, radius, saveCirclePaint)
-            canvas.drawLine(
-                saveButtonCenterX - arm,
-                saveButtonCenterY,
-                saveButtonCenterX + arm,
-                saveButtonCenterY,
-                closeCrossPaint,
-            )
-            canvas.drawLine(
-                saveButtonCenterX,
-                saveButtonCenterY - arm,
-                saveButtonCenterX,
-                saveButtonCenterY + arm,
-                closeCrossPaint,
-            )
+            if (saveButtonVisible) {
+                // Translate-in-place button: green circle with a plus
+                canvas.drawCircle(saveButtonCenterX, saveButtonCenterY, radius, saveCirclePaint)
+                canvas.drawLine(
+                    saveButtonCenterX - arm,
+                    saveButtonCenterY,
+                    saveButtonCenterX + arm,
+                    saveButtonCenterY,
+                    closeCrossPaint,
+                )
+                canvas.drawLine(
+                    saveButtonCenterX,
+                    saveButtonCenterY - arm,
+                    saveButtonCenterX,
+                    saveButtonCenterY + arm,
+                    closeCrossPaint,
+                )
+            }
         }
     }
 
@@ -296,7 +294,6 @@ class TranslationOverlayView(context: Context) : View(context) {
             clipRect(drawRect)
             translate(textLeft, textTop)
             if (isSelected) {
-                drawSavedWordHighlights(this, layout, text)
                 drawPhraseHighlight(this, layout)
             }
             layout.draw(this)
@@ -326,47 +323,6 @@ class TranslationOverlayView(context: Context) : View(context) {
         }
     }
 
-    /**
-     * Draws a highlight behind every word of [text] that is already in the
-     * saved vocabulary, so learners see their progress on the page.
-     */
-    private fun drawSavedWordHighlights(canvas: Canvas, layout: StaticLayout, text: String) {
-        val saved = savedWordsProvider?.invoke().orEmpty()
-        if (saved.isEmpty()) return
-
-        fun isWordChar(c: Char) = c.isLetterOrDigit() || c == '\'' || c == '’' || c == '-'
-
-        var index = 0
-        while (index < text.length) {
-            if (!isWordChar(text[index])) {
-                index++
-                continue
-            }
-            var end = index
-            while (end < text.length && isWordChar(text[end])) end++
-            val word = text.substring(index, end).trim('\'', '’', '-')
-            if (word.lowercase() in saved) {
-                val startLine = layout.getLineForOffset(index)
-                if (startLine == layout.getLineForOffset(end - 1)) {
-                    val x1 = layout.getPrimaryHorizontal(index)
-                    val x2 = layout.getPrimaryHorizontal(end)
-                    canvas.drawRoundRect(
-                        RectF(
-                            minOf(x1, x2),
-                            layout.getLineTop(startLine).toFloat(),
-                            maxOf(x1, x2),
-                            layout.getLineBottom(startLine).toFloat(),
-                        ),
-                        2 * density,
-                        2 * density,
-                        savedWordPaint,
-                    )
-                }
-            }
-            index = end
-        }
-    }
-
     private fun buildLayout(text: String, textSize: Float, width: Int): StaticLayout {
         textPaint.textSize = textSize
         return StaticLayout.Builder.obtain(text, 0, text.length, textPaint, width.coerceAtLeast(1))
@@ -387,7 +343,7 @@ class TranslationOverlayView(context: Context) : View(context) {
             if (hypot(x - closeButtonCenterX, y - closeButtonCenterY) <= touchRadius) {
                 return TouchTarget.CloseButton
             }
-            if (hypot(x - saveButtonCenterX, y - saveButtonCenterY) <= touchRadius) {
+            if (saveButtonVisible && hypot(x - saveButtonCenterX, y - saveButtonCenterY) <= touchRadius) {
                 return TouchTarget.SaveButton
             }
         }

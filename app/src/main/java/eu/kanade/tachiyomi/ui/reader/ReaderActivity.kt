@@ -100,7 +100,6 @@ import logcat.LogPriority
 import mihon.feature.translate.PageTranslator
 import mihon.feature.translate.TextTranslator
 import mihon.feature.translate.TranslateSelectionView
-import mihon.feature.translate.VocabularyStore
 import mihon.feature.translate.WordInspectorView
 import tachiyomi.core.common.Constants
 import tachiyomi.core.common.i18n.stringResource
@@ -187,6 +186,15 @@ class ReaderActivity : BaseActivity() {
         // Load the OCR model and probe translation backends off the critical
         // path so the first "translate area" action is fast
         lifecycleScope.launchIO { Injekt.get<PageTranslator>().warmUp() }
+
+        // The word-inspector panel is tied to what's on screen: hide it when
+        // the user moves on to another page
+        viewModel.state
+            .map { it.currentPage }
+            .distinctUntilChanged()
+            .drop(1)
+            .onEach { hideWordInspector() }
+            .launchIn(lifecycleScope)
 
         if (viewModel.needsInit()) {
             val manga = intent.extras?.getLong("manga", -1) ?: -1L
@@ -557,6 +565,7 @@ class ReaderActivity : BaseActivity() {
             return
         }
         val inspector = ensureWordInspector()
+        inspectorScrollAccum = 0f
         inspector.showLoading(phrase)
         inspector.visibility = View.VISIBLE
         inspector.bringToFront()
@@ -584,6 +593,7 @@ class ReaderActivity : BaseActivity() {
             .joinToString("\n\n")
         if (original.isBlank() || translated.isBlank()) return
         val inspector = ensureWordInspector()
+        inspectorScrollAccum = 0f
         inspector.showResult(original, translated)
         inspector.visibility = View.VISIBLE
         inspector.bringToFront()
@@ -591,10 +601,6 @@ class ReaderActivity : BaseActivity() {
 
     private fun ensureWordInspector(): WordInspectorView {
         return wordInspectorView ?: WordInspectorView(this).also { view ->
-            view.onSave = { word, translation ->
-                Injekt.get<VocabularyStore>().saveAsync(word, translation)
-                hideWordInspector()
-            }
             view.onDismiss = { hideWordInspector() }
             view.onPhraseTap = { phrase -> lookupVariantsInto(view, phrase) }
             wordInspectorView = view
@@ -612,6 +618,21 @@ class ReaderActivity : BaseActivity() {
     private fun hideWordInspector() {
         inspectorLookupJob?.cancel()
         wordInspectorView?.visibility = View.GONE
+    }
+
+    private var inspectorScrollAccum = 0f
+
+    /**
+     * Called by the webtoon viewer on every scroll: once the reader has moved
+     * on (about a third of a screen), the inspector panel is stale — hide it.
+     */
+    fun onReaderScrolled(dy: Int) {
+        val inspector = wordInspectorView ?: return
+        if (inspector.visibility != View.VISIBLE) return
+        inspectorScrollAccum += kotlin.math.abs(dy)
+        if (inspectorScrollAccum > binding.readerContainer.height / 3f) {
+            hideWordInspector()
+        }
     }
 
     /**

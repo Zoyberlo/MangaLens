@@ -431,19 +431,29 @@ object SettingsReaderScreen : SearchableSettings {
         val verticalNavigatorHeightPref = readerPreferences.verticalNavigatorHeight
         val verticalNavigatorHeight by verticalNavigatorHeightPref.collectAsState()
 
-        val tapZoneSizePref = readerPreferences.navigationTapZoneSize
-        val tapZoneSize by tapZoneSizePref.collectAsState()
+        val tapZoneWidthPref = readerPreferences.navigationTapZoneWidth
+        val tapZoneWidth by tapZoneWidthPref.collectAsState()
+        val tapZoneHeightPref = readerPreferences.navigationTapZoneHeight
+        val tapZoneHeight by tapZoneHeightPref.collectAsState()
 
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_reader_navigation),
             preferenceItems = listOf(
                 Preference.PreferenceItem.SliderPreference(
-                    value = tapZoneSize,
-                    valueRange = 50..150,
-                    title = stringResource(MR.strings.pref_nav_tap_zone_size),
+                    value = tapZoneWidth,
+                    valueRange = 30..150,
+                    title = stringResource(MR.strings.pref_nav_tap_zone_width),
                     subtitle = stringResource(MR.strings.pref_nav_tap_zone_size_summary),
-                    valueString = "$tapZoneSize%",
-                    onValueChanged = { tapZoneSizePref.set(it) },
+                    valueString = "$tapZoneWidth%",
+                    onValueChanged = { tapZoneWidthPref.set(it) },
+                ),
+                Preference.PreferenceItem.SliderPreference(
+                    value = tapZoneHeight,
+                    valueRange = 30..150,
+                    title = stringResource(MR.strings.pref_nav_tap_zone_height),
+                    subtitle = stringResource(MR.strings.pref_nav_tap_zone_size_summary),
+                    valueString = "$tapZoneHeight%",
+                    onValueChanged = { tapZoneHeightPref.set(it) },
                 ),
                 Preference.PreferenceItem.SwitchPreference(
                     preference = readWithVolumeKeysPref,

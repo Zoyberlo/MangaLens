@@ -48,6 +48,18 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
      */
     private val frame = WebtoonFrame(activity)
 
+    init {
+        // Let the activity dismiss the word-inspector panel once the reader
+        // scrolls away from the translated spot
+        recycler.addOnScrollListener(
+            object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+                override fun onScrolled(recyclerView: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
+                    activity.onReaderScrolled(dy)
+                }
+            },
+        )
+    }
+
     /**
      * Routes a translate-area selection (in the viewer's coordinate space) to
      * every page holder it intersects, so a selection spanning the seam

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">Mihon Lingo</string>
+    <string name="app_name" translatable="false">Mihon TL</string>
 
     <!-- Generic strings -->
     <string name="on">On</string>
@@ -402,14 +402,6 @@
     <string name="translate_selection_no_text">No text recognized in the selected area</string>
     <string name="translate_selection_failed">Translation failed — check the translation service in settings</string>
     <string name="translate_in_progress">Translating…</string>
-    <string name="translate_save_no_app">Words app is not installed</string>
-    <string name="label_saved_words">Saved words</string>
-    <string name="translate_word_saved">Saved: %s</string>
-    <string name="saved_words_empty">Nothing saved yet. Translate an area in the reader, then tap a block or a single word to save it.</string>
-    <string name="action_send_to_words_app">Send to words app</string>
-    <string name="stats_words_total">Words saved</string>
-    <string name="stats_words_week">This week</string>
-    <string name="stats_blocks_translated">Bubbles translated</string>
     <string name="pref_translate_original_first">Show original text first</string>
     <string name="pref_translate_original_first_summary">Selections show recognized text untranslated; tap a block\'s + to translate it, tap words to look them up</string>
     <string name="pref_translate_result_display">Translation display</string>
@@ -419,7 +411,8 @@
     <string name="migrate_from_app_info">Apps can\'t read each other\'s data directly, so migration works through backup files. Open the detected app, create a backup (Settings → Data and storage), then find it below and restore it.</string>
     <string name="migrate_from_app_find_backups">Find backup files…</string>
     <string name="migrate_from_app_none_found">No backup files found in that folder</string>
-    <string name="pref_nav_tap_zone_size">Page-turn tap zone size</string>
+    <string name="pref_nav_tap_zone_width">Side tap zones width</string>
+    <string name="pref_nav_tap_zone_height">Top and bottom tap zones height</string>
     <string name="pref_nav_tap_zone_size_summary">Smaller zones leave more room in the center for opening the menu</string>
     <string name="pref_flash_page">Flash on page change</string>
     <string name="pref_flash_page_summ">Reduces ghosting on e-ink displays</string>

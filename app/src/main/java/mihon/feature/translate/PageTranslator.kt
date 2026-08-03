@@ -8,7 +8,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import logcat.LogPriority
-import tachiyomi.core.common.preference.getAndSet
 import tachiyomi.core.common.util.system.logcat
 
 /**
@@ -154,7 +153,6 @@ class PageTranslator(
         val blocks = translateBlocks(candidates, from, to)
         if (blocks.isEmpty()) return RegionTranslateResult.Failed
 
-        readerPreferences.translatedBlockCount.getAndSet { it + blocks.size }
         return RegionTranslateResult.Success(PageTranslation(bounds.outWidth, bounds.outHeight, blocks))
     }
 
@@ -171,7 +169,6 @@ class PageTranslator(
             logcat(LogPriority.WARN, e) { "Translation failed for block" }
             null
         }
-        if (result != null) readerPreferences.translatedBlockCount.getAndSet { it + 1 }
         return result
     }
 
