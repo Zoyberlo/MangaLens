@@ -391,7 +391,7 @@ class PageTranslator(
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Translation failed after cloud re-recognition" }
             null
-        } ?: return CloudRetryResult.Failed
+        } ?: return CloudRetryResult.RecognizedOnly(text)
         return CloudRetryResult.Success(text, translated)
     }
 

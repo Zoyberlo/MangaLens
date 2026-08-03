@@ -143,6 +143,14 @@ sealed interface RegionTranslateResult {
  */
 sealed interface CloudRetryResult {
     data class Success(val sourceText: String, val translation: String) : CloudRetryResult
+
+    /**
+     * Recognition worked but translating it did not. The request has already
+     * been billed, so the better text is kept rather than thrown away — the
+     * block shows it untranslated, with the usual + to translate in place.
+     */
+    data class RecognizedOnly(val sourceText: String) : CloudRetryResult
+
     data object NoText : CloudRetryResult
     data object NotConfigured : CloudRetryResult
     data object Failed : CloudRetryResult

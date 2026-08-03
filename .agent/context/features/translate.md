@@ -170,10 +170,15 @@ Two settings decide who runs, each with a per-source-language override stored as
   chosen engine is unconfigured or cannot do layout.
 - **`ocrRetryEngine`** — the purple ↻ button on a selected block. Default
   `GEMINI`. `retryBlockWithCloud()` crops that one block from the original
-  image, re-reads it, re-translates and writes both back. The crop is sent
+  image, re-reads it, re-translates and writes **both** back. The crop is sent
   **unmodified** — the grayscale/contrast treatment in `enhanceForOcr` exists
   for ML Kit and only degrades what the cloud engines see. On failure or spent
   quota the on-device result is left alone.
+
+  If recognition succeeds but the translation fails, the result is
+  `RecognizedOnly`: the request was already billed, so the better text is kept
+  and the block goes back to showing it untranslated, with the green + to
+  translate in place. Never throw away something the user paid for.
 
 The ↻ button is hidden entirely when no language resolves to a configured cloud
 engine (`isRetryEngineUsable`), so it never appears as a dead control.

@@ -126,6 +126,11 @@ class WebtoonPageHolder(
                     is mihon.feature.translate.CloudRetryResult.Success ->
                         pageTranslator.updateOverlayBlock(key, block, result.translation, result.sourceText)
                             ?.let { frame.setTranslation(it) }
+                    is mihon.feature.translate.CloudRetryResult.RecognizedOnly -> {
+                        pageTranslator.updateOverlayBlock(key, block, "", result.sourceText)
+                            ?.let { frame.setTranslation(it) }
+                        viewer.activity.toast(MR.strings.translate_selection_failed)
+                    }
                     mihon.feature.translate.CloudRetryResult.NoText ->
                         viewer.activity.toast(MR.strings.translate_selection_no_text)
                     mihon.feature.translate.CloudRetryResult.NotConfigured ->
