@@ -207,13 +207,33 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
         const val SWIPE_DISMISS_DP = 56f
     }
 
+    /**
+     * A tap picks that one word; tapping a word directly next to the pick
+     * extends it into a phrase; tapping the pick again clears it and returns
+     * to the whole text. Words are never selected just for sitting between
+     * two taps.
+     */
     private fun onWordSpanTapped(start: Int, end: Int) {
-        if (selStart < 0) {
-            selStart = start
-            selEnd = end
-        } else {
-            selStart = minOf(selStart, start)
-            selEnd = maxOf(selEnd, end)
+        when {
+            selStart < 0 -> {
+                selStart = start
+                selEnd = end
+            }
+            start >= selStart && end <= selEnd -> {
+                selStart = -1
+                selEnd = -1
+                currentSelection = fullText
+                renderText()
+                showChipsLoading()
+                onPhraseTap?.invoke(fullText)
+                return
+            }
+            end <= selStart && isWordless(end, selStart) -> selStart = start
+            start >= selEnd && isWordless(selEnd, start) -> selEnd = end
+            else -> {
+                selStart = start
+                selEnd = end
+            }
         }
         val phrase = fullText.substring(selStart, selEnd.coerceAtMost(fullText.length)).trim('\'', '’', '-', ' ')
         if (phrase.isBlank()) return
@@ -221,5 +241,11 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
         renderText()
         showChipsLoading()
         onPhraseTap?.invoke(phrase)
+    }
+
+    /** True when the range holds only separators, i.e. the words are neighbours. */
+    private fun isWordless(from: Int, to: Int): Boolean {
+        if (from >= to) return true
+        return (from until to.coerceAtMost(fullText.length)).none { fullText[it].isLetterOrDigit() }
     }
 }

@@ -58,6 +58,40 @@ class TranslationOverlayView(context: Context) : View(context) {
         if (notify) onPhraseSelected?.invoke(null)
     }
 
+    /**
+     * Updates the pick for a tapped word spanning [start, end): a tap on the
+     * current pick clears it, a tap on a word directly next to it extends the
+     * phrase, and anything else starts a fresh single-word pick. Never selects
+     * words the user did not tap through.
+     */
+    private fun applyWordPick(start: Int, end: Int) {
+        val text = selectedLayoutText
+        when {
+            phraseStart < 0 -> {
+                phraseStart = start
+                phraseEnd = end
+            }
+            start >= phraseStart && end <= phraseEnd -> {
+                clearPhrase(notify = true)
+                return
+            }
+            end <= phraseStart && text.isWordless(end, phraseStart) -> phraseStart = start
+            start >= phraseEnd && text.isWordless(phraseEnd, start) -> phraseEnd = end
+            else -> {
+                phraseStart = start
+                phraseEnd = end
+            }
+        }
+        val phrase = text.substring(phraseStart, phraseEnd.coerceAtMost(text.length)).trim('\'', '’', '-', ' ')
+        if (phrase.isNotBlank()) onPhraseSelected?.invoke(phrase)
+    }
+
+    /** True when the range holds only separators, i.e. the words are neighbours. */
+    private fun String.isWordless(from: Int, to: Int): Boolean {
+        if (from >= to) return true
+        return (from until to.coerceAtMost(length)).none { this[it].isLetterOrDigit() }
+    }
+
     /** Called after the user removes a block, with the remaining blocks. */
     var onBlocksChanged: ((List<TranslatedBlock>) -> Unit)? = null
 
@@ -426,21 +460,12 @@ class TranslationOverlayView(context: Context) : View(context) {
                     }
                     is TouchTarget.Block -> {
                         if (target.block === selectedBlock) {
-                            // Taps on words pick a word; further taps extend it
-                            // to a phrase. A miss toggles back to the translation.
+                            // A tap picks that one word; tapping a word next to
+                            // the pick extends it into a phrase; tapping the
+                            // pick again clears it. A miss deselects the block.
                             val range = wordRangeAt(event.x, event.y)
                             if (range != null) {
-                                if (phraseStart < 0) {
-                                    phraseStart = range.first
-                                    phraseEnd = range.last + 1
-                                } else {
-                                    phraseStart = minOf(phraseStart, range.first)
-                                    phraseEnd = maxOf(phraseEnd, range.last + 1)
-                                }
-                                val phrase = selectedLayoutText
-                                    .substring(phraseStart, phraseEnd.coerceAtMost(selectedLayoutText.length))
-                                    .trim('\'', '’', '-', ' ')
-                                if (phrase.isNotBlank()) onPhraseSelected?.invoke(phrase)
+                                applyWordPick(range.first, range.last + 1)
                             } else {
                                 selectedBlock = null
                                 clearPhrase(notify = true)
