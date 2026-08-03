@@ -8,6 +8,12 @@ discussed and consciously postponed, plus known rough edges.
 1. **Edit info**: per-manga custom title/cover/notes overrides.
 2. **Merged series**: one library entry fed by several sources (largest, last).
 
+Migration (`mihon.feature.migratefromapp`) now has two screens:
+`MigrateFromAppScreen` (detect Mihon-family packages, optional all-files-access
+storage scan, folder picker fallback) and `MigrateRestoreScreen` (decode the
+backup, show new-vs-existing counts, skip-or-update overlapping entries by
+restoring a filtered copy written to cacheDir, opt-in settings restore).
+
 Shipped from the earlier queue: translator UX settings
 (`translateResultDisplay` overlay/panel + `translateShowOriginalFirst` with
 per-block on-demand translation) and More → Migrate from another app
