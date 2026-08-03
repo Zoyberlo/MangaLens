@@ -26,8 +26,8 @@ import tachiyomi.i18n.MR
  * Bottom panel for word lookup and panel-mode translation results. The shown
  * original text is word-tappable in both modes: taps pick a word, further
  * taps extend the pick to a phrase (highlighted), and the host is asked for
- * variants of the current pick through [onPhraseTap]. Save submits the
- * current pick with the chosen variant.
+ * variants of the current pick through [onPhraseTap]. Read-only — nothing is
+ * saved anywhere.
  */
 @SuppressLint("ViewConstructor", "SetTextI18n")
 class WordInspectorView(context: Context) : LinearLayout(context) {

@@ -6,10 +6,12 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -28,8 +30,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -48,6 +53,40 @@ import java.util.Date
 private data class DetectedApp(val packageName: String, val label: String)
 
 private data class FoundBackup(val name: String, val uri: String, val lastModified: Long)
+
+/** A backup with the owning app resolved for display. */
+private data class BackupEntry(
+    val backup: FoundBackup,
+    val appLabel: String,
+    val icon: ImageBitmap?,
+    val isOwnBackup: Boolean,
+)
+
+/**
+ * Backup file names are `<package>_<date>.tachibk`, so the owning app can be
+ * resolved from the prefix and shown with its real name and icon instead of a
+ * raw file name.
+ */
+private fun FoundBackup.toEntry(context: Context, ownPackage: String): BackupEntry {
+    val pkg = name.substringBefore('_').takeIf { it.contains('.') }
+    var label = pkg ?: name
+    var icon: ImageBitmap? = null
+    if (pkg != null) {
+        try {
+            val info = context.packageManager.getApplicationInfo(pkg, 0)
+            label = context.packageManager.getApplicationLabel(info).toString()
+            icon = context.packageManager.getApplicationIcon(info).toBitmap(96, 96).asImageBitmap()
+        } catch (_: PackageManager.NameNotFoundException) {
+            // App no longer installed: the package name is the best label we have
+        }
+    }
+    return BackupEntry(
+        backup = this,
+        appLabel = label,
+        icon = icon,
+        isOwnBackup = pkg != null && (pkg == ownPackage || ownPackage.startsWith("$pkg.")),
+    )
+}
 
 /**
  * Migration helper: detects installed Mihon-family apps and finds their
@@ -77,6 +116,9 @@ class MigrateFromAppScreen : Screen() {
         var scanned by remember { mutableStateOf(false) }
         var scanning by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
+
+        val entries = remember(backups) { backups.map { it.toEntry(context, context.packageName) } }
+        val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
 
         val folderPicker = rememberLauncherForActivityResult(
             ActivityResultContracts.OpenDocumentTree(),
@@ -193,22 +235,38 @@ class MigrateFromAppScreen : Screen() {
                         )
                     }
                 }
-                items(backups, key = { it.uri }) { backup ->
+                items(entries, key = { it.backup.uri }) { entry ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        if (entry.icon != null) {
+                            Image(
+                                bitmap = entry.icon,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .padding(end = 12.dp)
+                                    .size(40.dp),
+                            )
+                        }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = backup.name, style = MaterialTheme.typography.titleSmall)
                             Text(
-                                text = DateFormat.getDateTimeInstance().format(Date(backup.lastModified)),
-                                style = MaterialTheme.typography.bodySmall,
+                                text = if (entry.isOwnBackup) {
+                                    stringResource(MR.strings.migrate_from_app_own_backup, entry.appLabel)
+                                } else {
+                                    entry.appLabel
+                                },
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Text(
+                                text = dateFormat.format(Date(entry.backup.lastModified)),
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        IconButton(onClick = { navigator.push(MigrateRestoreScreen(backup.uri)) }) {
+                        IconButton(onClick = { navigator.push(MigrateRestoreScreen(entry.backup.uri)) }) {
                             Icon(imageVector = Icons.Outlined.Restore, contentDescription = null)
                         }
                     }

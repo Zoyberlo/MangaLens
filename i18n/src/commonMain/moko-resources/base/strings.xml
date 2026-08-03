@@ -414,6 +414,7 @@
     <string name="migrate_from_app_scan_device">Scan device automatically</string>
     <string name="migrate_from_app_scan_needs_permission">Needs all-files access to search storage for backups</string>
     <string name="migrate_from_app_scanning">Searching for backups…</string>
+    <string name="migrate_from_app_own_backup">%s (this app)</string>
     <string name="migrate_restore_title">Import backup</string>
     <string name="migrate_restore_summary">This backup has %1$d entries: %2$d are new to your library, %3$d you already have.</string>
     <string name="migrate_restore_conflict">Entries you already have</string>

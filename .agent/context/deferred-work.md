@@ -27,10 +27,6 @@ packages, `.tachibk` folder scan → `RestoreBackupScreen`).
   the repo secrets; the owner uploads them with
   `A:\Projects\.keys\set-github-secrets.ps1` (outside the repo). Until then CI
   release builds fail at signing.
-- **Silent save to words-app.** Saving currently opens words-app's Add screen via
-  deep link; a background save (no app switch) would need an exported receiver on
-  the words-app side, which Expo makes awkward. Revisit only if the app-switch
-  annoys in practice.
 
 ## Known rough edges
 
@@ -38,9 +34,6 @@ packages, `.tachibk` folder scan → `RestoreBackupScreen`).
   remaining awkwardness comes from the backend itself: Google gtx translates short
   context-free lines literally. DeepL is noticeably better and is wired up — it only
   needs a user API key.
-- **The deep link needs a words-app dev/standalone build.** Expo Go registers its
-  own scheme, not `wordsapp://` — the save button only reaches words-app when a real
-  build of it is installed.
 - **Overlay is per-page state.** Translations persist on disk (`TextTranslator`'s
   DiskLruCache), so re-translating is instant — but the boxes themselves are not
   restored when re-entering a page; the user re-selects.

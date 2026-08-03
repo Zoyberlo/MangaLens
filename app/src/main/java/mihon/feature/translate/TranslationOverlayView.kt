@@ -31,8 +31,11 @@ class TranslationOverlayView(context: Context) : View(context) {
     /** Supplies the image view to map coordinates through; set by the host. */
     var ssivProvider: (() -> SubsamplingScaleImageView?)? = null
 
-    /** Called when the user taps the save button on a selected block. */
-    var onSaveBlock: ((TranslatedBlock) -> Unit)? = null
+    /**
+     * Called when the user taps the + button of a selected but still
+     * untranslated block (original-first mode) to translate it in place.
+     */
+    var onTranslateBlock: ((TranslatedBlock) -> Unit)? = null
 
     /**
      * Called with the currently picked word/phrase (taps on further words
@@ -74,10 +77,10 @@ class TranslationOverlayView(context: Context) : View(context) {
     private val hitRects = mutableListOf<Pair<RectF, TranslatedBlock>>()
     private var closeButtonCenterX = 0f
     private var closeButtonCenterY = 0f
-    private var saveButtonCenterX = 0f
-    private var saveButtonCenterY = 0f
+    private var translateButtonCenterX = 0f
+    private var translateButtonCenterY = 0f
     private var closeButtonVisible = false
-    private var saveButtonVisible = false
+    private var translateButtonVisible = false
 
     private var downTarget: TouchTarget? = null
 
@@ -95,7 +98,7 @@ class TranslationOverlayView(context: Context) : View(context) {
         style = Paint.Style.FILL
     }
 
-    private val saveCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val translateCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFF2E7D32.toInt()
         style = Paint.Style.FILL
     }
@@ -138,7 +141,7 @@ class TranslationOverlayView(context: Context) : View(context) {
         super.onDraw(canvas)
         hitRects.clear()
         closeButtonVisible = false
-        saveButtonVisible = false
+        translateButtonVisible = false
         selectedLayout = null
         if (blocks.isEmpty() || imageWidth <= 0 || imageHeight <= 0) return
         val ssiv = ssivProvider?.invoke() ?: return
@@ -173,12 +176,12 @@ class TranslationOverlayView(context: Context) : View(context) {
             if (isSelected) {
                 closeButtonCenterX = drawnRect.right
                 closeButtonCenterY = drawnRect.top
-                saveButtonCenterX = drawnRect.left
-                saveButtonCenterY = drawnRect.top
+                translateButtonCenterX = drawnRect.left
+                translateButtonCenterY = drawnRect.top
                 closeButtonVisible = true
                 // The + (translate-in-place) button only applies to blocks
                 // that are still untranslated (original-first mode)
-                saveButtonVisible = block.translatedText.isBlank()
+                translateButtonVisible = block.translatedText.isBlank()
             }
         }
 
@@ -202,21 +205,21 @@ class TranslationOverlayView(context: Context) : View(context) {
                 closeCrossPaint,
             )
 
-            if (saveButtonVisible) {
+            if (translateButtonVisible) {
                 // Translate-in-place button: green circle with a plus
-                canvas.drawCircle(saveButtonCenterX, saveButtonCenterY, radius, saveCirclePaint)
+                canvas.drawCircle(translateButtonCenterX, translateButtonCenterY, radius, translateCirclePaint)
                 canvas.drawLine(
-                    saveButtonCenterX - arm,
-                    saveButtonCenterY,
-                    saveButtonCenterX + arm,
-                    saveButtonCenterY,
+                    translateButtonCenterX - arm,
+                    translateButtonCenterY,
+                    translateButtonCenterX + arm,
+                    translateButtonCenterY,
                     closeCrossPaint,
                 )
                 canvas.drawLine(
-                    saveButtonCenterX,
-                    saveButtonCenterY - arm,
-                    saveButtonCenterX,
-                    saveButtonCenterY + arm,
+                    translateButtonCenterX,
+                    translateButtonCenterY - arm,
+                    translateButtonCenterX,
+                    translateButtonCenterY + arm,
                     closeCrossPaint,
                 )
             }
@@ -333,7 +336,7 @@ class TranslationOverlayView(context: Context) : View(context) {
 
     private sealed interface TouchTarget {
         data object CloseButton : TouchTarget
-        data object SaveButton : TouchTarget
+        data object TranslateButton : TouchTarget
         data class Block(val block: TranslatedBlock) : TouchTarget
     }
 
@@ -343,8 +346,10 @@ class TranslationOverlayView(context: Context) : View(context) {
             if (hypot(x - closeButtonCenterX, y - closeButtonCenterY) <= touchRadius) {
                 return TouchTarget.CloseButton
             }
-            if (saveButtonVisible && hypot(x - saveButtonCenterX, y - saveButtonCenterY) <= touchRadius) {
-                return TouchTarget.SaveButton
+            if (translateButtonVisible &&
+                hypot(x - translateButtonCenterX, y - translateButtonCenterY) <= touchRadius
+            ) {
+                return TouchTarget.TranslateButton
             }
         }
         return hitRects.lastOrNull { (rect, _) -> rect.contains(x, y) }
@@ -416,8 +421,8 @@ class TranslationOverlayView(context: Context) : View(context) {
                         clearPhrase(notify = true)
                         onBlocksChanged?.invoke(blocks.toList())
                     }
-                    is TouchTarget.SaveButton -> {
-                        selectedBlock?.let { onSaveBlock?.invoke(it) }
+                    is TouchTarget.TranslateButton -> {
+                        selectedBlock?.let { onTranslateBlock?.invoke(it) }
                     }
                     is TouchTarget.Block -> {
                         if (target.block === selectedBlock) {

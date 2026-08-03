@@ -126,7 +126,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
         val overlay = translationOverlay ?: TranslationOverlayView(context).also {
             it.ssivProvider = { pageView as? SubsamplingScaleImageView }
             // Original-first mode: + on an untranslated block translates it
-            it.onSaveBlock = { block -> onTranslationBlockTranslateRequested?.invoke(block) }
+            it.onTranslateBlock = { block -> onTranslationBlockTranslateRequested?.invoke(block) }
             it.onPhraseSelected = { phrase -> onTranslationPhraseSelected?.invoke(phrase) }
             it.onBlocksChanged = { blocks -> onTranslationBlocksChanged?.invoke(blocks) }
             translationOverlay = it
