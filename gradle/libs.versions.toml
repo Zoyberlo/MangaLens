@@ -53,6 +53,7 @@ markdown = "0.43.0"
 material = "1.12.0"
 materialKolor = "5.0.0"
 mlkit-text = "16.0.1"
+onnxruntime = "1.20.0"
 mockk = "1.14.11"
 moko-resources = "0.26.4"
 okhttp = "5.4.0"
@@ -158,6 +159,7 @@ mlkit-text-chinese = { module = "com.google.mlkit:text-recognition-chinese", ver
 mlkit-text-japanese = { module = "com.google.mlkit:text-recognition-japanese", version.ref = "mlkit-text" }
 mlkit-text-korean = { module = "com.google.mlkit:text-recognition-korean", version.ref = "mlkit-text" }
 mlkit-text-latin = { module = "com.google.mlkit:text-recognition", version.ref = "mlkit-text" }
+onnxruntime-android = { module = "com.microsoft.onnxruntime:onnxruntime-android", version.ref = "onnxruntime" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 moko-resources = { module = "dev.icerock.moko:resources", version.ref = "moko-resources" }
 natural-comparator = { module = "com.github.gpanther:java-nat-sort", version = "natural-comparator-1.1" }

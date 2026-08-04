@@ -21,7 +21,8 @@ enum class TranslationSourceLanguage(val langCode: String) {
  * user's own paid accounts, metered against a monthly limit they set.
  */
 enum class OcrEngine(val displayName: String) {
-    ON_DEVICE("On-device"),
+    ON_DEVICE("On-device (ML Kit)"),
+    ON_DEVICE_PADDLE("On-device (PaddleOCR)"),
     GOOGLE_VISION("Google Cloud Vision"),
     AZURE_READ("Azure AI Vision"),
     GEMINI("Gemini"),
@@ -34,7 +35,7 @@ enum class OcrEngine(val displayName: String) {
      */
     val canDetectLayout: Boolean get() = this != GEMINI
 
-    val isCloud: Boolean get() = this != ON_DEVICE
+    val isCloud: Boolean get() = this != ON_DEVICE && this != ON_DEVICE_PADDLE
 }
 
 /**

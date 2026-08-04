@@ -74,7 +74,7 @@ class CloudTextRecognizer(
 
     /** True once the engine has everything it needs to run. */
     fun isConfigured(engine: OcrEngine): Boolean = when (engine) {
-        OcrEngine.ON_DEVICE -> true
+        OcrEngine.ON_DEVICE, OcrEngine.ON_DEVICE_PADDLE -> true
         OcrEngine.GOOGLE_VISION -> readerPreferences.visionApiKey.get().isNotBlank()
         OcrEngine.AZURE_READ -> readerPreferences.azureApiKey.get().isNotBlank() &&
             readerPreferences.azureEndpoint.get().isNotBlank()
@@ -108,7 +108,7 @@ class CloudTextRecognizer(
                 OcrEngine.GOOGLE_VISION -> requestGoogleVision(bitmap, TranslationSourceLanguage.ENGLISH)
                 OcrEngine.AZURE_READ -> requestAzureRead(bitmap)
                 OcrEngine.GEMINI -> requestGemini(bitmap, TranslationSourceLanguage.ENGLISH)
-                OcrEngine.ON_DEVICE -> emptyList()
+                OcrEngine.ON_DEVICE, OcrEngine.ON_DEVICE_PADDLE -> emptyList()
             }
             lastErrors.remove(engine)
             null
@@ -189,7 +189,7 @@ class CloudTextRecognizer(
         bitmap: Bitmap,
         language: TranslationSourceLanguage,
     ): List<RecognizedBlock>? {
-        if (engine == OcrEngine.ON_DEVICE || !isConfigured(engine)) return null
+        if (!engine.isCloud || !isConfigured(engine)) return null
         val quota = quotas[engine] ?: return null
         if (!quota.canSpend(1)) return null
 
@@ -198,7 +198,7 @@ class CloudTextRecognizer(
                 OcrEngine.GOOGLE_VISION -> requestGoogleVision(bitmap, language)
                 OcrEngine.AZURE_READ -> requestAzureRead(bitmap)
                 OcrEngine.GEMINI -> requestGemini(bitmap, language)
-                OcrEngine.ON_DEVICE -> emptyList()
+                OcrEngine.ON_DEVICE, OcrEngine.ON_DEVICE_PADDLE -> emptyList()
             }
             quota.record(1)
             lastErrors.remove(engine)

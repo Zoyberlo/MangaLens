@@ -42,11 +42,26 @@ class PageTextRecognizer {
         }
     }
 
-    private suspend fun recognizeWith(
-        bitmap: Bitmap,
-        language: TranslationSourceLanguage,
-    ): List<RecognizedBlock> {
-        val recognizer = synchronized(recognizers) {
+    /**
+     * Per-*line* boxes rather than per-block, for engines that read one line at
+     * a time. ML Kit finds these accurately even where it reads them wrongly,
+     * which is the whole reason a second recognizer can be bolted on top of it.
+     */
+    suspend fun recognizeLines(bitmap: Bitmap, language: TranslationSourceLanguage): List<RecognizedBlock> {
+        val recognizer = recognizerFor(language)
+        val result = recognizer.process(InputImage.fromBitmap(bitmap, 0)).await()
+        return result.textBlocks
+            .flatMap { it.lines }
+            .mapNotNull { line ->
+                val bounds = line.boundingBox ?: return@mapNotNull null
+                val text = line.text.trim()
+                if (text.isEmpty()) return@mapNotNull null
+                RecognizedBlock(text, Rect(bounds))
+            }
+    }
+
+    private fun recognizerFor(language: TranslationSourceLanguage): TextRecognizer =
+        synchronized(recognizers) {
             recognizers.getOrPut(language) {
                 TextRecognition.getClient(
                     when (language) {
@@ -58,6 +73,12 @@ class PageTextRecognizer {
                 )
             }
         }
+
+    private suspend fun recognizeWith(
+        bitmap: Bitmap,
+        language: TranslationSourceLanguage,
+    ): List<RecognizedBlock> {
+        val recognizer = recognizerFor(language)
 
         val result = recognizer.process(InputImage.fromBitmap(bitmap, 0)).await()
 

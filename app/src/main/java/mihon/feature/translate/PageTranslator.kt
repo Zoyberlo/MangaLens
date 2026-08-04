@@ -22,6 +22,7 @@ class PageTranslator(
     private val translator: TextTranslator,
     private val readerPreferences: ReaderPreferences,
     private val lexicon: EnglishLexicon,
+    private val paddle: PaddleTextRecognizer,
 ) {
 
     /**
@@ -33,7 +34,12 @@ class PageTranslator(
     fun primaryEngineFor(language: TranslationSourceLanguage): OcrEngine {
         val engine = readerPreferences.ocrEngineOverrides.get().ocrOverrideFor(language)
             ?: readerPreferences.ocrEngine.get()
-        return engine.takeIf { it.canDetectLayout && cloudRecognizer.isConfigured(it) } ?: OcrEngine.ON_DEVICE
+        val usable = when {
+            engine == OcrEngine.ON_DEVICE_PADDLE -> paddle.isAvailable
+            engine.isCloud -> cloudRecognizer.isConfigured(engine)
+            else -> true
+        }
+        return engine.takeIf { it.canDetectLayout && usable } ?: OcrEngine.ON_DEVICE
     }
 
     /** The engine the retry button on a block runs, for [language]. */
@@ -80,10 +86,11 @@ class PageTranslator(
             logcat(LogPriority.WARN, e) { "OCR warm-up failed" }
         }
 
-        // Building the word filter takes a moment; do it here rather than on
-        // the first bubble the user is waiting for
+        // Building the word filter and the ONNX session takes a moment; do it
+        // here rather than on the first bubble the user is waiting for
         try {
             lexicon.preload()
+            if (primaryEngineFor(from) == OcrEngine.ON_DEVICE_PADDLE) paddle.preload()
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Lexicon warm-up failed" }
         }
@@ -162,12 +169,15 @@ class PageTranslator(
         // so choosing one is a deliberate act in settings.
         var fromCloud = false
         val recognition = try {
-            val engine = primaryEngineFor(from)
-            cloudRecognizer.recognize(engine, bitmap, from)
-                ?.takeIf { it.isNotEmpty() }
-                ?.also { fromCloud = true }
-                ?.let { RecognitionResult(it, from) }
-                ?: recognizer.recognize(bitmap, from)
+            when (val engine = primaryEngineFor(from)) {
+                OcrEngine.ON_DEVICE_PADDLE -> recognizeWithPaddle(bitmap, from)
+                else ->
+                    cloudRecognizer.recognize(engine, bitmap, from)
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.also { fromCloud = true }
+                        ?.let { RecognitionResult(it, from) }
+                        ?: recognizer.recognize(bitmap, from)
+            }
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Text recognition failed" }
             return RegionTranslateResult.NoText
@@ -418,6 +428,48 @@ class PageTranslator(
             null
         } ?: return CloudRetryResult.RecognizedOnly(text)
         return CloudRetryResult.Success(text, translated)
+    }
+
+    /**
+     * ML Kit finds the lines, PaddleOCR reads them.
+     *
+     * The layout ML Kit produces is accurate even on lettering it cannot read,
+     * so only the reading is replaced. A line PaddleOCR declines is kept as ML
+     * Kit had it, which means the worst case is what we had before.
+     */
+    private suspend fun recognizeWithPaddle(
+        bitmap: android.graphics.Bitmap,
+        language: TranslationSourceLanguage,
+    ): RecognitionResult {
+        val lines = recognizer.recognizeLines(bitmap, language)
+        if (lines.isEmpty()) return recognizer.recognize(bitmap, language)
+
+        val read = lines.map { line ->
+            val crop = cropSafely(bitmap, line.bounds) ?: return@map line
+            val text = try {
+                paddle.recognize(crop)
+            } finally {
+                crop.recycle()
+            }
+            if (text.isNullOrBlank()) line else line.copy(text = text)
+        }
+        return RecognitionResult(read, language)
+    }
+
+    /** Crops [bounds] from [bitmap], clamped to it; null when nothing is left. */
+    private fun cropSafely(
+        bitmap: android.graphics.Bitmap,
+        bounds: android.graphics.Rect,
+    ): android.graphics.Bitmap? {
+        val rect = android.graphics.Rect(bounds)
+        if (!rect.intersect(android.graphics.Rect(0, 0, bitmap.width, bitmap.height))) return null
+        if (rect.width() <= 0 || rect.height() <= 0) return null
+        return try {
+            android.graphics.Bitmap.createBitmap(bitmap, rect.left, rect.top, rect.width(), rect.height())
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Line crop failed" }
+            null
+        }
     }
 
     /**

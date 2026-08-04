@@ -336,6 +336,9 @@ dependencies {
     // String similarity
     implementation(libs.stringSimilarity)
 
+    // PaddleOCR recognition, for the hand-lettered fonts ML Kit garbles
+    implementation(libs.onnxruntime.android)
+
     // Tests
     testImplementation(libs.bundles.test)
     testRuntimeOnly(libs.junit.platform.launcher)

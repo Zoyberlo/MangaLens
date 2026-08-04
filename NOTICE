@@ -41,3 +41,14 @@ entries of 2-20 characters; no other modification.
 Used offline to tell a real English word from a misread one. The recognizer's
 mistakes on comic lettering are systematic, so nothing about the shape of a
 garbled word reveals it — only knowing that no such word exists.
+
+--------------------------------------------------------------------------------
+PP-OCRv5 English recognition model (app/src/main/assets/paddle_rec_en.onnx,
+paddle_rec_en_dict.txt)
+
+From PaddleOCR (https://github.com/PaddlePaddle/PaddleOCR), Apache License 2.0.
+ONNX conversion redistributed by https://huggingface.co/monkt/paddleocr-onnx,
+also Apache License 2.0. Unmodified.
+
+Used for on-device English text recognition where the bundled ML Kit model
+misreads hand-lettered comic fonts.

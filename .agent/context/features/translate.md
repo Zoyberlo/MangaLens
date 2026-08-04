@@ -257,6 +257,7 @@ mid-sentence.
 | Engine | Where it runs | Notes |
 |--------|---------------|-------|
 | `ON_DEVICE` | ML Kit, offline | Free, the default for everything, and the fallback whenever anything else fails |
+| `ON_DEVICE_PADDLE` | PP-OCRv5 English rec via ONNX Runtime, offline | ML Kit finds the lines, this reads them. English only, and costs ~38 MB of APK |
 | `GOOGLE_VISION` | `vision.googleapis.com/v1/images:annotate` | `DOCUMENT_TEXT_DETECTION`; blocks from `fullTextAnnotation.pages[].blocks[]` |
 | `AZURE_READ` | `{endpoint}/computervision/imageanalysis:analyze?features=read` | Image Analysis 4.0 — synchronous, posts raw bytes; returns **lines**, which merge into bubbles downstream like ML Kit's |
 | `GEMINI` | `generativelanguage.googleapis.com/…:generateContent` | Reads for meaning, so it handles stylised lettering best — but returns no usable geometry |
@@ -322,7 +323,32 @@ people trip over: Vision needs a billing account even for its free tier, DeepL
 free keys must keep their `:fx` suffix, Azure needs the endpoint as well as the
 key, and Gemini's free tier is not private.
 
-### Not implemented: on-device neural engines
+### PaddleOCR (`PaddleTextRecognizer`)
+
+Recognition **only**: ML Kit's line boxes are accurate even on lettering it
+cannot read, so PP-OCR's detection stage is not carried. `recognizeWithPaddle`
+takes `PageTextRecognizer.recognizeLines()`, crops each line, and replaces the
+text; a line PaddleOCR declines keeps its ML Kit reading, so the worst case is
+what came before.
+
+The contract was verified against the real model on a desktop before any Kotlin
+was written, which is worth repeating for any future model:
+
+- input is `(1, 3, 48, width)`, RGB, **height 48** — the model's own published
+  config says 32, and 32 throws;
+- pixels normalized to `[-1, 1]` as `(x/255 - 0.5) / 0.5`;
+- output is 438 classes for a 436-entry dictionary, i.e. `[blank] + dict + [" "]`,
+  decoded greedily with blanks and repeats dropped.
+
+Rendered text in a handwritten face came back exactly right, apostrophe and all,
+where ML Kit mangles it — the reason to think this helps at all.
+
+**Cost: ~38 MB of APK** — 30 MB of ONNX Runtime native libraries across two ABIs
+and 7.5 MB of model. If the accuracy does not justify that, the levers are
+dropping `armeabi-v7a` for the native lib, downloading the model on demand, or
+`onnxruntime-mobile` with an ORT-format model.
+
+### Not implemented: other on-device neural engines
 
 PaddleOCR PP-OCRv5 mobile and manga-ocr would both beat ML Kit *offline*, but
 each needs an ONNX Runtime dependency plus model files that are too big to
