@@ -20,6 +20,7 @@ import androidx.compose.runtime.CompositionContext
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import eu.kanade.presentation.components.UpstreamDocsNotice
 import eu.kanade.presentation.theme.TachiyomiTheme
 import eu.kanade.tachiyomi.R
 
@@ -33,7 +34,11 @@ inline fun ComponentActivity.setComposeContent(
                 LocalTextStyle provides MaterialTheme.typography.bodySmall,
                 LocalContentColor provides MaterialTheme.colorScheme.onBackground,
             ) {
-                content()
+                // Wraps LocalUriHandler for every activity at once, so no help
+                // link can quietly send the reader to upstream's docs
+                UpstreamDocsNotice {
+                    content()
+                }
             }
         }
     }

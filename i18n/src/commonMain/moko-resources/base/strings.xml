@@ -489,6 +489,8 @@ Got:
     <string name="supportUsScreen_reportIssue">Report an issue</string>
     <string name="supportUsScreen_tip">Buy me a coffee</string>
     <string name="about_upstream_project">Mihon</string>
+    <string name="upstream_docs_title">Mihon's documentation</string>
+    <string name="upstream_docs_message">MangaLens has no documentation of its own yet, so this opens the docs of Mihon, the app it is built on. Nearly all of it still applies. Translation is only in this fork and is not covered there.</string>
     <string name="about_fork_notice_title">Fork notice</string>
     <string name="about_fork_notice_summary">MangaLens is an unofficial fork of Mihon, licensed under Apache 2.0</string>
     <string name="supportUsScreen_upstreamCredit">Everything except the translation features comes from Mihon. If you want to support the app this is built on, donate to them:</string>
