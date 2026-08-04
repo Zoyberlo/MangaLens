@@ -262,8 +262,8 @@ mid-sentence.
 
 | Engine | Where it runs | Notes |
 |--------|---------------|-------|
-| `ON_DEVICE` | ML Kit, offline | Free, the default for everything, and the fallback whenever anything else fails |
-| `ON_DEVICE_PADDLE` | PP-OCRv5 English rec via ONNX Runtime, offline | ML Kit finds the lines, this reads them. English only, and costs ~38 MB of APK |
+| `ON_DEVICE_PADDLE` | PP-OCRv5 English rec via ONNX Runtime, offline | **The default.** ML Kit finds the lines, this reads them. English only; other languages fall back on their own |
+| `ON_DEVICE` | ML Kit, offline | The fallback whenever anything else cannot run, and the reader for every non-English script |
 | `GOOGLE_VISION` | `vision.googleapis.com/v1/images:annotate` | `DOCUMENT_TEXT_DETECTION`; blocks from `fullTextAnnotation.pages[].blocks[]` |
 | `AZURE_READ` | `{endpoint}/computervision/imageanalysis:analyze?features=read` | Image Analysis 4.0 — synchronous, posts raw bytes; returns **lines**, which merge into bubbles downstream like ML Kit's |
 | `GEMINI` | `generativelanguage.googleapis.com/…:generateContent` | Reads for meaning, so it handles stylised lettering best — but returns no usable geometry |
@@ -348,6 +348,19 @@ was written, which is worth repeating for any future model:
 
 Rendered text in a handwritten face came back exactly right, apostrophe and all,
 where ML Kit mangles it — the reason to think this helps at all.
+
+**PaddleOCR is the default because it earned it**: on the pages that drove all
+of this it reads the lettering correctly where ML Kit misread it
+systematically. Two things follow, and both are enforced in
+`primaryEngineFor` / `translateRegion` rather than left to configuration:
+
+- the bundled model is **English-only**, so a non-English source language falls
+  back to ML Kit regardless of the setting — pointing an English model at
+  Japanese returns confident gibberish;
+- the **second recognition pass is skipped** unless ML Kit produced the reading.
+  That pass is ML Kit re-reading a crop; against a stronger engine it can only
+  trade a better reading for a worse one, exactly as it could for the cloud
+  engines before that was fixed.
 
 **Verify it before trusting it.** Settings → Translation → Text recognition →
 *On-device (PaddleOCR)* → **Test on-device recognition** renders a line and

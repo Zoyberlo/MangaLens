@@ -118,9 +118,12 @@ class ReaderPreferences(
 
     // region Text recognition
 
-    // The engine every automatic pass uses. On-device is free and offline, so
-    // it stays the default; a cloud engine here bills for every selection.
-    val ocrEngine: Preference<OcrEngine> = preferenceStore.getEnum("pref_ocr_engine", OcrEngine.ON_DEVICE)
+    // The engine every automatic pass uses. PaddleOCR reads hand-lettered
+    // comic fonts where ML Kit systematically misreads them, and both are free
+    // and offline; a cloud engine here would bill for every selection. The
+    // bundled PaddleOCR model is English-only, so other languages fall back to
+    // ML Kit on their own.
+    val ocrEngine: Preference<OcrEngine> = preferenceStore.getEnum("pref_ocr_engine", OcrEngine.ON_DEVICE_PADDLE)
 
     // What the retry button on a block runs. Gemini reads stylised lettering
     // best and its free tier is per-day rather than per-month, which suits an

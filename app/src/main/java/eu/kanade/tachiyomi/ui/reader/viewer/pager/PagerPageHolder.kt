@@ -357,20 +357,15 @@ class PagerPageHolder(
                         // Which engine actually read the page. Silent fallback
                         // to ML Kit is why "I see no difference" was impossible
                         // to tell apart from "the engine never ran".
-                        viewer.activity.toast(
-                            if (result.fellBack) {
+                        if (result.fellBack) {
+                            viewer.activity.toast(
                                 viewer.activity.stringResource(
                                     MR.strings.translate_engine_fallback,
                                     result.requestedEngine.displayName,
                                     result.usedEngine.displayName,
-                                )
-                            } else {
-                                viewer.activity.stringResource(
-                                    MR.strings.translate_engine_used,
-                                    result.usedEngine.displayName,
-                                )
-                            },
-                        )
+                                ),
+                            )
+                        }
                         if (readerPreferences.translateResultDisplay.get() ==
                             mihon.feature.translate.TranslateResultDisplay.PANEL
                         ) {

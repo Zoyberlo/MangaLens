@@ -40,7 +40,11 @@ class PageTranslator(
     fun primaryEngineFor(language: TranslationSourceLanguage): OcrEngine {
         val engine = requestedEngineFor(language)
         val usable = when {
-            engine == OcrEngine.ON_DEVICE_PADDLE -> paddle.isAvailable
+            // The bundled PP-OCR model reads English only. Pointing it at
+            // Japanese would return confident gibberish, so the language
+            // decides this, not the user.
+            engine == OcrEngine.ON_DEVICE_PADDLE ->
+                paddle.isAvailable && language == TranslationSourceLanguage.ENGLISH
             engine.isCloud -> cloudRecognizer.isConfigured(engine)
             else -> true
         }
@@ -207,7 +211,12 @@ class PageTranslator(
         // both billed and better, and refinement is on-device, so it could only
         // ever trade a paid reading for a free worse one.
         val repairWords = readerPreferences.repairRecognizedWords.get()
-        val candidates = if (fromCloud) {
+        // The second pass is ML Kit re-reading a crop. It exists to shore up
+        // ML Kit, and against any stronger engine it can only trade a better
+        // reading for a worse one — the same mistake that was already fixed
+        // for the cloud engines.
+        val refinementWouldHelp = !fromCloud && primaryEngineFor(from) == OcrEngine.ON_DEVICE
+        val candidates = if (!refinementWouldHelp) {
             merged
         } else {
             merged.map { block ->
