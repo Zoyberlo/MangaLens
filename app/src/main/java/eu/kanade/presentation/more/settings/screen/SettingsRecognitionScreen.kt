@@ -57,8 +57,19 @@ object SettingsRecognitionScreen : SearchableSettings {
         val paddleMismatch = stringResource(MR.strings.pref_paddle_mismatch)
         val okLabel = stringResource(MR.strings.pref_engine_test_ok)
 
+        // The on-device test involves no key, so it cannot borrow the cloud
+        // engines' "Test key" heading or their "the key is set up correctly"
+        val keyTestTitle = stringResource(MR.strings.pref_engine_test)
+        val paddleTestTitle = stringResource(MR.strings.pref_paddle_test)
+        val paddleOkLabel = stringResource(MR.strings.pref_paddle_test_ok)
+        var reportTitle by remember { mutableStateOf(keyTestTitle) }
+
         report?.let { message ->
-            EngineReportDialog(message = message, onDismissRequest = { report = null })
+            EngineReportDialog(
+                message = message,
+                title = reportTitle,
+                onDismissRequest = { report = null },
+            )
         }
         models?.let { list ->
             GeminiModelDialog(
@@ -74,6 +85,7 @@ object SettingsRecognitionScreen : SearchableSettings {
         val testEngine: (OcrEngine) -> Unit = { engine ->
             if (!busy) {
                 busy = true
+                reportTitle = keyTestTitle
                 report = testingLabel
                 scope.launch {
                     val error = recognizer.testEngine(engine)
@@ -85,6 +97,7 @@ object SettingsRecognitionScreen : SearchableSettings {
         val testPaddle: () -> Unit = {
             if (!busy) {
                 busy = true
+                reportTitle = paddleTestTitle
                 report = testingLabel
                 scope.launch {
                     val outcome = withContext(Dispatchers.Default) {
@@ -92,7 +105,7 @@ object SettingsRecognitionScreen : SearchableSettings {
                     }
                     report = when {
                         !outcome.engineAvailable -> paddleUnavailable
-                        outcome.passed -> "$okLabel\n\n\"${outcome.actual}\""
+                        outcome.passed -> "$paddleOkLabel\n\n\"${outcome.actual}\""
                         else -> paddleMismatch.format(outcome.expected, outcome.actual ?: "-")
                     }
                     busy = false

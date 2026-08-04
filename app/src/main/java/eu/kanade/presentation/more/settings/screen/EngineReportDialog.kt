@@ -24,10 +24,14 @@ import tachiyomi.presentation.core.i18n.stringResource
  * the honest thing is to pass its words through rather than paraphrase them.
  */
 @Composable
-fun EngineReportDialog(message: String, onDismissRequest: () -> Unit) {
+fun EngineReportDialog(
+    message: String,
+    onDismissRequest: () -> Unit,
+    title: String = stringResource(MR.strings.pref_engine_test),
+) {
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text(text = stringResource(MR.strings.pref_engine_test)) },
+        title = { Text(text = title) },
         text = {
             Text(
                 text = message,

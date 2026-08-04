@@ -447,6 +447,7 @@
     <string name="pref_engine_testing">Testing…</string>
     <string name="pref_paddle_test">Test on-device recognition</string>
     <string name="pref_paddle_test_summary">Reads a line of text this app renders itself, and shows what came back</string>
+    <string name="pref_paddle_test_ok">Works. On-device recognition read the test line back correctly.</string>
     <string name="pref_paddle_unavailable">The model or its runtime failed to load, so this engine falls back to ML Kit.</string>
     <string name="pref_paddle_mismatch">Read something, but not the text it was given.
 
