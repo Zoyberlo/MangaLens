@@ -165,15 +165,14 @@ class PageTranslator(
             BAND_OVERLAP_PX,
         )
 
-        var fromCloud = false
         val recognition = try {
             val engine = primaryEngineFor(from)
             val perBand = bands.map { band ->
                 val rect = android.graphics.Rect(band.left, band.top, band.right, band.bottom)
-                recognizeBand(imageBytes, rect, engine, from).also { if (it.second) fromCloud = true }
+                recognizeBand(imageBytes, rect, engine, from)
             }
-            val blocks = perBand.flatMap { (result, _) -> result.blocks }
-            val language = perBand.firstOrNull { it.first.blocks.isNotEmpty() }?.first?.language ?: from
+            val blocks = perBand.flatMap { it.blocks }
+            val language = perBand.firstOrNull { it.blocks.isNotEmpty() }?.language ?: from
             RecognitionResult(blocks, language)
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Text recognition failed" }
@@ -210,40 +209,22 @@ class PageTranslator(
         // Skipped entirely when the first pass came from the cloud: that pass is
         // both billed and better, and refinement is on-device, so it could only
         // ever trade a paid reading for a free worse one.
-        val repairWords = readerPreferences.repairRecognizedWords.get()
-        // The second pass is ML Kit re-reading a crop. It exists to shore up
-        // ML Kit, and against any stronger engine it can only trade a better
-        // reading for a worse one — the same mistake that was already fixed
-        // for the cloud engines.
-        val refinementWouldHelp = !fromCloud && primaryEngineFor(from) == OcrEngine.ON_DEVICE
-        val candidates = if (!refinementWouldHelp) {
-            merged
-        } else {
-            merged.map { block ->
-                // Repair before comparing, or a correct-but-digit-speckled
-                // reading loses to a garbled one that merely has no digits
-                // The dictionary only knows English, so it only gets a say
-                // when English is what was read
-                val checkWord = lexicon::contains.takeIf {
-                    repairWords && recognizedLanguage == TranslationSourceLanguage.ENGLISH
-                }
-                val primary = OcrText.repairDigitConfusions(block.text, checkWord)
-                val refined = refineBlockText(imageBytes, block, recognizedLanguage)
-                    ?.let { OcrText.repairDigitConfusions(it, checkWord) }
-                val best = if (refined != null && OcrText.textQuality(refined) > OcrText.textQuality(primary)) {
-                    refined
-                } else {
-                    primary
-                }
-                // This font's mistakes are systematic, so both passes make the
-                // same one and agree; only the dictionary sees those.
-                val repaired = checkWord?.let { OcrText.repairLetterConfusions(best, it) } ?: best
-                val passesAgree = refined == null ||
-                    OcrText.agreementRatio(primary, refined) >= OcrText.MIN_PASS_AGREEMENT
-                val readsAsEnglish = checkWord == null ||
-                    OcrText.unknownWordRatio(repaired, checkWord) <= OcrText.MAX_UNKNOWN_WORDS
-                block.copy(text = repaired, confident = passesAgree && readsAsEnglish)
-            }
+        // The dictionary only knows English, so it only gets a say when English
+        // is what was read
+        val checkWord = lexicon::contains.takeIf {
+            readerPreferences.repairRecognizedWords.get() &&
+                recognizedLanguage == TranslationSourceLanguage.ENGLISH
+        }
+        val candidates = merged.map { block ->
+            val repaired = checkWord
+                ?.let { OcrText.repairLetterConfusions(OcrText.repairDigitConfusions(block.text, it), it) }
+                ?: block.text
+            // Words no dictionary knows are the remaining signal that a reading
+            // is a guess. Loose on purpose: comic dialogue is full of names and
+            // sound effects no dictionary holds.
+            val confident = checkWord == null ||
+                OcrText.unknownWordRatio(repaired, checkWord) <= OcrText.MAX_UNKNOWN_WORDS
+            block.copy(text = repaired, confident = confident)
         }
 
         // Original-first mode (overlay display only): show the recognized text
@@ -272,52 +253,6 @@ class PageTranslator(
     }
 
     /**
-     * Re-reads one recognized block from the original image, cropped tight and
-     * scaled so its lettering is large regardless of how much the user
-     * selected. Returns null when the crop or recognition fails.
-     */
-    private suspend fun refineBlockText(
-        imageBytes: ByteArray,
-        block: RecognizedBlock,
-        language: TranslationSourceLanguage,
-    ): String? {
-        return try {
-            val bounds = block.bounds
-            if (bounds.width() <= 0 || bounds.height() <= 0) return null
-
-            val padX = (bounds.width() * BLOCK_PADDING).toInt().coerceAtLeast(6)
-            val padY = (bounds.height() * BLOCK_PADDING).toInt().coerceAtLeast(6)
-            val crop = android.graphics.Rect(bounds).apply { inset(-padX, -padY) }
-
-            val info = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, info)
-            if (!crop.intersect(android.graphics.Rect(0, 0, info.outWidth, info.outHeight))) return null
-
-            @Suppress("DEPRECATION")
-            val decoder = android.graphics.BitmapRegionDecoder
-                .newInstance(imageBytes, 0, imageBytes.size, false)
-            val decoded = try {
-                decoder.decodeRegion(crop, BitmapFactory.Options())
-            } finally {
-                decoder.recycle()
-            } ?: return null
-
-            val scale = (TARGET_BLOCK_HEIGHT / decoded.height.toFloat()).coerceIn(1f, MAX_BLOCK_UPSCALE)
-            val prepared = enhanceForOcr(decoded, scale)
-            val text = try {
-                recognizer.recognize(prepared, language).blocks.joinToString(" ") { it.text }.trim()
-            } finally {
-                prepared.recycle()
-                decoded.recycle()
-            }
-            text.takeIf { it.isNotBlank() }
-        } catch (e: Exception) {
-            logcat(LogPriority.WARN, e) { "Block refinement failed" }
-            null
-        }
-    }
-
-    /**
      * How much to enlarge a region before OCR. Small selections carry too few
      * pixels per glyph for stylised lettering; the cap keeps the bitmap within
      * what ML Kit handles well.
@@ -335,11 +270,15 @@ class PageTranslator(
     }
 
     /**
-     * Returns an enlarged, grey, contrast-boosted copy: manga bubbles are dark
-     * lettering on a light fill, so pushing them apart helps the recognizer
-     * far more than the extra pixels alone.
+     * Returns an enlarged copy. More pixels per glyph is the one part of the
+     * old preprocessing with a mechanism behind it.
+     *
+     * The grayscale and 1.6 contrast that used to come with it are gone: they
+     * were credited with a fix that a different change in the same commit had
+     * actually made, and when finally measured they never helped and made
+     * blurred or compression-damaged text worse. See `context/decisions.md`.
      */
-    private fun enhanceForOcr(source: android.graphics.Bitmap, scale: Float): android.graphics.Bitmap {
+    private fun upscaleForOcr(source: android.graphics.Bitmap, scale: Float): android.graphics.Bitmap {
         val width = (source.width * scale).toInt().coerceAtLeast(1)
         val height = (source.height * scale).toInt().coerceAtLeast(1)
         val result = android.graphics.Bitmap.createBitmap(
@@ -347,30 +286,11 @@ class PageTranslator(
             height,
             android.graphics.Bitmap.Config.ARGB_8888,
         )
-        val canvas = android.graphics.Canvas(result)
-        val contrast = 1.6f
-        val translate = -(0.5f * contrast - 0.5f) * 255f
-        val matrix = android.graphics.ColorMatrix().apply {
-            setSaturation(0f)
-            postConcat(
-                android.graphics.ColorMatrix(
-                    floatArrayOf(
-                        contrast, 0f, 0f, 0f, translate,
-                        0f, contrast, 0f, 0f, translate,
-                        0f, 0f, contrast, 0f, translate,
-                        0f, 0f, 0f, 1f, 0f,
-                    ),
-                ),
-            )
-        }
-        val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG).apply {
-            colorFilter = android.graphics.ColorMatrixColorFilter(matrix)
-        }
-        canvas.drawBitmap(
+        android.graphics.Canvas(result).drawBitmap(
             source,
             null,
             android.graphics.Rect(0, 0, width, height),
-            paint,
+            android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG),
         )
         return result
     }
@@ -434,39 +354,35 @@ class PageTranslator(
     }
 
     /**
-     * Decodes one band, enhances it and recognizes it, returning blocks in
-     * **full-image** coordinates. The second value says whether a cloud engine
-     * produced them, which decides later whether the free refinement pass is
-     * allowed to overwrite the result.
+     * Decodes one band, upscales it and recognizes it, returning blocks in
+     * **full-image** coordinates.
      */
     private suspend fun recognizeBand(
         imageBytes: ByteArray,
         band: android.graphics.Rect,
         engine: OcrEngine,
         language: TranslationSourceLanguage,
-    ): Pair<RecognitionResult, Boolean> {
+    ): RecognitionResult {
         @Suppress("DEPRECATION")
         val decoder = android.graphics.BitmapRegionDecoder.newInstance(imageBytes, 0, imageBytes.size, false)
         val decoded = try {
             decoder.decodeRegion(band, BitmapFactory.Options())
         } finally {
             decoder.recycle()
-        } ?: return RecognitionResult(emptyList(), language) to false
+        } ?: return RecognitionResult(emptyList(), language)
 
         // Comic lettering is stylised and often small on the page; enlarging
         // and hardening the contrast before OCR is what turns "swolos manshe"
         // back into "swordsmanship"
         val upscale = ocrUpscaleFor(decoded)
-        val bitmap = if (upscale > 1f) enhanceForOcr(decoded, upscale) else decoded
+        val bitmap = if (upscale > 1f) upscaleForOcr(decoded, upscale) else decoded
 
-        var fromCloud = false
         val result = try {
             when (engine) {
                 OcrEngine.ON_DEVICE_PADDLE -> recognizeWithPaddle(bitmap, decoded, upscale, language)
                 else ->
                     cloudRecognizer.recognize(engine, bitmap, language)
                         ?.takeIf { it.isNotEmpty() }
-                        ?.also { fromCloud = true }
                         ?.let { RecognitionResult(it, language) }
                         ?: recognizer.recognize(bitmap, language)
             }
@@ -486,7 +402,7 @@ class PageTranslator(
                 ),
             )
         }
-        return RecognitionResult(moved, result.language) to fromCloud
+        return RecognitionResult(moved, result.language)
     }
 
     /**
