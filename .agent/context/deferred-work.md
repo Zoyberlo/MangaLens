@@ -22,22 +22,31 @@ packages, `.tachibk` folder scan → `RestoreBackupScreen`).
 
 ## Discussed, not built
 
-- **On-device neural OCR engines.** `OcrEngine` was built to take them, but both
-  candidates need model files that cannot be bundled, so they need a
-  download-manage-delete story (and an ONNX Runtime dependency, ~10–15 MB)
-  before either is worth starting:
-  - **PaddleOCR PP-OCRv5 mobile** — the one that would improve the *default,
-    offline* path. Recognition is only ~2M parameters and there is an
-    English-specific variant; v5 targets exactly our weak spots (handwriting,
-    vertical text, unusual glyphs). Needs the full PP-OCR pipeline: DB detection
-    with unclip post-processing, CTC decode, charset dictionaries. Roughly
-    +25–30 MB and a day or two of careful numeric work that cannot be verified
-    without a device.
-  - **manga-ocr** — best-in-class for Japanese manga specifically, and reads a
-    whole multi-line bubble in one pass, which is where ML Kit fails. Japanese
-    only, no detection stage (fine — our crops come from the user's selection),
-    but ~110M parameters, so ~100 MB+ even quantized: an explicit opt-in
-    download, like an offline translation pack.
+- **On-device neural OCR engines.** `OcrEngine` was built to take one, but the
+  case for either candidate got much weaker once the cloud engines landed, and
+  both need model files too big to bundle — i.e. a download-manage-delete story
+  plus an ONNX Runtime dependency (~10–15 MB) before any of it starts.
+
+  - **PaddleOCR PP-OCRv5 mobile** — the only one still worth considering. It is
+    the sole way to improve the *default, offline, keyless* path: recognition is
+    ~2M parameters, there is an English-specific variant, and v5 targets our
+    exact weak spots (handwriting, vertical text, unusual glyphs). Needs the
+    full PP-OCR pipeline — DB detection with unclip post-processing, CTC decode,
+    charset dictionaries — so ~+25–30 MB and a day or two of numeric work that
+    cannot be verified without a device. Only pays off for users who refuse to
+    create any API key at all.
+
+  - **manga-ocr — dropped.** Best-in-class for Japanese manga and reads a whole
+    multi-line bubble in one pass, but it is **Japanese only**, so it does
+    nothing for the stylised Latin lettering that drove this whole thread. At
+    ~110M parameters (~100 MB+ quantized) it buys a narrow audience a marginal
+    gain over Gemini, which already handles Japanese and costs no download. Do
+    not resurrect this without a concrete Japanese-raws use case.
+
+  Worth remembering *why* recognition kept getting the investment: nearly every
+  "the translation is bad" report traced back to OCR. A faithful translation of
+  garbled text reads as a translation bug. Fix recognition and the translation
+  complaints mostly disappear on their own.
 
 - **Gemini doing OCR and translation in one call.** It currently only
   transcribes, so the user's chosen translation provider still applies. Letting
