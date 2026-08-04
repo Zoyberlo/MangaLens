@@ -39,6 +39,22 @@ class OcrTextTest {
         }
 
         @Test
+        fun `keeps a digit rather than inventing a word from it`() {
+            // "HUNTER?" comes back as "HUNTER2". Swapping to Z would give
+            // "HUNTERZ", which reads worse than the digit; with a dictionary
+            // the stray mark is dropped instead.
+            val isWord: (String) -> Boolean = { it.lowercase() in setOf("hunter", "swords") }
+            OcrText.repairDigitConfusions("HUNTER2", isWord) shouldBe "HUNTER"
+            OcrText.repairDigitConfusions("QWXYZ2", isWord) shouldBe "QWXYZ2"
+        }
+
+        @Test
+        fun `still repairs a digit when the result is a real word`() {
+            val isWord: (String) -> Boolean = { it.lowercase() in setOf("swords") }
+            OcrText.repairDigitConfusions("SW0RD5", isWord) shouldBe "SWORDS"
+        }
+
+        @Test
         fun `does not touch a token that is mostly digits`() {
             OcrText.repairDigitConfusions("ROOM 1005") shouldBe "ROOM 1005"
         }
@@ -142,7 +158,7 @@ class OcrTextTest {
         private val dictionary = setOf(
             "learn", "learned", "reason", "hunting", "wanted", "said", "just", "dust",
             "instead", "knew", "moment", "hunter", "sword", "swordsmanship", "the", "you",
-            "for", "not", "note", "no", "so", "son", "sun",
+            "for", "not", "note", "no", "so", "son", "sun", "insist",
         )
         private val isWord: (String) -> Boolean = { it.lowercase() in dictionary }
 
@@ -197,6 +213,13 @@ class OcrTextTest {
             repair("Vearn") shouldBe "Learn"
             repair("vearn") shouldBe "learn"
             repair("VEARN") shouldBe "LEARN"
+        }
+
+        @Test
+        fun `restores a swallowed first letter`() {
+            // The opening letter of a line is the one the balloon edge clips
+            repair("NSIST") shouldBe "INSIST"
+            repair("NSTEAD") shouldBe "INSTEAD"
         }
 
         @Test

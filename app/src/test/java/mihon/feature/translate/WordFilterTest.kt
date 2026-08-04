@@ -103,6 +103,35 @@ class WordFilterTest {
         }
     }
 
+    @Test
+    fun `repairs the readings from real pages, against the real dictionary`() {
+        // The end-to-end check that was missing while the lexicon silently did
+        // nothing: real word list, real strings off the reader's screen.
+        val isWord: (String) -> Boolean = filter::contains
+        fun repair(text: String) = OcrText.repairLetterConfusions(text, isWord)
+
+        repair("TO VEARN HUNTENG FOR NO ZEASON") shouldBe "TO LEARN HUNTING FOR NO REASON"
+        repair("NSIST") shouldBe "INSIST"
+        repair("ZEASON...") shouldBe "REASON..."
+        OcrText.repairDigitConfusions("HUNTER2", isWord) shouldBe "HUNTER"
+    }
+
+    @Test
+    fun `gives up on a word with two errors in it`() {
+        // "BECOMING" came back as "BECONTNG": two misreadings in one word, and
+        // the repair is single-edit by design. Trying harder here is how a
+        // corrector starts inventing words that were never on the page.
+        val isWord: (String) -> Boolean = filter::contains
+        OcrText.repairLetterConfusions("BECONTNG", isWord) shouldBe "BECONTNG"
+    }
+
+    @Test
+    fun `leaves correct text untouched, against the real dictionary`() {
+        val isWord: (String) -> Boolean = filter::contains
+        val correct = "YOU COULD HAVE JUST LEARNED SWORDSMANSHIP INSTEAD"
+        OcrText.repairLetterConfusions(correct, isWord) shouldBe correct
+    }
+
     private inline fun <T> withClue(clue: String, block: () -> T): T = try {
         block()
     } catch (e: AssertionError) {

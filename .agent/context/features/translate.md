@@ -119,11 +119,22 @@ good (see `context/deferred-work.md`):
 - only substitutions from `LETTER_LOOKALIKES` — the shapes this lettering
   actually confuses, observed from real pages — plus one dropped trailing letter;
 - the result must itself be a word;
-- **two candidate repairs that are both words means neither is applied.**
+- **two candidate repairs that are both words means neither is applied**;
+- candidates are **tiered**: a substitution from the confusion table is tried
+  before an inserted letter, and only the best tier that yields exactly one word
+  is used. Treating them as equals let a Bloom false positive ("WVEARN") tie
+  with the obvious "LEARN" and block the repair entirely.
 
 So "TO VEARN HUNTENG FOR NO ZEASON" becomes "TO LEARN HUNTING FOR NO REASON",
-while an invented name stays exactly as it was. It cannot catch everything: JUST
-misread as "DUST" is a real word, so it passes silently.
+while an invented name stays exactly as it was. It cannot catch everything, and the limits are worth knowing:
+
+- a misreading that lands on a **real word** is invisible — JUST as "DUST",
+  YOU'RE as "YOUZE", SAID as "SAI", LEARN as "EARN";
+- a word with **two** errors is out of reach — "BECONTNG" for "BECOMING" —
+  because the repair is single-edit by design, and trying harder is how a
+  corrector starts inventing words that were never on the page;
+- a word with punctuation **inside** it ("YOU'E") is skipped, since there is no
+  safe way to splice an apostrophe back into a word that changed length.
 
 `unknownWordRatio` is the matching confidence signal, and the only one that sees
 a systematic misreading. Its threshold is loose (`MAX_UNKNOWN_WORDS = 0.5`)

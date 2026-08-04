@@ -219,9 +219,14 @@ class PageTranslator(
             merged.map { block ->
                 // Repair before comparing, or a correct-but-digit-speckled
                 // reading loses to a garbled one that merely has no digits
-                val primary = OcrText.repairDigitConfusions(block.text)
+                // The dictionary only knows English, so it only gets a say
+                // when English is what was read
+                val checkWord = lexicon::contains.takeIf {
+                    repairWords && recognizedLanguage == TranslationSourceLanguage.ENGLISH
+                }
+                val primary = OcrText.repairDigitConfusions(block.text, checkWord)
                 val refined = refineBlockText(imageBytes, block, recognizedLanguage)
-                    ?.let(OcrText::repairDigitConfusions)
+                    ?.let { OcrText.repairDigitConfusions(it, checkWord) }
                 val best = if (refined != null && OcrText.textQuality(refined) > OcrText.textQuality(primary)) {
                     refined
                 } else {
@@ -229,16 +234,11 @@ class PageTranslator(
                 }
                 // This font's mistakes are systematic, so both passes make the
                 // same one and agree; only the dictionary sees those.
-                val repaired = if (repairWords) {
-                    OcrText.repairLetterConfusions(best, lexicon::contains)
-                } else {
-                    best
-                }
+                val repaired = checkWord?.let { OcrText.repairLetterConfusions(best, it) } ?: best
                 val passesAgree = refined == null ||
                     OcrText.agreementRatio(primary, refined) >= OcrText.MIN_PASS_AGREEMENT
-                val readsAsEnglish = !repairWords ||
-                    recognizedLanguage != TranslationSourceLanguage.ENGLISH ||
-                    OcrText.unknownWordRatio(repaired, lexicon::contains) <= OcrText.MAX_UNKNOWN_WORDS
+                val readsAsEnglish = checkWord == null ||
+                    OcrText.unknownWordRatio(repaired, checkWord) <= OcrText.MAX_UNKNOWN_WORDS
                 block.copy(text = repaired, confident = passesAgree && readsAsEnglish)
             }
         }

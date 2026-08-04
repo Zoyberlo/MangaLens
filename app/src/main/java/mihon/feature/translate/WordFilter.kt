@@ -50,23 +50,30 @@ class WordFilter private constructor(private val bits: LongArray) {
          * drift apart.
          */
         private inline fun forEachBit(word: String, action: (index: Int, mask: Long) -> Unit) {
-            var hash = (word.hashCode().toLong() and 0x7FFFFFFFL)
-            val step = (fnv1a(word) and 0x7FFFFFFFL) or 1L
+            var hash = fnv1a(word, FNV_OFFSET) % TOTAL_BITS
+            val step = (fnv1a(word, FNV_SECOND_OFFSET) % (TOTAL_BITS - 1)) + 1
             repeat(HASH_COUNT) {
-                val bit = hash % TOTAL_BITS
-                action((bit ushr 6).toInt(), 1L shl (bit and 63L).toInt())
-                hash = (hash + step) and 0x7FFFFFFFFFFFL
+                action((hash ushr 6).toInt(), 1L shl (hash and 63L).toInt())
+                hash = (hash + step) % TOTAL_BITS
             }
         }
 
-        /** A second hash unrelated to [String.hashCode], so the two do not correlate. */
-        private fun fnv1a(word: String): Long {
-            var hash = -0x340d631b7bdddcdbL
+        /**
+         * Two FNV-1a passes with different seeds, rather than one of them being
+         * [String.hashCode]. That pairing correlated enough to push the real
+         * false-positive rate well past the design figure — "WVEARN" came back
+         * as a word, which was enough to block a correct repair.
+         */
+        private fun fnv1a(word: String, seed: Long): Long {
+            var hash = seed
             for (char in word) {
                 hash = hash xor char.code.toLong()
                 hash *= 0x100000001b3L
             }
-            return hash and 0x7FFFFFFFFFFFFFFL
+            return (hash xor (hash ushr 32)) and 0x7FFFFFFFFFFFFFFL
         }
+
+        private const val FNV_OFFSET = -0x340d631b7bdddcdbL
+        private const val FNV_SECOND_OFFSET = 0x27220a95L
     }
 }

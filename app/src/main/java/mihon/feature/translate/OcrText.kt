@@ -23,7 +23,7 @@ object OcrText {
      * mostly letters already, so genuine numbers survive: "CHAPTER 12", "1999"
      * and "LEVEL 5" all pass through untouched.
      */
-    fun repairDigitConfusions(text: String): String {
+    fun repairDigitConfusions(text: String, isWord: ((String) -> Boolean)? = null): String {
         if (text.none { it.isDigit() }) return text
         return WORD_LIKE.replace(text) { match ->
             val token = match.value
@@ -31,8 +31,16 @@ object OcrText {
             val digits = token.count { it.isDigit() }
             if (letters < 2 || digits == 0 || digits > letters) return@replace token
 
+            // Punctuation misread as a digit: "HUNTER?" comes back as "HUNTER2".
+            // Dropping the stray mark loses a question mark, which is a far
+            // smaller error than inventing the word "HUNTERZ".
+            val withoutTrailing = token.trimEnd { it.isDigit() }
+            if (isWord != null && withoutTrailing != token && isWord(withoutTrailing)) {
+                return@replace withoutTrailing
+            }
+
             val upperCase = token.count { it.isUpperCase() } >= letters - 1
-            token.mapIndexed { index, char ->
+            val substituted = token.mapIndexed { index, char ->
                 val replacement = DIGIT_LOOKALIKES[char]
                 if (replacement != null && token.hasLetterBeside(index)) {
                     if (upperCase) replacement else replacement.lowercaseChar()
@@ -40,6 +48,11 @@ object OcrText {
                     char
                 }
             }.joinToString("")
+
+            // With a dictionary to hand, only take the swap when it produces a
+            // real word — otherwise "HUNTER2" becomes "HUNTERZ", which reads
+            // worse than the digit it replaced
+            if (isWord != null && substituted != token && !isWord(substituted)) token else substituted
         }
     }
 
@@ -114,25 +127,41 @@ object OcrText {
     fun repairLetterConfusions(text: String, isWord: (String) -> Boolean): String =
         WORD_LIKE.replace(text) { match ->
             val token = match.value
-            val letters = token.filter { it.isLetter() }
-            if (letters.length < MIN_REPAIRED_LENGTH || !letters.all { it.isLetter() }) return@replace token
-            if (isWord(letters)) return@replace token
+            val prefix = token.takeWhile { !it.isLetter() }
+            val suffix = token.takeLastWhile { !it.isLetter() }
+            val core = token.substring(prefix.length, token.length - suffix.length)
+            // A word with punctuation *inside* it ("YOU'E") is left alone: the
+            // repair works on letters, and there is no safe way to splice the
+            // apostrophe back into a word that changed length
+            if (core.length < MIN_REPAIRED_LENGTH || !core.all { it.isLetter() }) return@replace token
+            if (isWord(core)) return@replace token
 
-            val candidates = repairCandidates(letters).filter(isWord).distinct()
-            val repaired = candidates.singleOrNull() ?: return@replace token
-            token.replaceFirst(letters, matchCase(repaired, letters))
+            val repaired = repairCandidates(core).firstNotNullOfOrNull { tier ->
+                tier.filter(isWord).distinct().singleOrNull()
+            } ?: return@replace token
+            prefix + matchCase(repaired, core) + suffix
         }
 
-    private fun repairCandidates(letters: String): List<String> {
+    /**
+     * Candidate repairs in order of how likely they are, most likely first.
+     * Only the best tier that yields exactly one word is used.
+     *
+     * Swapping one letter for a shape it is genuinely confused with beats
+     * inventing a letter the recognizer never reported, and treating the two as
+     * equals let a spurious "WVEARN" block the obvious "LEARN".
+     */
+    private fun repairCandidates(letters: String): List<List<String>> {
         val lower = letters.lowercase()
         val substitutions = lower.indices.flatMap { index ->
             LETTER_LOOKALIKES[lower[index]].orEmpty().map { replacement ->
                 lower.substring(0, index) + replacement + lower.substring(index + 1)
             }
         }
-        // A swallowed final stroke: "WANTE" for "WANTED", "SAI" for "SAID"
-        val appended = TRAILING_LETTERS.map { lower + it }
-        return substitutions + appended
+        // A swallowed final stroke: "WANTE" for "WANTED", "SAI" for "SAID".
+        // Or a swallowed first one: "NSIST" for "INSIST" — the opening letter
+        // of a line is the one the speech balloon's edge tends to clip.
+        val inserted = TRAILING_LETTERS.map { lower + it } + LEADING_LETTERS.map { it + lower }
+        return listOf(substitutions, inserted)
     }
 
     /** Keeps the repaired word looking like the one it replaced. */
@@ -301,6 +330,7 @@ object OcrText {
     }
 
     private val TRAILING_LETTERS = listOf('d', 's', 'e', 't', 'y', 'r')
+    private val LEADING_LETTERS = listOf('i', 'l', 't', 'a', 's', 'b', 'w', 'h')
 
     private const val MIN_REPAIRED_LENGTH = 3
 
