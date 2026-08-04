@@ -444,6 +444,16 @@
     <string name="pref_engine_test">Test key</string>
     <string name="pref_engine_test_summary">Sends one tiny request and shows exactly what came back</string>
     <string name="pref_engine_testing">Testing…</string>
+    <string name="pref_paddle_test">Test on-device recognition</string>
+    <string name="pref_paddle_test_summary">Reads a line of text this app renders itself, and shows what came back</string>
+    <string name="pref_paddle_unavailable">The model or its runtime failed to load, so this engine falls back to ML Kit.</string>
+    <string name="pref_paddle_mismatch">Read something, but not the text it was given.
+
+Expected:
+%1$s
+
+Got:
+%2$s</string>
     <string name="pref_engine_test_ok">Works. The key, and everything else it needs, is set up correctly.</string>
     <string name="pref_gemini_fetch_models">Available models</string>
     <string name="pref_gemini_fetch_models_summary">Ask the API which models this key can use, and pick one</string>

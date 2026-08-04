@@ -11,9 +11,13 @@ import androidx.compose.runtime.setValue
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.system.LocaleHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import mihon.feature.translate.CloudTextRecognizer
 import mihon.feature.translate.OcrEngine
+import mihon.feature.translate.PaddleSelfTest
+import mihon.feature.translate.PaddleTextRecognizer
 import mihon.feature.translate.TranslationSourceLanguage
 import mihon.feature.translate.ocrOverrideFor
 import mihon.feature.translate.withOcrOverride
@@ -49,6 +53,8 @@ object SettingsRecognitionScreen : SearchableSettings {
         var models by remember { mutableStateOf<List<String>?>(null) }
 
         val testingLabel = stringResource(MR.strings.pref_engine_testing)
+        val paddleUnavailable = stringResource(MR.strings.pref_paddle_unavailable)
+        val paddleMismatch = stringResource(MR.strings.pref_paddle_mismatch)
         val okLabel = stringResource(MR.strings.pref_engine_test_ok)
 
         report?.let { message ->
@@ -72,6 +78,23 @@ object SettingsRecognitionScreen : SearchableSettings {
                 scope.launch {
                     val error = recognizer.testEngine(engine)
                     report = error ?: okLabel
+                    busy = false
+                }
+            }
+        }
+        val testPaddle: () -> Unit = {
+            if (!busy) {
+                busy = true
+                report = testingLabel
+                scope.launch {
+                    val outcome = withContext(Dispatchers.Default) {
+                        PaddleSelfTest(Injekt.get<PaddleTextRecognizer>()).run()
+                    }
+                    report = when {
+                        !outcome.engineAvailable -> paddleUnavailable
+                        outcome.passed -> "$okLabel\n\n\"${outcome.actual}\""
+                        else -> paddleMismatch.format(outcome.expected, outcome.actual ?: "-")
+                    }
                     busy = false
                 }
             }
@@ -108,9 +131,24 @@ object SettingsRecognitionScreen : SearchableSettings {
                 MR.strings.pref_category_recognition_retry_per_language,
                 OcrEngine.entries,
             ),
+            getOnDeviceGroup(testPaddle),
             getVisionGroup(readerPreferences, showGuide, testEngine),
             getAzureGroup(readerPreferences, showGuide, testEngine),
             getGeminiGroup(readerPreferences, showGuide, testEngine, fetchModels),
+        )
+    }
+
+    @Composable
+    private fun getOnDeviceGroup(onTest: () -> Unit): Preference.PreferenceGroup {
+        return Preference.PreferenceGroup(
+            title = OcrEngine.ON_DEVICE_PADDLE.displayName,
+            preferenceItems = listOf(
+                Preference.PreferenceItem.TextPreference(
+                    title = stringResource(MR.strings.pref_paddle_test),
+                    subtitle = stringResource(MR.strings.pref_paddle_test_summary),
+                    onClick = onTest,
+                ),
+            ),
         )
     }
 

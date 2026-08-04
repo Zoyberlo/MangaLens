@@ -341,6 +341,8 @@ dependencies {
 
     // Tests
     testImplementation(libs.bundles.test)
+
+    androidTestImplementation(libs.androidx.test.junit)
     testRuntimeOnly(libs.junit.platform.launcher)
 
     // For detecting memory leaks; see https://square.github.io/leakcanary/

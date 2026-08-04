@@ -343,6 +343,16 @@ was written, which is worth repeating for any future model:
 Rendered text in a handwritten face came back exactly right, apostrophe and all,
 where ML Kit mangles it — the reason to think this helps at all.
 
+**Verify it before trusting it.** Settings → Translation → Text recognition →
+*On-device (PaddleOCR)* → **Test on-device recognition** renders a line and
+reads it back, showing exactly what came out. `PaddleSelfTest` exists because
+this feature shipped silently doing nothing twice, and because the development
+device's ROM blocks instrumentation tests — `PaddleTextRecognizerTest` in
+`app/src/androidTest` is written and correct but has never run on that hardware
+(ColorOS refuses `grantRuntimePermission` and reports an instrumentation ABI
+mismatch). Desktop agreement proves the model; only the self-test proves the
+app.
+
 **Cost: ~38 MB of APK** — 30 MB of ONNX Runtime native libraries across two ABIs
 and 7.5 MB of model. If the accuracy does not justify that, the levers are
 dropping `armeabi-v7a` for the native lib, downloading the model on demand, or
