@@ -146,20 +146,6 @@ fun MoreScreen(
                     onPreferenceClick = onClickSettings,
                 )
             }
-            item {
-                TextPreferenceWidget(
-                    title = stringResource(MR.strings.label_support_us),
-                    icon = Icons.Default.VolunteerActivism,
-                    onPreferenceClick = onClickSupport,
-                )
-            }
-            item {
-                TextPreferenceWidget(
-                    title = stringResource(MR.strings.pref_category_about),
-                    icon = Icons.Outlined.Info,
-                    onPreferenceClick = onClickAbout,
-                )
-            }
             // Null when the updater is compiled out, which is the whole point of
             // the foss and store-less builds
             if (onClickCheckForUpdates != null) {
@@ -174,6 +160,20 @@ fun MoreScreen(
                         icon = Icons.Outlined.Update,
                     )
                 }
+            }
+            item {
+                TextPreferenceWidget(
+                    title = stringResource(MR.strings.label_support_us),
+                    icon = Icons.Default.VolunteerActivism,
+                    onPreferenceClick = onClickSupport,
+                )
+            }
+            item {
+                TextPreferenceWidget(
+                    title = stringResource(MR.strings.pref_category_about),
+                    icon = Icons.Outlined.Info,
+                    onPreferenceClick = onClickAbout,
+                )
             }
             item {
                 TextPreferenceWidget(
