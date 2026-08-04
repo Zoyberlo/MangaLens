@@ -36,8 +36,9 @@ Compose reads a preference with `.collectAsState()` from
 | Changed while reading | Both: reader tab **and** global screen |
 | Per-manga (reading mode, orientation) | Reader dialog's Reading mode tab — these write viewer flags on the manga, not `PreferenceStore` |
 
-The fork's translation preferences are global (they apply to every manga) and appear
-on both surfaces.
+The fork's translation preferences are global (they apply to every manga). They
+live in `ReaderPreferences` for historical reasons, but their **settings screen
+is not the reader one** — see below.
 
 ## Translation preferences
 
@@ -50,5 +51,22 @@ on both surfaces.
 
 The `pref_auto_translate_*` keys date from the removed auto-translate feature; they
 were kept so existing installs keep their language pair.
+
+## Where they are edited
+
+| Surface | What it holds |
+|---------|---------------|
+| **Settings → Translation** (`SettingsTranslationScreen`) | Languages, provider, DeepL key and limit, result display, and a link onward to Text recognition |
+| **Settings → Translation → Text recognition** (`SettingsRecognitionScreen`) | OCR engines, per-language overrides, every cloud key and quota |
+| **Reader → Settings dialog → Translation tab** (`TranslationSettingsPage`) | Language pair, provider, display mode only — for changing them mid-chapter |
+
+Translation is a **top-level** settings entry, not a group under Reader. Reader
+settings are about how pages are displayed; these are about languages, services
+and paid accounts, and having them in one list made both harder to scan. The
+in-reader dialog tab stays because switching a language pair without leaving the
+page is the common case while reading.
+
+The class still lives in `ReaderPreferences` — moving the keys would reset every
+existing install's configuration for no user-visible gain.
 
 Adding one: `processes/add-reader-setting.md`.

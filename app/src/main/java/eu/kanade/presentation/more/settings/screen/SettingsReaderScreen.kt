@@ -70,7 +70,6 @@ object SettingsReaderScreen : SearchableSettings {
                 preference = readerPref.pageTransitions,
                 title = stringResource(MR.strings.pref_page_transitions),
             ),
-            getAutoTranslateGroup(readerPreferences = readerPref),
             getDisplayGroup(readerPreferences = readerPref),
             getEInkGroup(readerPreferences = readerPref),
             getReadingGroup(readerPreferences = readerPref),
@@ -78,73 +77,6 @@ object SettingsReaderScreen : SearchableSettings {
             getWebtoonGroup(readerPreferences = readerPref),
             getNavigationGroup(readerPreferences = readerPref),
             getActionsGroup(readerPreferences = readerPref),
-        )
-    }
-
-    @Composable
-    private fun getAutoTranslateGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
-        val pageTranslator = remember { Injekt.get<PageTranslator>() }
-        val lastAutoProvider by pageTranslator.lastAutoProvider.collectAsState()
-        val deeplApiKey by readerPreferences.deeplApiKey.collectAsState()
-        val retryEngine by readerPreferences.ocrRetryEngine.collectAsState()
-        val navigator = LocalNavigator.currentOrThrow
-        val deeplLimit by readerPreferences.deeplMonthlyCharLimit.collectAsState()
-        val textTranslator = remember { Injekt.get<TextTranslator>() }
-        val deeplUsed = remember(deeplApiKey, deeplLimit) { textTranslator.deeplUsedThisMonth() }
-        var guide by remember { mutableStateOf<ApiKeyGuide?>(null) }
-        guide?.let { ApiKeyGuideDialog(guide = it, onDismissRequest = { guide = null }) }
-        return Preference.PreferenceGroup(
-            title = stringResource(MR.strings.pref_category_auto_translate),
-            preferenceItems = listOf(
-                Preference.PreferenceItem.ListPreference(
-                    preference = readerPreferences.autoTranslateSourceLanguage,
-                    entries = TranslationSourceLanguage.entries
-                        .associateWith { LocaleHelper.getDisplayName(it.langCode) },
-                    title = stringResource(MR.strings.pref_auto_translate_source),
-                ),
-                Preference.PreferenceItem.ListPreference(
-                    preference = readerPreferences.autoTranslateTargetLanguage,
-                    entries = TARGET_LANGUAGES.associateWith { LocaleHelper.getDisplayName(it) },
-                    title = stringResource(MR.strings.pref_auto_translate_target),
-                ),
-                Preference.PreferenceItem.ListPreference(
-                    preference = readerPreferences.translationProvider,
-                    // DeepL has no keyless tier, so it is only offered once a key is set
-                    entries = TranslationProvider.entries
-                        .filter { it != TranslationProvider.DEEPL || deeplApiKey.isNotBlank() }
-                        .associateWith { it.labelWithAutoHint(lastAutoProvider) },
-                    title = stringResource(MR.strings.pref_translation_provider),
-                ),
-                Preference.PreferenceItem.EditTextPreference(
-                    preference = readerPreferences.deeplApiKey,
-                    title = stringResource(MR.strings.pref_deepl_api_key),
-                    subtitle = stringResource(MR.strings.pref_deepl_api_key_summary),
-                    onHelpClick = { guide = ApiKeyGuide.DEEPL },
-                ),
-                Preference.PreferenceItem.SliderPreference(
-                    // Stepped in thousands: character budgets are large numbers
-                    value = deeplLimit / 1000,
-                    valueRange = 0..1000,
-                    steps = 39,
-                    title = stringResource(MR.strings.pref_deepl_monthly_limit),
-                    subtitle = if (deeplApiKey.isBlank()) {
-                        stringResource(MR.strings.pref_deepl_monthly_limit_summary)
-                    } else {
-                        stringResource(MR.strings.pref_deepl_usage, deeplUsed, deeplLimit)
-                    },
-                    valueString = if (deeplLimit == 0) {
-                        stringResource(MR.strings.pref_vision_no_limit)
-                    } else {
-                        "${deeplLimit / 1000}k"
-                    },
-                    onValueChanged = { readerPreferences.deeplMonthlyCharLimit.set(it * 1000) },
-                ),
-                Preference.PreferenceItem.TextPreference(
-                    title = stringResource(MR.strings.pref_category_recognition),
-                    subtitle = stringResource(MR.strings.pref_recognition_summary, retryEngine.displayName),
-                    onClick = { navigator.push(SettingsRecognitionScreen) },
-                ),
-            ),
         )
     }
 

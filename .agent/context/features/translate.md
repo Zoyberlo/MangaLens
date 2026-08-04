@@ -188,8 +188,8 @@ Two settings decide who runs, each with a per-source-language override stored as
 The ↻ button is hidden entirely when no language resolves to a configured cloud
 engine (`isRetryEngineUsable`), so it never appears as a dead control.
 
-Everything lives in **Settings → Reader → Text recognition**
-(`SettingsRecognitionScreen`), off the translation group.
+Everything lives in **Settings → Translation → Text recognition**
+(`SettingsRecognitionScreen`).
 
 Every engine group has a **Test key** row that makes one real request and shows
 the service's own reply verbatim, and Gemini additionally has **Available
@@ -250,11 +250,13 @@ counted against the user.
 
 ## Settings
 
-Language pair, provider, DeepL key, Vision key and both monthly limits live in
-`ReaderPreferences` and are surfaced twice: globally in **Settings → Reader**
-(`SettingsReaderScreen`) and in-reader in the **Translation** tab
-(`TranslationSettingsPage`). Both edit the same preferences. The limit sliders
-show live usage in their subtitle once the matching key is set. See
+Everything lives in `ReaderPreferences` (historical — the keys predate the
+split) but is edited from **Settings → Translation**
+(`SettingsTranslationScreen`), a top-level entry, with engines and keys one
+level deeper under **Text recognition**. The reader's own Translation dialog tab
+(`TranslationSettingsPage`) keeps only what is worth changing mid-chapter:
+language pair, provider, display mode. Limit sliders show live usage in their
+subtitle once the matching key is set. See
 `context/features/reader-settings.md`.
 
 ## Warm-up
