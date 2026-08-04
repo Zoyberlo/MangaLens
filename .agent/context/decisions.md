@@ -139,3 +139,31 @@ provider looked like an OCR problem.
 skipped for 5 minutes.
 **Why:** The shared `NetworkHelper` client allows 2 minutes per call. With several
 blocks per selection, one dead public instance made the whole feature feel broken.
+
+## `enhanceForOcr` is unproven, and measured harmful for neural recognizers
+
+The grayscale + 1.6 contrast + upscale pass was credited with turning "swolos
+manshe" into "swordsmanship". That credit is unsafe: the same change shipped
+alongside the script-mismatch fallback (a CJK model reading Latin lettering),
+and nobody isolated which one did the work.
+
+Measured against PP-OCRv5 on rendered handwritten text, it never helps and
+sometimes hurts:
+
+| Condition | Raw | Grayscale + 1.6 contrast + 3x |
+|---|---|---|
+| faded grey on grey | 1.000 | 1.000 |
+| blurred | 1.000 | 0.989 |
+| jpeg q20 | 1.000 | 1.000 |
+| all three | 0.968 | 0.925 |
+
+So it is bypassed for every cloud engine and for PaddleOCR, which see the crop
+as drawn. It survives on the ML Kit path only, where it remains **unmeasured** —
+ML Kit cannot be run off-device, so the question stays open there.
+
+The wider lesson, raised by the repo's owner and worth keeping: this feature has
+accumulated compensating machinery — a second recognition pass, a quality
+heuristic to choose between passes, digit repair, dictionary repair — much of it
+built to work around one weak recognizer. If a stronger recognizer proves out on
+real pages, the right move is to **switch that machinery off for it**, not to
+keep stacking. Removing an unmeasured step is as legitimate as adding one.

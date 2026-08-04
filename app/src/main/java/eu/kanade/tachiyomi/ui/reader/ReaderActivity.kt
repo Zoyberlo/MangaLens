@@ -597,21 +597,25 @@ class ReaderActivity : BaseActivity() {
         QuotaKind.CLOUD_OCR -> when (event.level) {
             QuotaLevel.APPROACHING -> MR.strings.cloud_ocr_approaching_limit
             QuotaLevel.REACHED -> MR.strings.cloud_ocr_limit_reached
+            QuotaLevel.RATE_LIMITED -> MR.strings.cloud_ocr_rate_limited
             QuotaLevel.FAILED -> MR.strings.cloud_ocr_failed
         }
         QuotaKind.AZURE_OCR -> when (event.level) {
             QuotaLevel.APPROACHING -> MR.strings.azure_ocr_approaching_limit
             QuotaLevel.REACHED -> MR.strings.azure_ocr_limit_reached
+            QuotaLevel.RATE_LIMITED -> MR.strings.cloud_ocr_rate_limited
             QuotaLevel.FAILED -> MR.strings.azure_ocr_failed
         }
         QuotaKind.GEMINI_OCR -> when (event.level) {
             QuotaLevel.APPROACHING -> MR.strings.gemini_ocr_approaching_limit
             QuotaLevel.REACHED -> MR.strings.gemini_ocr_limit_reached
+            QuotaLevel.RATE_LIMITED -> MR.strings.cloud_ocr_rate_limited
             QuotaLevel.FAILED -> MR.strings.gemini_ocr_failed
         }
         QuotaKind.DEEPL -> when (event.level) {
             QuotaLevel.APPROACHING -> MR.strings.deepl_approaching_limit
             QuotaLevel.REACHED -> MR.strings.deepl_limit_reached
+            QuotaLevel.RATE_LIMITED -> MR.strings.cloud_ocr_rate_limited
             QuotaLevel.FAILED -> MR.strings.translate_selection_failed
         }
     }

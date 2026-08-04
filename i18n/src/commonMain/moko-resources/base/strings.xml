@@ -407,6 +407,7 @@
     <string name="cloud_ocr_limit_reached">Monthly cloud limit reached — the on-device result is kept</string>
     <string name="cloud_ocr_failed">Cloud recognition failed — the on-device result is kept</string>
     <string name="cloud_ocr_in_progress">Reading again with cloud recognition…</string>
+    <string name="cloud_ocr_rate_limited">Too many requests just now — wait a moment and try again</string>
     <string name="cloud_ocr_not_configured">Set up a recognition engine in Reader → Text recognition first</string>
     <string name="pref_category_recognition">Text recognition</string>
     <string name="pref_recognition_summary">Retry button uses %1$s</string>

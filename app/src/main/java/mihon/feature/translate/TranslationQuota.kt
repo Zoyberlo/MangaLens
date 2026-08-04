@@ -16,6 +16,14 @@ enum class QuotaKind {
 enum class QuotaLevel {
     APPROACHING,
     REACHED,
+
+    /**
+     * The service refused because requests came too fast, not because anything
+     * is wrong. Worth telling apart from a failure: waiting fixes it, and
+     * reporting it as "recognition failed" sends people hunting for a broken
+     * key that is not broken.
+     */
+    RATE_LIMITED,
     FAILED,
 }
 
@@ -84,6 +92,8 @@ class QuotaTracker(
     }
 
     fun reportFailure() = notifier.report(kind, QuotaLevel.FAILED)
+
+    fun reportRateLimited() = notifier.report(kind, QuotaLevel.RATE_LIMITED)
 
     private fun rollover() {
         val period = currentQuotaPeriod()

@@ -438,7 +438,7 @@ class PageTranslator(
         var fromCloud = false
         val result = try {
             when (engine) {
-                OcrEngine.ON_DEVICE_PADDLE -> recognizeWithPaddle(bitmap, language)
+                OcrEngine.ON_DEVICE_PADDLE -> recognizeWithPaddle(bitmap, decoded, upscale, language)
                 else ->
                     cloudRecognizer.recognize(engine, bitmap, language)
                         ?.takeIf { it.isNotEmpty() }
@@ -471,16 +471,32 @@ class PageTranslator(
      * The layout ML Kit produces is accurate even on lettering it cannot read,
      * so only the reading is replaced. A line PaddleOCR declines is kept as ML
      * Kit had it, which means the worst case is what we had before.
+     *
+     * Detection runs on the contrast-boosted [detection] bitmap, which is what
+     * that treatment was built for, but the crop handed to PaddleOCR comes from
+     * the untouched [source]. The same reasoning already applies to the cloud
+     * engines: the grayscale-and-contrast pass exists to help ML Kit, and only
+     * degrades a model trained on ordinary images.
      */
     private suspend fun recognizeWithPaddle(
-        bitmap: android.graphics.Bitmap,
+        detection: android.graphics.Bitmap,
+        source: android.graphics.Bitmap,
+        upscale: Float,
         language: TranslationSourceLanguage,
     ): RecognitionResult {
-        val lines = recognizer.recognizeLines(bitmap, language)
-        if (lines.isEmpty()) return recognizer.recognize(bitmap, language)
+        val lines = recognizer.recognizeLines(detection, language)
+        if (lines.isEmpty()) return recognizer.recognize(detection, language)
 
         val read = lines.map { line ->
-            val crop = cropSafely(bitmap, line.bounds) ?: return@map line
+            // Boxes come from the enhanced bitmap; the crop is taken from the
+            // untouched one, so the model sees the page as it was drawn
+            val bounds = android.graphics.Rect(
+                (line.bounds.left / upscale).toInt(),
+                (line.bounds.top / upscale).toInt(),
+                (line.bounds.right / upscale).toInt(),
+                (line.bounds.bottom / upscale).toInt(),
+            )
+            val crop = cropSafely(source, bounds) ?: return@map line
             val text = try {
                 paddle.recognize(crop)
             } finally {

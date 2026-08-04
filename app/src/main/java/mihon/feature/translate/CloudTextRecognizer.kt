@@ -206,7 +206,14 @@ class CloudTextRecognizer(
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Cloud text recognition failed on ${engine.displayName}" }
             lastErrors[engine] = e.readableMessage()
-            quota.reportFailure()
+            // Every one of these services rate limits per minute as well as per
+            // month, and the per-minute one is easy to hit by retrying a few
+            // bubbles quickly. Waiting fixes it; nothing is broken.
+            if (HTTP_TOO_MANY_REQUESTS in e.message.orEmpty()) {
+                quota.reportRateLimited()
+            } else {
+                quota.reportFailure()
+            }
             null
         }
     }
@@ -490,6 +497,7 @@ class CloudTextRecognizer(
         const val TEST_BITMAP_PX = 64
         const val HTTP_NOT_FOUND = "HTTP 404"
         const val HTTP_BAD_REQUEST = "HTTP 400"
+        const val HTTP_TOO_MANY_REQUESTS = "HTTP 429"
         const val MAX_OUTPUT_TOKENS = 1024
         val OCTET_STREAM = "application/octet-stream".toMediaType()
 
