@@ -23,18 +23,40 @@ class CrashLogUtil(
     private val preferences: BasePreferences = Injekt.get(),
 ) {
 
+    /**
+     * Collects the log and opens a share sheet with it, pre-addressed to
+     * [DEVELOPER_EMAIL].
+     *
+     * An app cannot post the report by itself: sending mail needs a mail
+     * server, and any credential shipped inside the APK is readable by anyone
+     * who unzips it. So the user presses Send. That also means nothing leaves
+     * the device the user has not seen, which is the right default for a log
+     * that carries the device model and whatever the crash dragged in with it.
+     */
     suspend fun dumpLogs(exception: Throwable? = null) = withNonCancellableContext {
         try {
-            val file = context.createFileInCacheDir("mihon_crash_logs.txt")
+            val file = context.createFileInCacheDir("mangalens_crash_logs.txt")
 
-            file.appendText(getDebugInfo() + "\n\n")
+            val debugInfo = getDebugInfo()
+            file.appendText(debugInfo + "\n\n")
             getExtensionsInfo()?.let { file.appendText("$it\n\n") }
             exception?.let { file.appendText("$it\n\n") }
 
             Runtime.getRuntime().exec("logcat *:E -d -v year -v zone -f ${file.absolutePath}").waitFor()
 
             val uri = file.getUriCompat(context)
-            context.startActivity(uri.toShareIntent(context, "text/plain"))
+            context.startActivity(
+                uri.toShareIntent(
+                    context = context,
+                    type = "text/plain",
+                    // Repeated in the body because mail clients hide attachments
+                    // behind a tap, and this is the half that identifies the build
+                    message = debugInfo,
+                    recipient = DEVELOPER_EMAIL,
+                    // Sorts the inbox by build and device without opening anything
+                    subject = "MangaLens ${BuildConfig.VERSION_NAME} — ${Build.MANUFACTURER} ${Build.MODEL}",
+                ),
+            )
         } catch (e: Throwable) {
             withUIContext { context.toast("Failed to get logs") }
         }
@@ -79,5 +101,10 @@ class CrashLogUtil(
         } else {
             null
         }
+    }
+
+    companion object {
+        /** Where reports go. The fork has no issue tracker staffed by anyone else. */
+        const val DEVELOPER_EMAIL = "zyberdebug@gmail.com"
     }
 }

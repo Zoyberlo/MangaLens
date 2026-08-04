@@ -10,7 +10,17 @@ import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.i18n.MR
 import java.io.Serializable
 
-fun Uri.toShareIntent(context: Context, type: String = "image/*", message: String? = null): Intent {
+/**
+ * [recipient] and [subject] pre-fill a mail app when one is picked from the
+ * chooser; every other target ignores them and just receives the attachment.
+ */
+fun Uri.toShareIntent(
+    context: Context,
+    type: String = "image/*",
+    message: String? = null,
+    recipient: String? = null,
+    subject: String? = null,
+): Intent {
     val uri = this
 
     val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -23,6 +33,8 @@ fun Uri.toShareIntent(context: Context, type: String = "image/*", message: Strin
                 putExtra(Intent.EXTRA_STREAM, uri)
             }
         }
+        recipient?.let { putExtra(Intent.EXTRA_EMAIL, arrayOf(it)) }
+        subject?.let { putExtra(Intent.EXTRA_SUBJECT, it) }
         clipData = ClipData.newRawUri(null, uri)
         setType(type)
         flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
