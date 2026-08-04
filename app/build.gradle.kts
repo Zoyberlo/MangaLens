@@ -52,8 +52,8 @@ android {
 
         // Fork versioning, independent of upstream: release tags are "v<name>"
         // and the in-app updater compares against them
-        versionCode = 102
-        versionName = "1.0.2"
+        versionCode = 103
+        versionName = "1.0.3"
 
         buildConfigField("String", "COMMIT_COUNT", "\"${getLatestCommitCount()}\"")
         buildConfigField("String", "COMMIT_SHA", "\"${getLatestCommitSha()}\"")
