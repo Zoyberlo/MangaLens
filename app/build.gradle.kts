@@ -111,7 +111,13 @@ android {
 
             isProfileable = true
 
-            proguardFiles("proguard-android-optimize.txt", "proguard-rules.pro")
+            // The fork's own keep rules live in their own file so upstream can
+            // keep appending to theirs without meeting ours in a conflict
+            proguardFiles(
+                "proguard-android-optimize.txt",
+                "proguard-rules.pro",
+                "proguard-rules-mangalens.pro",
+            )
 
             buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLatestCommitTime = true)}\"")
         }
