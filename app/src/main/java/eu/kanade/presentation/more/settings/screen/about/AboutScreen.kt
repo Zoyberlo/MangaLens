@@ -23,7 +23,6 @@ import eu.kanade.presentation.more.settings.widget.TextPreferenceWidget
 import eu.kanade.presentation.util.LocalBackPress
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.BuildConfig
-import eu.kanade.tachiyomi.data.updater.RELEASE_URL
 import eu.kanade.tachiyomi.util.CrashLogUtil
 import eu.kanade.tachiyomi.util.lang.toDateTimestampString
 import eu.kanade.tachiyomi.util.system.copyToClipboard
@@ -92,13 +91,12 @@ object AboutScreen : Screen() {
                     }
                 }
 
-                if (!BuildConfig.DEBUG) {
-                    item {
-                        TextPreferenceWidget(
-                            title = stringResource(MR.strings.whats_new),
-                            onPreferenceClick = { uriHandler.openUri(RELEASE_URL) },
-                        )
-                    }
+                item {
+                    TextPreferenceWidget(
+                        title = stringResource(MR.strings.whats_new),
+                        subtitle = stringResource(MR.strings.whats_new_summary),
+                        onPreferenceClick = { navigator.push(WhatsNewScreen()) },
+                    )
                 }
 
                 item {

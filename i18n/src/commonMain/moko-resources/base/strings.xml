@@ -777,6 +777,7 @@ Got:
     <string name="website">Website</string>
     <string name="version">Version</string>
     <string name="whats_new">What\'s new</string>
+    <string name="whats_new_summary">Release notes for this version and the ones before it</string>
     <string name="help_translate">Help translate</string>
     <string name="licenses">Open source licenses</string>
     <string name="privacy_policy">Privacy policy</string>
