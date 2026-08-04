@@ -51,7 +51,9 @@ android {
         applicationId = "app.mangalens"
 
         // Fork versioning, independent of upstream: release tags are "v<name>"
-        // and the in-app updater compares against them
+        // and the in-app updater compares against them. Upstream was on
+        // 0.20.3 (versionCode 28) at this merge; do not take theirs, or every
+        // installed copy sees a downgrade and stops updating.
         versionCode = 103
         versionName = "1.0.3"
 
@@ -273,6 +275,8 @@ dependencies {
     implementation(libs.bundles.kotlinx.coroutines)
 
     implementation(libs.sqldelight.async)
+
+    implementation(libs.kotlinx.datetime)
 
     // AndroidX libraries
     implementation(libs.androidx.annotation)

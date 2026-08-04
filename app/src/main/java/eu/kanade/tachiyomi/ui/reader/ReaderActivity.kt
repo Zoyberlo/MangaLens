@@ -213,6 +213,14 @@ class ReaderActivity : BaseActivity() {
         setContentView(binding.root)
         binding.setComposeOverlay()
 
+        if (!viewModel.hasValidArgs) {
+            finish()
+            return
+        }
+
+        // After the args check on purpose: nothing below is worth doing for an
+        // activity that is about to finish, least of all loading an OCR model
+
         // Load the OCR model and probe translation backends off the critical
         // path so the first "translate area" action is fast
         lifecycleScope.launchIO { Injekt.get<PageTranslator>().warmUp() }
@@ -232,25 +240,11 @@ class ReaderActivity : BaseActivity() {
             .onEach { hideWordInspector() }
             .launchIn(lifecycleScope)
 
-        if (viewModel.needsInit()) {
-            val manga = intent.extras?.getLong("manga", -1) ?: -1L
-            val chapter = intent.extras?.getLong("chapter", -1) ?: -1L
-            if (manga == -1L || chapter == -1L) {
-                finish()
-                return
-            }
-            NotificationReceiver.dismissNotification(this, manga.hashCode(), Notifications.ID_NEW_CHAPTERS)
-
-            lifecycleScope.launch {
-                val initResult = viewModel.init(manga, chapter)
-                if (!initResult.getOrDefault(false)) {
-                    val exception = initResult.exceptionOrNull() ?: IllegalStateException("Unknown err")
-                    withUIContext {
-                        setInitialChapterError(exception)
-                    }
-                }
-            }
-        }
+        NotificationReceiver.dismissNotification(
+            this,
+            viewModel.mangaId.hashCode(),
+            Notifications.ID_NEW_CHAPTERS,
+        )
 
         config = ReaderConfig()
         setMenuVisibility(viewModel.state.value.menuVisible)
@@ -259,6 +253,13 @@ class ReaderActivity : BaseActivity() {
         preferences.incognitoMode.changes()
             .drop(1)
             .onEach { if (!it) finish() }
+            .launchIn(lifecycleScope)
+
+        viewModel.state
+            .map { it.initError }
+            .distinctUntilChanged()
+            .filterNotNull()
+            .onEach(::setInitialChapterError)
             .launchIn(lifecycleScope)
 
         viewModel.state
