@@ -22,26 +22,35 @@ packages, `.tachibk` folder scan → `RestoreBackupScreen`).
 
 ## Discussed, not built
 
-- **On-device neural OCR engines.** `OcrEngine` was built to take one, but the
-  case for either candidate got much weaker once the cloud engines landed, and
-  both need model files too big to bundle — i.e. a download-manage-delete story
-  plus an ONNX Runtime dependency (~10–15 MB) before any of it starts.
+- **Replacing ML Kit entirely — decided against.** PaddleOCR shipped and is the
+  default English reader, but ML Kit stays, for two reasons that are not going
+  away cheaply:
 
-  - **PaddleOCR PP-OCRv5 mobile** — the only one still worth considering. It is
-    the sole way to improve the *default, offline, keyless* path: recognition is
-    ~2M parameters, there is an English-specific variant, and v5 targets our
-    exact weak spots (handwriting, vertical text, unusual glyphs). Needs the
-    full PP-OCR pipeline — DB detection with unclip post-processing, CTC decode,
-    charset dictionaries — so ~+25–30 MB and a day or two of numeric work that
-    cannot be verified without a device. Only pays off for users who refuse to
-    create any API key at all.
+  - **It finds the text.** PaddleOCR here is recognition only; the line boxes
+    come from ML Kit and have been right on every page examined. Dropping it
+    means PP-OCR's DB detection *and* its post-processing — binarisation,
+    contour finding, polygon unclipping — the hardest numeric code in the
+    feature and the least verifiable without a device. The detection model in
+    the repo we use is **83 MB**, against the 21.2 MB of ML Kit models it would
+    replace. Three times the size for the privilege.
+  - **It reads Japanese.** PaddleOCR ships rec models for English, Chinese,
+    Korean, Latin, Arabic, Greek, Hindi, Thai, Tamil, Telugu and East Slavic —
+    **no Japanese**. A general PP-OCRv5 model covering zh/en/ja exists at 15 MB,
+    but that is another unverified bet for a language we already read.
 
-  - **manga-ocr — dropped.** Best-in-class for Japanese manga and reads a whole
-    multi-line bubble in one pass, but it is **Japanese only**, so it does
-    nothing for the stylised Latin lettering that drove this whole thread. At
-    ~110M parameters (~100 MB+ quantized) it buys a narrow audience a marginal
-    gain over Gemini, which already handles Japanese and costs no download. Do
-    not resurrect this without a concrete Japanese-raws use case.
+- **Cyrillic recognition — decided against.** PaddleOCR's `eslav` model would
+  add something the app cannot do at all today: ML Kit has no Cyrillic model, so
+  Russian and Ukrainian scans are unreadable. It is +12 MB down an already
+  working code path, so the work is nearly free. It was still declined, on the
+  owner's reasoning: readers of those languages overwhelmingly read the
+  original, English, or another widely-scanlated language, so the audience is a
+  narrow slice of a narrow slice, and everyone else pays the megabytes.
+
+- **manga-ocr — dropped.** Best-in-class for Japanese manga and reads a whole
+  multi-line bubble in one pass, but it is **Japanese only**, so it does nothing
+  for the stylised Latin lettering that drove this. At ~110M parameters
+  (~100 MB+ quantized) it buys a narrow audience a marginal gain over engines
+  already present. Do not resurrect without a concrete Japanese-raws use case.
 
   Worth remembering *why* recognition kept getting the investment: nearly every
   "the translation is bad" report traced back to OCR. A faithful translation of
