@@ -353,7 +353,24 @@ class PagerPageHolder(
             }
             withUIContext {
                 when (result) {
-                    is mihon.feature.translate.RegionTranslateResult.Success ->
+                    is mihon.feature.translate.RegionTranslateResult.Success -> {
+                        // Which engine actually read the page. Silent fallback
+                        // to ML Kit is why "I see no difference" was impossible
+                        // to tell apart from "the engine never ran".
+                        viewer.activity.toast(
+                            if (result.fellBack) {
+                                viewer.activity.stringResource(
+                                    MR.strings.translate_engine_fallback,
+                                    result.requestedEngine.displayName,
+                                    result.usedEngine.displayName,
+                                )
+                            } else {
+                                viewer.activity.stringResource(
+                                    MR.strings.translate_engine_used,
+                                    result.usedEngine.displayName,
+                                )
+                            },
+                        )
                         if (readerPreferences.translateResultDisplay.get() ==
                             mihon.feature.translate.TranslateResultDisplay.PANEL
                         ) {
@@ -361,6 +378,7 @@ class PagerPageHolder(
                         } else {
                             setTranslation(pageTranslator.storeOverlay(pageKey, result.translation))
                         }
+                    }
                     mihon.feature.translate.RegionTranslateResult.NoText ->
                         viewer.activity.toast(MR.strings.translate_selection_no_text)
                     mihon.feature.translate.RegionTranslateResult.Failed ->

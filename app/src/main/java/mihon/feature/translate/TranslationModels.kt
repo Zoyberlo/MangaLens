@@ -141,7 +141,19 @@ data class PageTranslation(
  * recognized" apart from "recognition worked but translation failed".
  */
 sealed interface RegionTranslateResult {
-    data class Success(val translation: PageTranslation) : RegionTranslateResult
+    /**
+     * [usedEngine] is the engine that actually read the page, which is not
+     * always [requestedEngine]: an engine whose model failed to load falls back
+     * to ML Kit. That fallback used to be silent, so "I see no difference"
+     * could equally mean "the engine you picked never ran".
+     */
+    data class Success(
+        val translation: PageTranslation,
+        val requestedEngine: OcrEngine = OcrEngine.ON_DEVICE,
+        val usedEngine: OcrEngine = OcrEngine.ON_DEVICE,
+    ) : RegionTranslateResult {
+        val fellBack: Boolean get() = requestedEngine != usedEngine
+    }
     data object NoText : RegionTranslateResult
     data object Failed : RegionTranslateResult
 }

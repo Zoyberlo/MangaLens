@@ -25,15 +25,20 @@ class PageTranslator(
     private val paddle: PaddleTextRecognizer,
 ) {
 
+    /** The engine the user asked for, before availability is considered. */
+    fun requestedEngineFor(language: TranslationSourceLanguage): OcrEngine =
+        readerPreferences.ocrEngineOverrides.get().ocrOverrideFor(language)
+            ?: readerPreferences.ocrEngine.get()
+
     /**
-     * The engine that reads a fresh selection, for [language]. A per-language
-     * override wins over the global setting; an engine that is not set up, or
-     * cannot produce block geometry, falls back to on-device so the automatic
-     * path never silently stops working.
+     * The engine that will actually read a fresh selection, for [language]. A
+     * per-language override wins over the global setting; an engine that is not
+     * set up, or cannot produce block geometry, falls back to ML Kit so the
+     * automatic path never stops working. The reader reports that fallback, so
+     * it is not mistaken for the chosen engine doing nothing.
      */
     fun primaryEngineFor(language: TranslationSourceLanguage): OcrEngine {
-        val engine = readerPreferences.ocrEngineOverrides.get().ocrOverrideFor(language)
-            ?: readerPreferences.ocrEngine.get()
+        val engine = requestedEngineFor(language)
         val usable = when {
             engine == OcrEngine.ON_DEVICE_PADDLE -> paddle.isAvailable
             engine.isCloud -> cloudRecognizer.isConfigured(engine)
@@ -236,15 +241,25 @@ class PageTranslator(
         // untranslated; each block is translated on demand via translateSingle
         val originalFirst = readerPreferences.translateShowOriginalFirst.get() &&
             readerPreferences.translateResultDisplay.get() == TranslateResultDisplay.OVERLAY
+        val requested = requestedEngineFor(from)
+        val used = primaryEngineFor(from)
         if (originalFirst) {
             val blocks = candidates.map { TranslatedBlock(it.text, "", it.bounds, it.confident) }
-            return RegionTranslateResult.Success(PageTranslation(bounds.outWidth, bounds.outHeight, blocks))
+            return RegionTranslateResult.Success(
+                PageTranslation(bounds.outWidth, bounds.outHeight, blocks),
+                requested,
+                used,
+            )
         }
 
         val blocks = translateBlocks(candidates, recognizedLanguage, to)
         if (blocks.isEmpty()) return RegionTranslateResult.Failed
 
-        return RegionTranslateResult.Success(PageTranslation(bounds.outWidth, bounds.outHeight, blocks))
+        return RegionTranslateResult.Success(
+            PageTranslation(bounds.outWidth, bounds.outHeight, blocks),
+            requested,
+            used,
+        )
     }
 
     /**

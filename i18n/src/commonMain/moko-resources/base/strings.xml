@@ -473,6 +473,8 @@ Got:
     <string name="translate_selection_no_text">No text recognized in the selected area</string>
     <string name="translate_selection_failed">Translation failed — check the translation service in settings</string>
     <string name="translate_in_progress">Translating…</string>
+    <string name="translate_engine_used">Read with %1$s</string>
+    <string name="translate_engine_fallback">%1$s could not run — read with %2$s instead</string>
     <string name="action_manual_translate">Type or dictate text</string>
     <string name="action_edit_text">Edit text</string>
     <string name="action_voice_input">Dictate</string>
