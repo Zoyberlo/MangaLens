@@ -134,3 +134,24 @@ treat a failure as a real regression rather than a strict assertion. When
 changing a rule there, confirm the suite still has teeth: break the rule on
 purpose, watch the matching test fail, then restore it. A test that passes
 either way is not protecting anything.
+
+## Before tagging a release
+
+Debug builds are not minified, so they cannot catch the failure that has now
+hit both native recognizers: R8 removing constructors that only JNI calls. It
+kills the process outright, with no Java stack trace and nothing on screen.
+
+```bash
+./gradlew :app:assembleRelease -Penable-updater -Psplit-abis
+```
+
+Install `app-arm64-v8a-release.apk`, then run **Settings → Translation → Text
+recognition → Test on-device recognition**. It must read its line back and the
+app must still be running afterwards:
+
+```bash
+adb shell dumpsys activity exit-info app.mangalens | head -12
+```
+
+`reason=5 (APP CRASH(NATIVE))` there is the signature — check
+`adb logcat -b crash -d` for the abort message before changing anything.

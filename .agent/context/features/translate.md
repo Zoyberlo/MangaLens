@@ -381,9 +381,32 @@ mismatch). Desktop agreement proves the model; only the self-test proves the
 app.
 
 **Cost: ~38 MB of APK** — 30 MB of ONNX Runtime native libraries across two ABIs
-and 7.5 MB of model. If the accuracy does not justify that, the levers are
-dropping `armeabi-v7a` for the native lib, downloading the model on demand, or
-`onnxruntime-mobile` with an ORT-format model.
+and 7.5 MB of model. Per-ABI splits mean a phone downloads only its half; see
+`context/decisions.md`. If the accuracy does not justify the rest, the levers
+are downloading the model on demand, or `onnxruntime-mobile` with an ORT-format
+model.
+
+**R8 will silently break this.** ONNX Runtime's JNI builds its result types
+(`TensorInfo`, `OnnxTensor`, `OrtSession$Result`) with `NewObject`, so no Java
+code references those constructors and R8 removes them while keeping the
+classes. The release build then aborts the entire process — SIGABRT, no Java
+stack trace, the app just disappears — on the first line it recognizes:
+
+```
+JNI DETECTED ERROR IN APPLICATION: mid == null
+    in call to NewObject
+    from ai.onnxruntime.OrtSession.run(...)
+```
+
+`-keep class ai.onnxruntime.** { *; }` in `app/proguard-rules.pro` is what
+prevents it; the AAR ships no consumer rules. ML Kit needed the same treatment
+for the same reason.
+
+**So a debug build proves nothing here.** Debug is not minified, and PaddleOCR
+read as working for weeks while every release build was broken. `mapping.txt`
+is no help either — R8 omits members whose names did not change, so a stripped
+constructor and a kept one look identical there. Run the in-app self-test
+against a **signed release APK** before tagging, every time.
 
 ### Not implemented: other on-device neural engines
 
