@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.MoveDown
 import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material.icons.outlined.Update
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -44,6 +45,9 @@ fun MoreScreen(
     onClickSettings: () -> Unit,
     onClickSupport: () -> Unit,
     onClickAbout: () -> Unit,
+    installedVersion: String,
+    isCheckingUpdates: Boolean,
+    onClickCheckForUpdates: (() -> Unit)?,
 ) {
     val uriHandler = LocalUriHandler.current
 
@@ -155,6 +159,21 @@ fun MoreScreen(
                     icon = Icons.Outlined.Info,
                     onPreferenceClick = onClickAbout,
                 )
+            }
+            // Null when the updater is compiled out, which is the whole point of
+            // the foss and store-less builds
+            if (onClickCheckForUpdates != null) {
+                item {
+                    CheckForUpdatesWidget(
+                        isChecking = isCheckingUpdates,
+                        onClick = onClickCheckForUpdates,
+                        // The version belongs next to the button that acts on it;
+                        // otherwise "check for updates" answers a question the
+                        // user cannot ask without walking into About first
+                        subtitle = installedVersion,
+                        icon = Icons.Outlined.Update,
+                    )
+                }
             }
             item {
                 TextPreferenceWidget(

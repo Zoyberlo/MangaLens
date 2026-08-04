@@ -18,6 +18,8 @@ import cafe.adriel.voyager.navigator.tab.TabOptions
 import eu.kanade.core.preference.asState
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.presentation.more.MoreScreen
+import eu.kanade.presentation.more.rememberAppUpdateCheck
+import eu.kanade.presentation.more.settings.screen.about.AboutScreen
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.download.DownloadManager
@@ -25,6 +27,7 @@ import eu.kanade.tachiyomi.ui.category.CategoryScreen
 import eu.kanade.tachiyomi.ui.download.DownloadQueueScreen
 import eu.kanade.tachiyomi.ui.setting.SettingsScreen
 import eu.kanade.tachiyomi.ui.stats.StatsScreen
+import eu.kanade.tachiyomi.util.system.updaterEnabled
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -61,6 +64,7 @@ data object MoreTab : Tab {
         val navigator = LocalNavigator.currentOrThrow
         val viewModel = viewModel<MoreViewModel>()
         val downloadQueueState by viewModel.downloadQueueState.collectAsState()
+        val updateCheck = rememberAppUpdateCheck()
         MoreScreen(
             downloadQueueStateProvider = { downloadQueueState },
             downloadedOnly = viewModel.downloadedOnly,
@@ -75,6 +79,9 @@ data object MoreTab : Tab {
             onClickSettings = { navigator.push(SettingsScreen()) },
             onClickSupport = { navigator.push(SupportUsScreen()) },
             onClickAbout = { navigator.push(SettingsScreen(SettingsScreen.Destination.About)) },
+            installedVersion = AboutScreen.getVersionName(withBuildDate = false),
+            isCheckingUpdates = updateCheck.isChecking,
+            onClickCheckForUpdates = updateCheck::start.takeIf { updaterEnabled },
         )
     }
 }
