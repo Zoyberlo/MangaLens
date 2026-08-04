@@ -103,6 +103,14 @@ with a worse one. Both candidates are digit-repaired before they are compared,
 or a correct-but-digit-speckled reading loses to a garbled one that merely has
 no digits.
 
+The vowel test is **Latin only, deliberately**. Every source language is Latin
+or CJK (`TranslationSourceLanguage`) and ML Kit ships no Cyrillic model, so
+Cyrillic never reaches this. Applying a vowel test to Japanese, Chinese and
+Korean marked every token garbled, both passes scored zero, and the comparison
+silently always kept the first — the refinement pass may as well not have
+existed for three of the four source languages. Those scripts now score on
+"kana/ideographs/hangul with no stray digits" instead.
+
 ## Overlay behavior
 
 - Box positions come from `sourceToViewCoord`, so they track pan/zoom.

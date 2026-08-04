@@ -325,6 +325,13 @@ class PageTranslator(
      * breaks across lines). Counting them against a token scored correct text
      * below garbled text — "COULD'VE" failed while "COLDVE" passed — which let
      * the second pass replace a good reading with a worse one.
+     *
+     * The vowel test only applies to alphabetic scripts. Japanese, Chinese and
+     * Korean have no vowel letters, so applying it there marked every token
+     * garbled, both passes scored zero, and the comparison silently always kept
+     * the first — the refinement pass may as well not have existed for three of
+     * the four source languages. For those, a run of kana/ideographs/hangul
+     * with no stray digits is as good a signal as this heuristic can give.
      */
     private fun textQuality(text: String): Float {
         val tokens = text.split(Regex("\\s+")).filter { it.any(Char::isLetter) }
@@ -332,11 +339,22 @@ class PageTranslator(
         val good = tokens.count { token ->
             val body = token.trim(*TRIMMED_PUNCTUATION).filterNot { it in WORD_PUNCTUATION }
             val letters = body.count { it.isLetter() }
-            letters >= body.length &&
-                (letters <= 2 || body.any { it.lowercaseChar() in VOWELS })
+            when {
+                letters < body.length -> false
+                body.any { it.isCjk() } -> true
+                else -> letters <= 2 || body.any { it.lowercaseChar() in VOWELS }
+            }
         }
         return good.toFloat() / tokens.size
     }
+
+    /** Kana, CJK ideographs and hangul — the scripts with no vowel letters. */
+    private fun Char.isCjk(): Boolean =
+        this in '぀'..'ヿ' || // hiragana and katakana
+            this in '㐀'..'䶿' || // CJK unified extension A
+            this in '一'..'鿿' || // CJK unified
+            this in 'ᄀ'..'ᇿ' || // hangul jamo
+            this in '가'..'힯' // hangul syllables
 
     /**
      * How much to enlarge a region before OCR. Small selections carry too few
@@ -635,7 +653,12 @@ class PageTranslator(
 
         private val TRIMMED_PUNCTUATION = charArrayOf('.', ',', '!', '?', '"', '\'', '’', '-', '…')
         private const val WORD_PUNCTUATION = "'’-"
-        private const val VOWELS = "aeiouyаеєиіїоуюя"
+
+        // Latin only, on purpose. Every source language is Latin or CJK
+        // (`TranslationSourceLanguage`), and ML Kit ships no Cyrillic model, so
+        // Cyrillic text never reaches this — it was dead weight that implied a
+        // support we do not have.
+        private const val VOWELS = "aeiouy"
 
         private const val MAX_BLOCKS_PER_PAGE = 24
         private const val MAX_PARALLEL_TRANSLATIONS = 4
