@@ -76,6 +76,10 @@ class MigrateRestoreScreen(private val uriString: String) : Screen() {
         var restoreCategories by remember { mutableStateOf(true) }
         var restoreAppSettings by remember { mutableStateOf(false) }
         var restoreSourceSettings by remember { mutableStateOf(true) }
+        // Its own switch because it decides whether the extensions already on
+        // the phone come back trusted, which is not what "source settings"
+        // sounds like it controls
+        var restoreExtensionStores by remember { mutableStateOf(true) }
         var starting by remember { mutableStateOf(false) }
 
         LaunchedEffect(uriString) {
@@ -148,6 +152,16 @@ class MigrateRestoreScreen(private val uriString: String) : Screen() {
                         checked = restoreSourceSettings,
                         onClick = { restoreSourceSettings = !restoreSourceSettings },
                     )
+                    CheckboxItem(
+                        label = stringResource(MR.strings.migrate_restore_extension_repos),
+                        checked = restoreExtensionStores,
+                        onClick = { restoreExtensionStores = !restoreExtensionStores },
+                    )
+                    Text(
+                        text = stringResource(MR.strings.migrate_restore_extension_repos_summary),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
 
                     Button(
                         enabled = !starting,
@@ -167,7 +181,7 @@ class MigrateRestoreScreen(private val uriString: String) : Screen() {
                                         libraryEntries = true,
                                         categories = restoreCategories,
                                         appSettings = restoreAppSettings,
-                                        extensionStores = restoreSourceSettings,
+                                        extensionStores = restoreExtensionStores,
                                         sourceSettings = restoreSourceSettings,
                                     ),
                                 )

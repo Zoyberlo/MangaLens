@@ -61,6 +61,31 @@ packages, `.tachibk` folder scan → `RestoreBackupScreen`).
   `A:\Projects\.keys\set-github-secrets.ps1` (outside the repo). Until then CI
   release builds fail at signing.
 
+## Extension trust after migration
+
+**The trust list can never be migrated.** `SourcePreferences.trustedExtensions`
+uses `Preference.appStateKey`, and `PreferenceBackupCreator` strips every
+`__APP_STATE_` key from backups — in Mihon, in Tachiyomi, in every fork. No
+`.tachibk` from any of them contains it, so there is nothing to import.
+
+What actually removes the prompts is **extension repos**. Extensions are
+device-wide packages, so a fresh app sees every extension already installed and
+finds none of them in its own empty trust set. `TrustExtension.isTrusted` also
+passes anything whose signature matches a repo's `signingKey`, and repos *are*
+in backups (`BackupExtensionStore`, proto 106). Restore those and the prompts go
+away for everything those repos signed. Sideloaded extensions still need a
+manual decision, correctly.
+
+Two fixes shipped for this:
+
+- `ExtensionManager.revalidateUntrustedExtensions()` re-runs the load (and so the
+  signature check) for each untrusted extension after a restore brings repos
+  back. Without it they stayed untrusted until the process restarted, because
+  trust is evaluated once at `initExtensions()`. It grants nothing a fresh
+  install would not have granted — anything failing the check stays untrusted.
+- Extension repos got their own checkbox on the migrate screen. They used to
+  ride on "Source settings", whose label gives no clue that it decides this.
+
 ## Known rough edges
 
 - **Translation quality is provider-bound.** After normalization and block merging,

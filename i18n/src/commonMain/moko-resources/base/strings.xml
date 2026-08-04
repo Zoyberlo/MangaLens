@@ -477,6 +477,8 @@
     <string name="about_fork_notice_summary">MangaLens is an unofficial fork of Mihon, licensed under Apache 2.0</string>
     <string name="supportUsScreen_upstreamCredit">Everything except the translation features comes from Mihon. If you want to support the app this is built on, donate to them:</string>
     <string name="onboarding_translation_info">Pick the languages you read in. In the reader, select an area of a page to translate it — you can change this later in Settings → Reader.</string>
+    <string name="migrate_restore_extension_repos">Extension repos</string>
+    <string name="migrate_restore_extension_repos_summary">Brings back the repos you added. Extensions signed by them stop asking to be trusted one by one — the trust list itself is never stored in a backup, by any app in the family.</string>
     <string name="pref_category_translation">Translation</string>
     <string name="pref_translation_summary">Languages, translation service, text recognition</string>
     <string name="pref_category_translation_languages">Languages</string>

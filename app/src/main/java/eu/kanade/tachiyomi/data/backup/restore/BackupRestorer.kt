@@ -14,6 +14,7 @@ import eu.kanade.tachiyomi.data.backup.restore.restorers.ExtensionStoreRestorer
 import eu.kanade.tachiyomi.data.backup.restore.restorers.MangaRestorer
 import eu.kanade.tachiyomi.data.backup.restore.restorers.PreferenceRestorer
 import eu.kanade.tachiyomi.data.download.DownloadCache
+import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.util.system.createFileInCacheDir
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
@@ -242,6 +243,12 @@ class BackupRestorer(
                     isSync,
                 )
             }
+
+        // Extensions were checked for trust when they loaded, before these
+        // repos existed. Without this, every extension the user already had
+        // stays flagged untrusted until the app process is restarted, even
+        // though their own repos now vouch for it.
+        Injekt.get<ExtensionManager>().revalidateUntrustedExtensions()
     }
 
     private fun writeErrorLog(): File {

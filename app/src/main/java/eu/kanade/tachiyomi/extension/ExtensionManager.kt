@@ -289,6 +289,31 @@ class ExtensionManager(
     }
 
     /**
+     * Re-checks every untrusted extension against the repo signing keys as they
+     * stand now, and promotes the ones that verify.
+     *
+     * Extensions are device-wide packages, so a freshly set up app sees every
+     * extension the user already had and treats all of them as untrusted — its
+     * own trust set is empty, and that set is deliberately never included in a
+     * backup. Restoring the user's extension repos is what fixes this: those
+     * repos already vouch for their extensions by signing key, so re-asking the
+     * user to confirm each one by hand establishes nothing.
+     *
+     * Nothing is trusted here that a fresh install would not have trusted:
+     * loading re-runs the normal signature check and simply leaves anything
+     * that fails it untrusted.
+     */
+    suspend fun revalidateUntrustedExtensions() {
+        untrustedExtensionMapFlow.value.keys.toList().forEach { pkgName ->
+            val loaded = ExtensionLoader.loadExtensionFromPkgName(context, pkgName)
+            if (loaded is LoadResult.Success) {
+                untrustedExtensionMapFlow.value -= pkgName
+                registerNewExtension(loaded.extension)
+            }
+        }
+    }
+
+    /**
      * Registers the given extension in this and the source managers.
      *
      * @param extension The extension to be registered.
