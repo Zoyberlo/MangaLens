@@ -16,29 +16,51 @@ location not found" while the file clearly exists, that is the BOM — rewrite i
 [System.IO.File]::WriteAllText("A:\Projects\MangaLens\local.properties", "sdk.dir=C\:\\Users\\zoybe\\AppData\\Local\\Android\\Sdk`n")
 ```
 
-## 2. Build
+## 2. Which variant
+
+**Iterate on `debug`. Do not install `release` over the owner's app.**
+
+| Variant | applicationId | Name on device |
+|---------|---------------|----------------|
+| `debug` | `app.mangalens.dev` | MangaLens Dev |
+| `release` | `app.mangalens` | MangaLens |
+
+They install side by side, so day-to-day work never touches the app the owner
+actually reads with — that one is meant to update through the in-app updater
+from a tagged GitHub release, nothing else.
+
+Two consequences to keep in mind:
+
+- **The dev app has its own, empty data.** Separate library, separate settings,
+  separate API keys. Testing a cloud engine there means pasting the key again.
+- **`debug` is not minified.** R8 has broken this app before (it stripped ML
+  Kit's reflectively-loaded components — see `app/proguard-rules.pro`). A green
+  dev build proves nothing about that. **Build and smoke-test `release` before
+  tagging a version.**
+
+## 3. Build
 
 ```bash
-./gradlew spotlessApply :app:assembleDebug
+./gradlew spotlessApply :app:assembleDebug --build-cache
 ```
 
 Always run `spotlessApply` in the same invocation — ktlint failures are the most
 common reason a build breaks after an edit. For a quick syntax check without
 packaging, `:app:compileDebugKotlin` is much faster.
 
-Output: `app/build/outputs/apk/debug/`
+Incremental debug builds land around **15 s**; a cold one is a couple of
+minutes. Release is not dramatically slower — most of the time is Kotlin
+compilation, not R8 — so pick the variant for *what it installs over*, not for
+speed.
 
-| APK | Use |
-|-----|-----|
-| `app-arm64-v8a-debug.apk` (~69 MB) | Any modern phone — the default choice |
-| `app-universal-debug.apk` (~136 MB) | Unknown target device |
-| `app-armeabi-v7a`, `app-x86*`| Old or emulator targets |
+Output: `app/build/outputs/apk/debug/app-debug.apk` (splits are off by default;
+pass `-Pall-abis` to also build the emulator-only x86 ABIs).
 
-## 3. Install
+## 4. Install
 
 ```bash
 adb devices                                                   # confirm the device is listed
-adb install -r app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 `adb` lives in `$ANDROID_HOME/platform-tools/`.
@@ -55,7 +77,7 @@ If `adb devices` prints nothing:
 The fork installs alongside official Mihon (different `applicationId`); a debug
 build additionally carries the `.dev` suffix.
 
-## 4. Verify
+## 5. Verify
 
 There are no automated tests for the fork's feature. Check by hand on the device
 and report exactly what was and was not verified. For the translation feature:
@@ -67,4 +89,18 @@ and report exactly what was and was not verified. For the translation feature:
 5. Tap the box → X appears → tap the X → the box disappears.
 6. Repeat in the other reading mode (paged vs webtoon).
 
-Logs while reproducing: `adb logcat --pid $(adb shell pidof app.mihon.tl.dev)`.
+## 6. Logs
+
+```bash
+adb logcat --pid=$(adb shell pidof app.mangalens.dev)
+```
+
+Filtering by pid matters — the device buffer rotates fast enough that grepping
+the whole log loses entries within a minute.
+
+**Release builds do log**, contrary to the obvious guess: `App.kt` installs
+`AndroidLogcatLogger` at `INFO` in release and `DEBUG` in debug, so anything
+logged at `WARN` (which is what the translate feature uses for failures) appears
+in both. Turning on **Settings → Advanced → Verbose logging** drops either build
+to `VERBOSE`. The reason to prefer the dev build is that it does not overwrite
+the owner's app, not that release is silent.

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Installs beside the real app (applicationId gets a ".dev" suffix), so
+         the launcher has to be able to tell the two apart. -->
+    <string name="app_name">MangaLens Dev</string>
+</resources>
