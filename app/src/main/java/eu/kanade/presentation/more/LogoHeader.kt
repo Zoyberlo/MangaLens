@@ -17,7 +17,7 @@ import eu.kanade.tachiyomi.R
 /**
  * The full-colour app artwork, not the flat silhouette.
  *
- * That silhouette (`ic_mihon`) has to stay single-colour because Android draws
+ * That silhouette (`ic_mangalens`) has to stay single-colour because Android draws
  * a notification's small icon as a mask — anything else arrives as a white
  * blob — but nothing forces the same restraint on a header, which was showing
  * a tinted monochrome mark while the launcher showed the real thing.
