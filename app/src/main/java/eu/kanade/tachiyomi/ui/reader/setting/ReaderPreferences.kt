@@ -111,6 +111,11 @@ class ReaderPreferences(
 
     val deeplUsagePeriod: Preference<String> = preferenceStore.getString("pref_deepl_usage_period", "")
 
+    // Dictionary repair of single-letter misreadings. Off means the recognizer's
+    // output is shown exactly as it came, which suits pages full of invented
+    // names better.
+    val repairRecognizedWords: Preference<Boolean> = preferenceStore.getBoolean("pref_repair_words", true)
+
     // region Text recognition
 
     // The engine every automatic pass uses. On-device is free and offline, so

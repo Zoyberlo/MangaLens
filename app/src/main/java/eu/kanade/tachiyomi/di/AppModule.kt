@@ -24,6 +24,7 @@ import eu.kanade.tachiyomi.source.AndroidSourceManager
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
 import mihon.feature.translate.CloudTextRecognizer
+import mihon.feature.translate.EnglishLexicon
 import mihon.feature.translate.PageTextRecognizer
 import mihon.feature.translate.PageTranslator
 import mihon.feature.translate.QuotaNotifier
@@ -133,9 +134,10 @@ class AppModule(val app: Application) : InjektModule {
         addSingletonFactory { ImageSaver(app) }
 
         addSingletonFactory { QuotaNotifier() }
+        addSingletonFactory { EnglishLexicon(app) }
         addSingletonFactory { TextTranslator(app, get(), get(), get(), get()) }
         addSingletonFactory { CloudTextRecognizer(get(), get(), get(), get()) }
-        addSingletonFactory { PageTranslator(PageTextRecognizer(), get(), get(), get()) }
+        addSingletonFactory { PageTranslator(PageTextRecognizer(), get(), get(), get(), get()) }
 
         addSingletonFactory { AndroidStorageFolderProvider(app) }
         addSingletonFactory { LocalSourceFileSystem(get()) }

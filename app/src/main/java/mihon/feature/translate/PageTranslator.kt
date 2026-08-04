@@ -21,6 +21,7 @@ class PageTranslator(
     private val cloudRecognizer: CloudTextRecognizer,
     private val translator: TextTranslator,
     private val readerPreferences: ReaderPreferences,
+    private val lexicon: EnglishLexicon,
 ) {
 
     /**
@@ -77,6 +78,14 @@ class PageTranslator(
             }
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "OCR warm-up failed" }
+        }
+
+        // Building the word filter takes a moment; do it here rather than on
+        // the first bubble the user is waiting for
+        try {
+            lexicon.preload()
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Lexicon warm-up failed" }
         }
 
         if (from.langCode != to) {
@@ -199,6 +208,7 @@ class PageTranslator(
         // Skipped entirely when the first pass came from the cloud: that pass is
         // both billed and better, and refinement is on-device, so it could only
         // ever trade a paid reading for a free worse one.
+        val repairWords = readerPreferences.repairRecognizedWords.get()
         val candidates = if (fromCloud) {
             merged
         } else {
@@ -213,12 +223,19 @@ class PageTranslator(
                 } else {
                     primary
                 }
-                // Two readings of the same bubble that disagree mean the model
-                // was guessing. Neither is trustworthy, and the user is better
-                // told than handed a confident translation of nonsense.
-                val confident = refined == null ||
+                // This font's mistakes are systematic, so both passes make the
+                // same one and agree; only the dictionary sees those.
+                val repaired = if (repairWords) {
+                    OcrText.repairLetterConfusions(best, lexicon::contains)
+                } else {
+                    best
+                }
+                val passesAgree = refined == null ||
                     OcrText.agreementRatio(primary, refined) >= OcrText.MIN_PASS_AGREEMENT
-                block.copy(text = best, confident = confident)
+                val readsAsEnglish = !repairWords ||
+                    recognizedLanguage != TranslationSourceLanguage.ENGLISH ||
+                    OcrText.unknownWordRatio(repaired, lexicon::contains) <= OcrText.MAX_UNKNOWN_WORDS
+                block.copy(text = repaired, confident = passesAgree && readsAsEnglish)
             }
         }
 

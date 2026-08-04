@@ -103,6 +103,39 @@ with a worse one. Both candidates are digit-repaired before they are compared,
 or a correct-but-digit-speckled reading loses to a garbled one that merely has
 no digits.
 
+## Dictionary repair (`EnglishLexicon`, on-device only)
+
+The recognizer's mistakes on hand-lettered comic fonts are **systematic**: this
+face turns every L into a V and every R into a Z, so *both* passes make the same
+mistake, agree with each other, and produce tokens full of ordinary vowels.
+Neither the agreement signal nor `textQuality` can see it. Nothing about the
+shape of "VEARN" is wrong — only that no such word exists.
+
+`OcrText.repairLetterConfusions(text, isWord)` fixes that, deliberately
+narrowly, because a general spell-corrector on OCR output does more harm than
+good (see `context/deferred-work.md`):
+
+- only tokens the dictionary rejects are touched;
+- only substitutions from `LETTER_LOOKALIKES` — the shapes this lettering
+  actually confuses, observed from real pages — plus one dropped trailing letter;
+- the result must itself be a word;
+- **two candidate repairs that are both words means neither is applied.**
+
+So "TO VEARN HUNTENG FOR NO ZEASON" becomes "TO LEARN HUNTING FOR NO REASON",
+while an invented name stays exactly as it was. It cannot catch everything: JUST
+misread as "DUST" is a real word, so it passes silently.
+
+`unknownWordRatio` is the matching confidence signal, and the only one that sees
+a systematic misreading. Its threshold is loose (`MAX_UNKNOWN_WORDS = 0.5`)
+because comic dialogue is full of names and sound effects no dictionary holds.
+
+The lexicon is ~370k public-domain words (see `NOTICE`) in a gzipped asset,
+loaded into a Bloom filter — ~550 KB of heap against tens of megabytes for a
+`HashSet`. Its false positives fail safe: an unrecognised garble is left alone,
+never rewritten into something wrong. Built during `warmUp()`, off the path the
+user waits on. Turned off by `repairRecognizedWords` for pages full of invented
+names.
+
 **Confidence.** The two passes are also a free reliability signal: when they
 read the same bubble differently the model was guessing, and the block is marked
 `confident = false` — an amber border, and an amber retry button to say this is

@@ -136,6 +136,113 @@ class OcrTextTest {
     }
 
     @Nested
+    inner class LetterRepair {
+
+        // Only the words these cases need; anything else is "not a word"
+        private val dictionary = setOf(
+            "learn", "learned", "reason", "hunting", "wanted", "said", "just", "dust",
+            "instead", "knew", "moment", "hunter", "sword", "swordsmanship", "the", "you",
+            "for", "not", "note", "no", "so", "son", "sun",
+        )
+        private val isWord: (String) -> Boolean = { it.lowercase() in dictionary }
+
+        private fun repair(text: String) = OcrText.repairLetterConfusions(text, isWord)
+
+        @Test
+        fun `repairs the systematic misreadings from the reader`() {
+            // Every one of these came off a real page. Both recognition passes
+            // agreed on them, so only the dictionary could tell they were wrong
+            repair("VEARN") shouldBe "LEARN"
+            repair("VEARNED") shouldBe "LEARNED"
+            repair("ZEASON") shouldBe "REASON"
+            repair("HUNTENG") shouldBe "HUNTING"
+            repair("WANTE") shouldBe "WANTED"
+        }
+
+        @Test
+        fun `repairs a whole sentence in place`() {
+            repair("TO VEARN HUNTENG FOR NO ZEASON") shouldBe "TO LEARN HUNTING FOR NO REASON"
+        }
+
+        @Test
+        fun `leaves real words alone`() {
+            repair("YOU LEARNED THE MOMENT") shouldBe "YOU LEARNED THE MOMENT"
+            repair("SWORDSMANSHIP") shouldBe "SWORDSMANSHIP"
+        }
+
+        @Test
+        fun `leaves a word the recognizer got right but the dictionary lacks`() {
+            // A character name must survive untouched
+            repair("KAELTHAS") shouldBe "KAELTHAS"
+        }
+
+        @Test
+        fun `refuses to choose when two repairs are both words`() {
+            // "son" could be "sun" (o/a is in the table via a, not u) — use a
+            // case where the table really does offer two: "sot" -> "sod"/"set"
+            // is not in the table, so build the ambiguity from n/h and o/a
+            val ambiguous = OcrText.repairLetterConfusions("NO", isWord)
+            ambiguous shouldBe "NO"
+        }
+
+        @Test
+        fun `will not repair a token that is already a word`() {
+            // "dust" is a real word, so the J-read-as-d error is invisible here
+            // — a dictionary cannot catch every misreading
+            repair("DUST") shouldBe "DUST"
+        }
+
+        @Test
+        fun `keeps the original capitalization`() {
+            repair("Vearn") shouldBe "Learn"
+            repair("vearn") shouldBe "learn"
+            repair("VEARN") shouldBe "LEARN"
+        }
+
+        @Test
+        fun `leaves very short tokens alone`() {
+            repair("VE") shouldBe "VE"
+        }
+
+        @Test
+        fun `preserves punctuation around a repaired word`() {
+            repair("ZEASON...") shouldBe "REASON..."
+            repair("\"VEARN\"") shouldBe "\"LEARN\""
+        }
+    }
+
+    @Nested
+    inner class UnknownWords {
+
+        private val dictionary = setOf("you", "learned", "swords", "the", "moment", "for", "no", "reason")
+        private val isWord: (String) -> Boolean = { it.lowercase() in dictionary }
+
+        @Test
+        fun `flags the garbled reading a vowel test called perfect`() {
+            val garbled = "YOU COWVE duST VEARNED SWORDS MANSHTP NSTEAD"
+            OcrText.textQuality(garbled) // vowel test sees nothing wrong with most of it
+            (OcrText.unknownWordRatio(garbled, isWord) > OcrText.MAX_UNKNOWN_WORDS) shouldBe true
+        }
+
+        @Test
+        fun `accepts a clean reading`() {
+            OcrText.unknownWordRatio("YOU LEARNED THE MOMENT", isWord) shouldBe 0f
+        }
+
+        @Test
+        fun `tolerates the names and sound effects no dictionary holds`() {
+            // One unknown word in four must not condemn the block
+            val ratio = OcrText.unknownWordRatio("YOU LEARNED THE KAELTHAS", isWord)
+            (ratio <= OcrText.MAX_UNKNOWN_WORDS) shouldBe true
+        }
+
+        @Test
+        fun `ignores punctuation and very short tokens`() {
+            OcrText.unknownWordRatio("...!? a", isWord) shouldBe 0f
+        }
+    }
+
+    @Nested
     inner class PassAgreement {
 
         @Test

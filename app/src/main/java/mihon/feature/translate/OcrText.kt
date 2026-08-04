@@ -93,6 +93,76 @@ object OcrText {
     }
 
     /**
+     * Repairs single-letter misreadings that only a dictionary can catch.
+     *
+     * This font's mistakes are systematic — every L comes back as V, every R as
+     * Z — so both recognition passes make the same one and agree with each
+     * other. "VEARN" is a perfectly plausible string; the only thing wrong with
+     * it is that no such word exists.
+     *
+     * Deliberately narrow, because a general spell-corrector on OCR output does
+     * more harm than good:
+     * - only tokens [isWord] rejects are touched at all;
+     * - only substitutions from [LETTER_LOOKALIKES], the shapes this lettering
+     *   actually confuses, plus one dropped trailing letter;
+     * - the result must itself be a word;
+     * - and if two different repairs both produce words, neither is applied.
+     *
+     * So "VEARN" becomes "LEARN" and "ZEASON" becomes "REASON", while a name
+     * the dictionary has never heard of is left exactly as it was.
+     */
+    fun repairLetterConfusions(text: String, isWord: (String) -> Boolean): String =
+        WORD_LIKE.replace(text) { match ->
+            val token = match.value
+            val letters = token.filter { it.isLetter() }
+            if (letters.length < MIN_REPAIRED_LENGTH || !letters.all { it.isLetter() }) return@replace token
+            if (isWord(letters)) return@replace token
+
+            val candidates = repairCandidates(letters).filter(isWord).distinct()
+            val repaired = candidates.singleOrNull() ?: return@replace token
+            token.replaceFirst(letters, matchCase(repaired, letters))
+        }
+
+    private fun repairCandidates(letters: String): List<String> {
+        val lower = letters.lowercase()
+        val substitutions = lower.indices.flatMap { index ->
+            LETTER_LOOKALIKES[lower[index]].orEmpty().map { replacement ->
+                lower.substring(0, index) + replacement + lower.substring(index + 1)
+            }
+        }
+        // A swallowed final stroke: "WANTE" for "WANTED", "SAI" for "SAID"
+        val appended = TRAILING_LETTERS.map { lower + it }
+        return substitutions + appended
+    }
+
+    /** Keeps the repaired word looking like the one it replaced. */
+    private fun matchCase(repaired: String, original: String): String = when {
+        original.all { it.isUpperCase() } -> repaired.uppercase()
+        original.first().isUpperCase() -> repaired.replaceFirstChar { it.uppercase() }
+        else -> repaired
+    }
+
+    /**
+     * Share of tokens that are not English words — the only signal that sees a
+     * systematic misreading, since those produce agreeing passes and tokens
+     * full of perfectly ordinary vowels.
+     */
+    fun unknownWordRatio(text: String, isWord: (String) -> Boolean): Float {
+        val tokens = text.split(WHITESPACE)
+            .map { it.filter(Char::isLetter) }
+            .filter { it.length >= MIN_REPAIRED_LENGTH }
+        if (tokens.isEmpty()) return 0f
+        return tokens.count { !isWord(it) }.toFloat() / tokens.size
+    }
+
+    /**
+     * Above this share of unrecognised words the reading is not trustworthy.
+     * Comic dialogue carries names and sound effects that no dictionary holds,
+     * so a third being unknown is normal; half is not.
+     */
+    const val MAX_UNKNOWN_WORDS = 0.5f
+
+    /**
      * Below this the two passes read the bubble too differently to trust
      * either. Measured, not guessed: the garbled bubble in `OcrTextTest`
      * scores 0.81, while a single misread character in a full sentence scores
@@ -215,6 +285,24 @@ object OcrText {
     // Only the pairs that are genuinely ambiguous in heavy all-caps lettering.
     // 4/A and 6/G are a stretch and stay out.
     private val DIGIT_LOOKALIKES = mapOf('0' to 'O', '1' to 'I', '5' to 'S', '8' to 'B', '2' to 'Z')
+
+    // Letter pairs this hand-lettered comic face actually confuses, observed
+    // from real pages: LEARN read as VEARN, REASON as ZEASON, HUNTING as
+    // HUNTENG. Kept short on purpose — every extra pair is another chance to
+    // rewrite a word that was right.
+    private val LETTER_LOOKALIKES: Map<Char, List<Char>> = buildMap {
+        listOf(
+            'l' to 'v', 'r' to 'z', 'i' to 'e', 'c' to 'e', 'n' to 'h',
+            'u' to 'v', 'o' to 'a', 't' to 'f', 's' to 'g', 'j' to 'd',
+        ).forEach { (a, b) ->
+            merge(a, listOf(b)) { old, new -> old + new }
+            merge(b, listOf(a)) { old, new -> old + new }
+        }
+    }
+
+    private val TRAILING_LETTERS = listOf('d', 's', 'e', 't', 'y', 'r')
+
+    private const val MIN_REPAIRED_LENGTH = 3
 
     private val TRIMMED_PUNCTUATION = charArrayOf('.', ',', '!', '?', '"', '\'', '’', '-', '…')
     private const val WORD_PUNCTUATION = "'’-"

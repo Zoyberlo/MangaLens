@@ -419,6 +419,8 @@
     <string name="pref_ocr_retry_engine">Retry button</string>
     <string name="pref_ocr_retry_engine_summary">Runs only when you tap retry on a badly recognized block</string>
     <string name="pref_ocr_engine_default">Follow the global setting</string>
+    <string name="pref_repair_words">Fix misread letters</string>
+    <string name="pref_repair_words_summary">Checks English words against a built-in dictionary and repairs single misread letters, which is how LEARN comes back as VEARN. Turn off for pages full of invented names.</string>
     <string name="pref_azure_endpoint">Azure endpoint</string>
     <string name="pref_azure_endpoint_summary">Your resource URL, e.g. https://my-vision.cognitiveservices.azure.com</string>
     <string name="pref_azure_api_key">Azure API key</string>
