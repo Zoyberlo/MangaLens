@@ -32,11 +32,11 @@ This fork is not affiliated with, endorsed by, or supported by the Mihon
 project. Please do not report issues with this build to Mihon.
 
 --------------------------------------------------------------------------------
-English word list (app/src/main/assets/english_words.txt.gz)
+English word list (app/src/main/assets/english_words.txt)
 
 Derived from the dwyl/english-words project (https://github.com/dwyl/english-words),
 released into the public domain under the Unlicense. Filtered to ASCII alphabetic
-entries of 2-20 characters and gzipped; no other modification.
+entries of 2-20 characters; no other modification.
 
 Used offline to tell a real English word from a misread one. The recognizer's
 mistakes on comic lettering are systematic, so nothing about the shape of a

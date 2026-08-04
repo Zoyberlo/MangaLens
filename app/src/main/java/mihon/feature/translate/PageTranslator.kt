@@ -183,20 +183,24 @@ class PageTranslator(
 
         // Map block bounds back through the upscale and the decode sampling
         val toImage = sampleSize / upscale
-        val inSelection = recognized
-            .map { block ->
-                block.copy(
-                    bounds = android.graphics.Rect(
-                        padded.left + (block.bounds.left * toImage).toInt(),
-                        padded.top + (block.bounds.top * toImage).toInt(),
-                        padded.left + (block.bounds.right * toImage).toInt(),
-                        padded.top + (block.bounds.bottom * toImage).toInt(),
-                    ),
-                )
-            }
-            .filter { android.graphics.Rect.intersects(it.bounds, clamped) }
+        val onPage = recognized.map { block ->
+            block.copy(
+                bounds = android.graphics.Rect(
+                    padded.left + (block.bounds.left * toImage).toInt(),
+                    padded.top + (block.bounds.top * toImage).toInt(),
+                    padded.left + (block.bounds.right * toImage).toInt(),
+                    padded.top + (block.bounds.bottom * toImage).toInt(),
+                ),
+            )
+        }
 
-        val merged = mergeBlocks(inSelection, recognizedLanguage)
+        // Merge first, filter second. The other way round drops a bubble's
+        // first line whenever the selection starts just below it — the line is
+        // discarded before merging can rejoin it, and the padded area that was
+        // supposed to make selections forgiving never gets a say. That is why
+        // "I KNEW IT" kept vanishing off the top of its own bubble.
+        val merged = mergeBlocks(onPage, recognizedLanguage)
+            .filter { android.graphics.Rect.intersects(it.bounds, clamped) }
             .filter { block -> block.text.length >= 2 && block.text.any { it.isLetter() } }
             .take(MAX_BLOCKS_PER_PAGE)
         if (merged.isEmpty()) return RegionTranslateResult.NoText

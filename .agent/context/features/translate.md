@@ -129,9 +129,16 @@ misread as "DUST" is a real word, so it passes silently.
 a systematic misreading. Its threshold is loose (`MAX_UNKNOWN_WORDS = 0.5`)
 because comic dialogue is full of names and sound effects no dictionary holds.
 
-The lexicon is ~370k public-domain words (see `NOTICE`) in a gzipped asset,
-loaded into a Bloom filter — ~550 KB of heap against tens of megabytes for a
-`HashSet`. Its false positives fail safe: an unrecognised garble is left alone,
+The lexicon is ~370k public-domain words (see `NOTICE`) in a **plain text**
+asset, loaded into a Bloom filter — ~1.1 MB of heap against tens of megabytes
+for a `HashSet`.
+
+Plain text on purpose: **AGP silently unpacks `.gz` assets at build time**, so
+shipping `english_words.txt.gz` puts `english_words.txt` in the APK while the
+code still asks for the `.gz`, and the lexicon fails to open. The APK deflates
+it anyway (4.2 MB to 1.4 MB), so the gzip layer bought nothing. `WordFilterTest`
+builds from `EnglishLexicon.ASSET` itself, so the file and the name the app opens
+cannot drift apart again. Its false positives fail safe: an unrecognised garble is left alone,
 never rewritten into something wrong. Built during `warmUp()`, off the path the
 user waits on. Turned off by `repairRecognizedWords` for pages full of invented
 names.
