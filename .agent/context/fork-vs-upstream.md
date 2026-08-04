@@ -59,8 +59,12 @@ Plus fork-only files outside that package:
 ## Releases and the in-app updater
 
 Tagging `v<version>` runs `.github/workflows/release-fork.yml`, which builds
-signed APKs with `-Penable-updater`, renames them to `mangalens-<tag>-<abi>.apk`
-(the updater matches assets by `-<abi>`) and publishes a GitHub release.
+signed APKs with `-Penable-updater -Psplit-abis`, renames them to
+`mangalens-<tag>-<abi>.apk` plus `mangalens-<tag>-universal.apk`, checks all
+three exist, and publishes a GitHub release. `ReleaseServiceImpl.downloadLinkFor`
+matches an asset by `-<abi>` and falls back to the one naming no ABI, which is
+why the universal build must keep a name the ABI list does not match —
+`ReleaseAssetSelectionTest` in `:data` is what holds that contract.
 `versionName`/`versionCode` in `app/build.gradle.kts` are the fork's own —
 `GetApplicationRelease` compares the running `versionName` against the release
 tag, so the two must move together. Upstream's `release.yml` is untouched; it is

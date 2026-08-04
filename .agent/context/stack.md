@@ -41,14 +41,26 @@ PowerShell's `Set-Content -Encoding utf8` writes one and Gradle then reports
 ./gradlew spotlessCheck            # CI-style lint gate
 ```
 
-APKs land in `app/build/outputs/apk/debug/` (per-ABI splits + a universal one).
+APKs land in `app/build/outputs/apk/debug/` — one universal APK. Per-ABI splits
+are built only with `-Psplit-abis`, which the release workflow passes.
 Installing on a device: see `processes/build-and-install.md`.
 
 ## Tests
 
-Upstream has unit tests in a few modules (`./gradlew test`), but **the fork's
-translation feature has none** — it is verified by building and using the app on a
-device. Say plainly which parts you did and did not verify.
+`./gradlew test` runs them all. The fork adds:
+
+- `app/src/test/java/mihon/feature/translate/` — `OcrTextTest`, `OcrLayoutTest`,
+  `WordFilterTest`. Everything in the translation pipeline that does not touch
+  `Bitmap`/`Rect`/`Canvas`; `WordFilterTest` builds from the **real shipped
+  asset**, because a lexicon that silently answers "no" to everything is
+  invisible and shipped broken twice.
+- `data/src/test/java/tachiyomi/data/release/ReleaseAssetSelectionTest.kt` —
+  the release-asset-name ↔ updater contract.
+
+What still has no coverage is anything below the device boundary: coordinate
+rescaling in `translateRegion`, `TranslationOverlayView`, and the recognizers
+themselves. Those are verified by building and using the app on a device — say
+plainly which parts you did and did not verify.
 
 ## Build flavors
 

@@ -26,18 +26,39 @@ words. Keeping a half-used feature meant extra buttons on every bubble.
 **Don't:** Re-add saving without agreeing it first — the panel is intentionally
 a read-only lookup. The code is recoverable from git history if that changes.
 
-## One universal APK, ARM only
+## Per-ABI release APKs, ARM only
 
-**What:** ABI splits are off by default; `assembleRelease` produces a single
-universal APK, and `ndk.abiFilters` keeps `arm64-v8a` + `armeabi-v7a` only.
-**Why:** Distribution is a GitHub release link, not a store that slices builds
-per device, so every extra file becomes a "which one do I download?" question.
-Dropping the emulator-only x86 ABIs took the universal APK from 106 MB to
-55 MB, which is close enough to an arm64-only build (39 MB) to be worth it.
-32-bit ARM is kept deliberately: the owner values old-phone support over the
-~16 MB it costs.
-**Don't:** Drop `armeabi-v7a` to save size. Use `-Pall-abis` when an x86
-emulator or per-ABI splits are genuinely needed.
+**What:** `ndk.abiFilters` keeps `arm64-v8a` + `armeabi-v7a` only. ABI splits
+are **off by default** and turned on by `-Psplit-abis`, which the tag workflow
+passes; a universal APK is always built alongside the per-ABI ones.
+
+Measured at v1.0.2, signed release:
+
+| APK | size |
+| --- | --- |
+| `arm64-v8a` | 65.0 MB |
+| `armeabi-v7a` | 52.8 MB |
+| universal | 93.5 MB |
+
+**Why:** Splitting was not worth it while the app was 55 MB, but ONNX Runtime
+took the native payload to 69 MB across the two ABIs — over 70% of the APK —
+and every phone was downloading the half it cannot run. The updater already
+picked assets per ABI (`ReleaseServiceImpl.downloadLinkFor`), so this cost
+nothing on the client. Splits stay off for the dev loop and for a local release
+smoke test, where a second and third APK are pure packaging time.
+
+The universal build is still published: it is the one to hand someone directly,
+and it is what `downloadLinkFor` falls back to for an ABI no split was built
+for. **No per-ABI `versionCode` offset** — that exists for Play's multi-APK
+ordering, and distinct codes would only make sideloading between ABIs refuse.
+
+32-bit ARM is kept deliberately: the owner values old-phone support, and now it
+costs those users nothing.
+
+**Don't:** Drop `armeabi-v7a` to save size, or rename release assets without
+running `:data:testDebugUnitTest` — `ReleaseAssetSelectionTest` is the only
+thing tying the workflow's file names to the updater's matcher. Use `-Pall-abis`
+when an x86 emulator is genuinely needed (it implies `-Psplit-abis`).
 
 ## A fork, not a Mihon extension
 

@@ -26,6 +26,24 @@ if (Config.includeTelemetry) {
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 
+// x86 is emulator-only and would double an already heavy native payload
+// (ONNX Runtime and ML Kit are 27 MB of .so on arm64 alone). -Pall-abis adds
+// it back for anyone running the app on an emulator.
+val includeX86 = project.hasProperty("all-abis")
+val targetAbis = buildList {
+    add("arm64-v8a")
+    add("armeabi-v7a")
+    if (includeX86) {
+        add("x86_64")
+        add("x86")
+    }
+}
+
+// One APK per ABI, plus a universal one. Off by default so the dev loop and a
+// local release smoke test stay a single package; the tag workflow turns it on.
+// Building x86 into a universal APK serves nobody, so -Pall-abis implies it.
+val splitAbis = project.hasProperty("split-abis") || includeX86
+
 android {
     namespace = "eu.kanade.tachiyomi"
 
@@ -45,14 +63,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Both ARM architectures ship; only the emulator-only x86 ABIs are
-        // dropped, which is what keeps the single universal APK reasonable
-        // (106 MB -> 55 MB). Keeping 32-bit ARM costs ~16 MB and keeps old
-        // phones supported. Pass -Pall-abis to build x86 too.
-        if (!project.hasProperty("all-abis")) {
-            ndk {
-                abiFilters += listOf("arm64-v8a", "armeabi-v7a")
-            }
+        ndk {
+            abiFilters += targetAbis
         }
     }
 
@@ -139,14 +151,17 @@ android {
 
     splits {
         abi {
-            // One universal APK is the default: with x86 filtered out it is
-            // only ~16 MB heavier than an arm64-only build, and it removes the
-            // "which file do I download" question entirely. Per-ABI splits are
-            // still available via -Pall-abis.
-            isEnable = project.hasProperty("all-abis")
+            isEnable = splitAbis
+            // Still published alongside the per-ABI builds: it is the one to
+            // hand someone directly, and the updater falls back to it when a
+            // device reports an ABI no split was built for
             isUniversalApk = true
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            include(*targetAbis.toTypedArray())
+
+            // Deliberately no per-ABI versionCode offset. That exists for Play's
+            // multi-APK ordering; here the updater compares versionName, and
+            // distinct codes would only make sideloading between ABIs refuse.
         }
     }
 

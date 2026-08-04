@@ -35,21 +35,47 @@ class ReleaseServiceImpl(
         )
     }
 
-    private fun getDownloadLink(release: GithubRelease, isFoss: Boolean): String? {
-        val map = release.assets.associate { asset ->
-            BUILD_TYPES.find { "-$it" in asset.name } to asset.downloadLink
-        }
-
-        return if (!isFoss) {
-            map[Build.SUPPORTED_ABIS[0]] ?: map[null]
-        } else {
-            map[FOSS]
-        }
-    }
+    private fun getDownloadLink(release: GithubRelease, isFoss: Boolean): String? =
+        downloadLinkFor(release.assets, Build.SUPPORTED_ABIS.firstOrNull().orEmpty(), isFoss)
 
     companion object {
         private const val FOSS = "foss"
-        private val BUILD_TYPES = listOf(FOSS, "arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+
+        /**
+         * The ABI a release asset was built for, read off its file name — the
+         * release workflow names them `mangalens-<tag>-<abi>.apk`.
+         *
+         * `x86_64` must be tested before `x86`, since the shorter one is a
+         * substring of the longer.
+         */
+        private val ABIS = listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+
+        /**
+         * Picks the asset to install on a device reporting [deviceAbi].
+         *
+         * Releases carry one APK per ABI plus a universal one, so the ABI match
+         * is what saves the ~30 MB that the per-ABI split exists for. The
+         * universal build is the fallback, and is recognised by having no ABI
+         * in its name.
+         *
+         * Non-APK assets are filtered out first. They used to be eligible as
+         * the fallback purely by not naming an ABI, so attaching a checksum or
+         * a mapping file to a release would have handed the updater a text file
+         * to install.
+         */
+        internal fun downloadLinkFor(
+            assets: List<GitHubAsset>,
+            deviceAbi: String,
+            isFoss: Boolean,
+        ): String? {
+            val apks = assets.filter { it.name.endsWith(".apk", ignoreCase = true) }
+            val isFossAsset = { asset: GitHubAsset -> "-$FOSS" in asset.name }
+            if (isFoss) return apks.firstOrNull(isFossAsset)?.downloadLink
+
+            val abiOf = { asset: GitHubAsset -> ABIS.firstOrNull { "-$it" in asset.name } }
+            return apks.firstOrNull { !isFossAsset(it) && abiOf(it) == deviceAbi }?.downloadLink
+                ?: apks.firstOrNull { !isFossAsset(it) && abiOf(it) == null }?.downloadLink
+        }
 
         /**
          * Regular expression that matches a mention to a valid GitHub username, like it's

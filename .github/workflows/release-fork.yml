@@ -38,10 +38,11 @@ jobs:
         with:
           cache-read-only: false
 
-      # -Penable-updater switches on the in-app update checker, which reads
-      # the releases this workflow publishes
+      # -Penable-updater switches on the in-app update checker, which reads the
+      # releases this workflow publishes. -Psplit-abis makes one APK per ABI
+      # plus a universal one, so a phone downloads ~65 MB instead of ~94 MB.
       - name: Build signed release APKs
-        run: ./gradlew assembleRelease -Penable-updater --build-cache
+        run: ./gradlew assembleRelease -Penable-updater -Psplit-abis --build-cache
         env:
           MIHON_GITHUB_RELEASE: "true"
           storeFileBase64: ${{ secrets.STORE_FILE_BASE64 }}
@@ -49,10 +50,13 @@ jobs:
           keyAlias: ${{ secrets.KEY_ALIAS }}
           keyPassword: ${{ secrets.KEY_PASSWORD }}
 
-      # The updater matches an asset by "-<abi>" in its file name and falls
-      # back to the one without an ABI marker, which is the universal build
+      # The updater matches an asset by "-<abi>" in its file name and falls back
+      # to the one with no ABI marker it recognises, which is the universal
+      # build. Renaming it to end in "-universal" keeps that fallback: the
+      # updater's ABI list has no "universal" entry, so it stays the null key.
       - name: Name the APKs after the release
         run: |
+          set -euo pipefail
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           cd app/build/outputs/apk/release
           if [ -f "app-release.apk" ]; then
@@ -64,6 +68,12 @@ jobs:
             fi
           done
           ls -la
+          # A missing split would silently publish a release that half the
+          # phones cannot update to, so fail here instead
+          for expected in "-arm64-v8a" "-armeabi-v7a" "-universal"; do
+            test -f "mangalens-$TAG$expected.apk" \
+              || { echo "::error::missing mangalens-$TAG$expected.apk"; exit 1; }
+          done
 
       - name: Publish the release
         env:

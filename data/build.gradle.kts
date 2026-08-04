@@ -39,4 +39,7 @@ dependencies {
     implementation(libs.injekt)
 
     api(libs.bundles.sqldelight)
+
+    testImplementation(libs.bundles.test)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }

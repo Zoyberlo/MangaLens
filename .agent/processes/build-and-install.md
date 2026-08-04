@@ -53,8 +53,10 @@ minutes. Release is not dramatically slower — most of the time is Kotlin
 compilation, not R8 — so pick the variant for *what it installs over*, not for
 speed.
 
-Output: `app/build/outputs/apk/debug/app-debug.apk` (splits are off by default;
-pass `-Pall-abis` to also build the emulator-only x86 ABIs).
+Output: `app/build/outputs/apk/debug/app-debug.apk` — one APK holding both ARM
+ABIs. Pass `-Psplit-abis` for one APK per ABI plus a universal one (what the
+release workflow does), or `-Pall-abis` to also build the emulator-only x86
+ABIs, which implies `-Psplit-abis`.
 
 ## 4. Install
 
