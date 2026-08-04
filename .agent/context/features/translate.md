@@ -83,6 +83,26 @@ instance fails fast.
 Comic lettering is all-caps, and machine translation of all-caps text drops or
 invents words. Do not remove this step.
 
+## On-device text repair (`PageTranslator`)
+
+Two corrections run on on-device results only — cloud engines neither need nor
+see them.
+
+**`repairDigitConfusions()`** rewrites digits that are really misread letters.
+At all-caps comic weight `O/0`, `I/1`, `S/5`, `B/8` and `Z/2` are near-identical
+shapes, so "SW0RD5" comes back and the translator faithfully mangles it. Only
+digits *inside* a mostly-alphabetic word are touched, so "CHAPTER 12", "1999"
+and "LEVEL 5" survive untouched.
+
+**`textQuality()`** decides whether the second recognition pass beat the first.
+It must not treat apostrophes or hyphens as stray punctuation: they sit inside
+ordinary dialogue ("COULD'VE") and wherever a word breaks across lines. Counting
+them against a token scored *correct* text below garbled text — "COULD'VE"
+failed while "COLDVE" passed — so the second pass could replace a good reading
+with a worse one. Both candidates are digit-repaired before they are compared,
+or a correct-but-digit-speckled reading loses to a garbled one that merely has
+no digits.
+
 ## Overlay behavior
 
 - Box positions come from `sourceToViewCoord`, so they track pan/zoom.

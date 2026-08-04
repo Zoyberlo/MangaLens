@@ -149,12 +149,14 @@ class PageTranslator(
         val upscale = ocrUpscaleFor(decoded)
         val bitmap = if (upscale > 1f) enhanceForOcr(decoded, upscale) else decoded
 
+        // Defaults to on-device: a cloud engine here bills for every selection,
+        // so choosing one is a deliberate act in settings.
+        var fromCloud = false
         val recognition = try {
-            // Defaults to on-device: a cloud engine here bills for every
-            // selection, so choosing one is a deliberate act in settings.
             val engine = primaryEngineFor(from)
             cloudRecognizer.recognize(engine, bitmap, from)
                 ?.takeIf { it.isNotEmpty() }
+                ?.also { fromCloud = true }
                 ?.let { RecognitionResult(it, from) }
                 ?: recognizer.recognize(bitmap, from)
         } catch (e: Exception) {
@@ -193,12 +195,25 @@ class PageTranslator(
         // Second pass: each bubble is re-read on its own at full resolution.
         // Scaling by the whole selection means a generous selection shrinks the
         // lettering; per-block scaling gives every bubble the same glyph size.
-        val candidates = merged.map { block ->
-            val refined = refineBlockText(imageBytes, block, recognizedLanguage)
-            if (refined != null && textQuality(refined) > textQuality(block.text)) {
-                block.copy(text = refined)
-            } else {
-                block
+        //
+        // Skipped entirely when the first pass came from the cloud: that pass is
+        // both billed and better, and refinement is on-device, so it could only
+        // ever trade a paid reading for a free worse one.
+        val candidates = if (fromCloud) {
+            merged
+        } else {
+            merged.map { block ->
+                // Repair before comparing, or a correct-but-digit-speckled
+                // reading loses to a garbled one that merely has no digits
+                val primary = repairDigitConfusions(block.text)
+                val refined = refineBlockText(imageBytes, block, recognizedLanguage)
+                    ?.let(::repairDigitConfusions)
+                val best = if (refined != null && textQuality(refined) > textQuality(primary)) {
+                    refined
+                } else {
+                    primary
+                }
+                block.copy(text = best)
             }
         }
 
@@ -264,17 +279,61 @@ class PageTranslator(
     }
 
     /**
+     * Repairs digits the on-device model produced where a letter belongs.
+     *
+     * Comic lettering is all-caps, and at that weight `O/0`, `I/1`, `S/5`,
+     * `B/8` and `Z/2` are near-identical shapes — so "SW0RD5" comes back
+     * instead of "SWORDS", and the translator then faithfully mangles it.
+     *
+     * Only digits *inside* a word are touched, and only when the word is
+     * mostly letters already, so genuine numbers survive: "CHAPTER 12", "1999"
+     * and "LEVEL 5" all pass through untouched. Cloud engines do not need this
+     * and never see it.
+     */
+    private fun repairDigitConfusions(text: String): String {
+        if (text.none { it.isDigit() }) return text
+        return WORD_LIKE.replace(text) { match ->
+            val token = match.value
+            val letters = token.count { it.isLetter() }
+            val digits = token.count { it.isDigit() }
+            if (letters < 2 || digits == 0 || digits > letters) return@replace token
+
+            val upperCase = token.count { it.isUpperCase() } >= letters - 1
+            token.mapIndexed { index, char ->
+                val replacement = DIGIT_LOOKALIKES[char]
+                if (replacement != null && token.hasLetterBeside(index)) {
+                    if (upperCase) replacement else replacement.lowercaseChar()
+                } else {
+                    char
+                }
+            }.joinToString("")
+        }
+    }
+
+    /** A digit flanked by a letter is a misread glyph, not a number. */
+    private fun String.hasLetterBeside(index: Int): Boolean =
+        (index > 0 && this[index - 1].isLetter()) ||
+            (index + 1 < length && this[index + 1].isLetter())
+
+    /**
      * Rough share of tokens that look like real words, used to decide whether
      * a second recognition pass actually improved on the first. Garbled OCR
      * shows up as tokens with stray punctuation, digits or no vowels.
+     *
+     * Apostrophes and hyphens are deliberately not treated as stray: they sit
+     * *inside* ordinary comic dialogue ("COULD'VE", and hyphens wherever a word
+     * breaks across lines). Counting them against a token scored correct text
+     * below garbled text — "COULD'VE" failed while "COLDVE" passed — which let
+     * the second pass replace a good reading with a worse one.
      */
     private fun textQuality(text: String): Float {
         val tokens = text.split(Regex("\\s+")).filter { it.any(Char::isLetter) }
         if (tokens.isEmpty()) return 0f
         val good = tokens.count { token ->
-            val letters = token.filter { it.isLetter() }
-            letters.length >= token.trim('.', ',', '!', '?', '"', '\'', '-', '…').length &&
-                (letters.length <= 2 || letters.any { it.lowercaseChar() in "aeiouyаеєиіїоуюя" })
+            val body = token.trim(*TRIMMED_PUNCTUATION).filterNot { it in WORD_PUNCTUATION }
+            val letters = body.count { it.isLetter() }
+            letters >= body.length &&
+                (letters <= 2 || body.any { it.lowercaseChar() in VOWELS })
         }
         return good.toFloat() / tokens.size
     }
@@ -568,6 +627,16 @@ class PageTranslator(
     // endregion
 
     companion object {
+        private val WORD_LIKE = Regex("[\\p{L}\\p{Nd}'’-]+")
+
+        // Only the pairs that are genuinely ambiguous in heavy all-caps
+        // lettering. 4/A and 6/G are a stretch and stay out.
+        private val DIGIT_LOOKALIKES = mapOf('0' to 'O', '1' to 'I', '5' to 'S', '8' to 'B', '2' to 'Z')
+
+        private val TRIMMED_PUNCTUATION = charArrayOf('.', ',', '!', '?', '"', '\'', '’', '-', '…')
+        private const val WORD_PUNCTUATION = "'’-"
+        private const val VOWELS = "aeiouyаеєиіїоуюя"
+
         private const val MAX_BLOCKS_PER_PAGE = 24
         private const val MAX_PARALLEL_TRANSLATIONS = 4
         private const val MAX_CONTEXT_CHARS = 1500
