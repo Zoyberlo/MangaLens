@@ -7,6 +7,12 @@
 # Gradle wrapper
 *.jar binary
 
+# Neural network weights. Without this the repo-wide "text=auto" mangles them
+# on checkout and the model silently stops loading.
+*.onnx binary
+*.tflite binary
+*.ort binary
+
 # Images
 *.webp binary
 *.png binary
