@@ -9,6 +9,9 @@ package mihon.feature.translate
  */
 object OcrText {
 
+    internal val TranslationSourceLanguage.isCjk: Boolean
+        get() = this != TranslationSourceLanguage.ENGLISH
+
     /**
      * Repairs digits the on-device model produced where a letter belongs.
      *
@@ -104,18 +107,43 @@ object OcrText {
         return builder.toString().replace(STANDALONE_I, " I ")
     }
 
+    /**
+     * Which language's model to re-read with, or null to keep what was read.
+     *
+     * A CJK model fed Latin lettering returns plausible-looking nonsense —
+     * "SWORDSMANSHIP" comes back as "swolos manshe" — so output from a CJK
+     * model holding no CJK characters means the wrong model ran. The reverse
+     * case is quieter: the Latin model simply finds nothing in Japanese.
+     * Without this, a mismatched language setting silently ruins every result
+     * with no error anywhere.
+     */
+    fun fallbackLanguageFor(
+        language: TranslationSourceLanguage,
+        recognized: List<String>,
+    ): TranslationSourceLanguage? = when {
+        language.isCjk && recognized.isNotEmpty() && recognized.none(::hasCjk) ->
+            TranslationSourceLanguage.ENGLISH
+        !language.isCjk && recognized.isEmpty() -> TranslationSourceLanguage.JAPANESE
+        else -> null
+    }
+
+    /** True when the text holds Han, kana or Hangul characters. */
+    fun hasCjk(text: String): Boolean = text.any { it.isCjk() }
+
     /** A digit flanked by a letter is a misread glyph, not a number. */
     private fun String.hasLetterBeside(index: Int): Boolean =
         (index > 0 && this[index - 1].isLetter()) ||
             (index + 1 < length && this[index + 1].isLetter())
 
-    /** Kana, CJK ideographs and hangul — the scripts with no vowel letters. */
-    private fun Char.isCjk(): Boolean =
-        this in '぀'..'ヿ' || // hiragana and katakana
-            this in '㐀'..'䶿' || // CJK unified extension A
-            this in '一'..'鿿' || // CJK unified
-            this in 'ᄀ'..'ᇿ' || // hangul jamo
-            this in '가'..'힯' // hangul syllables
+    /** Han, kana and hangul — the scripts with no vowel letters. */
+    private fun Char.isCjk(): Boolean = when (Character.UnicodeScript.of(code)) {
+        Character.UnicodeScript.HAN,
+        Character.UnicodeScript.HIRAGANA,
+        Character.UnicodeScript.KATAKANA,
+        Character.UnicodeScript.HANGUL,
+        -> true
+        else -> false
+    }
 
     private val WORD_LIKE = Regex("""[\p{L}\p{Nd}'’-]+""")
     private val WHITESPACE = Regex("""\s+""")

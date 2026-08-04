@@ -31,12 +31,8 @@ class PageTextRecognizer {
     suspend fun recognize(bitmap: Bitmap, language: TranslationSourceLanguage): RecognitionResult {
         val blocks = recognizeWith(bitmap, language)
 
-        val fallback = when {
-            language.isCjk && blocks.isNotEmpty() && blocks.none { it.text.hasCjk() } ->
-                TranslationSourceLanguage.ENGLISH
-            !language.isCjk && blocks.isEmpty() -> TranslationSourceLanguage.JAPANESE
-            else -> null
-        } ?: return RecognitionResult(blocks, language)
+        val fallback = OcrText.fallbackLanguageFor(language, blocks.map { it.text })
+            ?: return RecognitionResult(blocks, language)
 
         val alternative = recognizeWith(bitmap, fallback)
         return if (alternative.isNotEmpty()) {
@@ -66,7 +62,7 @@ class PageTextRecognizer {
         val result = recognizer.process(InputImage.fromBitmap(bitmap, 0)).await()
 
         // CJK scripts don't use spaces between the lines of a speech bubble
-        val lineSeparator = if (language.isCjk) "" else " "
+        val lineSeparator = if (language == TranslationSourceLanguage.ENGLISH) " " else ""
 
         return result.textBlocks.mapNotNull { block ->
             val bounds = block.boundingBox ?: return@mapNotNull null
@@ -80,20 +76,5 @@ class PageTextRecognizer {
         addOnSuccessListener { continuation.resume(it) }
         addOnFailureListener { continuation.resumeWithException(it) }
         addOnCanceledListener { continuation.cancel() }
-    }
-}
-
-private val TranslationSourceLanguage.isCjk: Boolean
-    get() = this != TranslationSourceLanguage.ENGLISH
-
-/** True when the text holds Han, kana or Hangul characters. */
-private fun String.hasCjk(): Boolean = any { char ->
-    when (Character.UnicodeScript.of(char.code)) {
-        Character.UnicodeScript.HAN,
-        Character.UnicodeScript.HIRAGANA,
-        Character.UnicodeScript.KATAKANA,
-        Character.UnicodeScript.HANGUL,
-        -> true
-        else -> false
     }
 }

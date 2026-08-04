@@ -434,66 +434,24 @@ class PageTranslator(
     }
 
     /**
-     * ML Kit often splits one speech bubble into a block per line. Merge
-     * blocks that sit close together (relative to their line size) so the
-     * whole bubble is translated as a single piece of text.
+     * Rejoins the per-line boxes a recognizer returns into whole bubbles. The
+     * rules are in [OcrLayout]; this only converts to and from `Rect`.
      */
     private fun mergeBlocks(
         blocks: List<RecognizedBlock>,
         from: TranslationSourceLanguage,
     ): List<RecognizedBlock> {
-        val separator = when (from) {
-            TranslationSourceLanguage.JAPANESE, TranslationSourceLanguage.CHINESE -> ""
-            else -> " "
+        val items = blocks.map { block ->
+            TextItem(
+                block.text,
+                TextBox(block.bounds.left, block.bounds.top, block.bounds.right, block.bounds.bottom),
+            )
         }
-        val list = blocks.toMutableList()
-        var changed = true
-        while (changed) {
-            changed = false
-            outer@ for (i in list.indices) {
-                for (j in i + 1 until list.size) {
-                    if (!shouldMerge(list[i].bounds, list[j].bounds)) continue
-                    val a = list[i]
-                    val b = list[j]
-                    val ordered = orderForReading(a, b, from)
-                    val union = android.graphics.Rect(a.bounds)
-                    union.union(b.bounds)
-                    list[i] = RecognizedBlock(
-                        ordered.joinToString(separator) { it.text },
-                        union,
-                    )
-                    list.removeAt(j)
-                    changed = true
-                    break@outer
-                }
-            }
-        }
-        return list
-    }
-
-    private fun shouldMerge(a: android.graphics.Rect, b: android.graphics.Rect): Boolean {
-        val lineSize = minOf(a.height(), b.height()).coerceAtLeast(1)
-        val verticalGap = maxOf(a.top, b.top) - minOf(a.bottom, b.bottom)
-        val horizontalGap = maxOf(a.left, b.left) - minOf(a.right, b.right)
-        return verticalGap < lineSize * 0.9f && horizontalGap < lineSize * 1.5f
-    }
-
-    private fun orderForReading(
-        a: RecognizedBlock,
-        b: RecognizedBlock,
-        from: TranslationSourceLanguage,
-    ): List<RecognizedBlock> {
-        val lineSize = minOf(a.bounds.height(), b.bounds.height()).coerceAtLeast(1)
-        val sameRow = kotlin.math.abs(a.bounds.top - b.bounds.top) < lineSize / 2
-        return if (sameRow) {
-            // Vertical Japanese columns read right to left
-            if (from == TranslationSourceLanguage.JAPANESE) {
-                listOf(a, b).sortedByDescending { it.bounds.left }
-            } else {
-                listOf(a, b).sortedBy { it.bounds.left }
-            }
-        } else {
-            listOf(a, b).sortedBy { it.bounds.top }
+        return OcrLayout.merge(items, from).map { item ->
+            RecognizedBlock(
+                item.text,
+                android.graphics.Rect(item.box.left, item.box.top, item.box.right, item.box.bottom),
+            )
         }
     }
 

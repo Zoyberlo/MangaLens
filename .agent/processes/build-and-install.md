@@ -109,13 +109,23 @@ the owner's app, not that release is silent.
 ## 7. Tests
 
 ```bash
-./gradlew :app:testDebugUnitTest --tests "mihon.feature.translate.OcrTextTest"
+./gradlew :app:testDebugUnitTest --tests "mihon.feature.translate.*"
 ```
 
-`OcrText` holds the pure text rules of the translation pipeline — digit repair,
-the two-pass quality comparison, and normalization — deliberately kept out of
-the classes that own ML Kit, network clients and preferences so they can be
-called directly from a test.
+The recognizer is a black box: bitmap in, boxes and strings out. Nothing here
+tests the model. Everything the app decides *afterwards* takes those boxes and
+strings as input, so a test writes them down directly — no image, no device.
+That is also where every bug so far has actually been.
+
+- **`OcrText`** — digit repair, the two-pass quality comparison, normalization,
+  and the script-mismatch fallback.
+- **`OcrLayout`** — `TextBox`/`TextItem` and the rules that rebuild a speech
+  bubble out of the per-line boxes ML Kit returns: `shouldMerge`,
+  `orderForReading`, `merge`.
+
+Both are free of Android and of the classes that own ML Kit, network clients and
+preferences. `PageTranslator` and `PageTextRecognizer` only convert to and from
+`Rect` and call them.
 
 Every case in `OcrTextTest` is one that once went the wrong way in the app, so
 treat a failure as a real regression rather than a strict assertion. When
