@@ -112,7 +112,7 @@ class WebtoonPageHolder(
     private fun cloudRetryBlock(block: mihon.feature.translate.TranslatedBlock) {
         val key = pageKey ?: return
         val streamFn = page?.stream ?: return
-        viewer.activity.toast(MR.strings.cloud_ocr_in_progress)
+        frame.setTranslationBusyBlock(block)
         scope.launchIO {
             val result = try {
                 val bytes = streamFn().use { process(Buffer().readFrom(it)) }.readByteArray()
@@ -122,6 +122,7 @@ class WebtoonPageHolder(
                 mihon.feature.translate.CloudRetryResult.Failed
             }
             withUIContext {
+                frame.setTranslationBusyBlock(null)
                 when (result) {
                     is mihon.feature.translate.CloudRetryResult.Success ->
                         pageTranslator.updateOverlayBlock(key, block, result.translation, result.sourceText)

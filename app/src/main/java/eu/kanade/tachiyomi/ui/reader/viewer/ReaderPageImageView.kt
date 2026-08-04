@@ -90,6 +90,11 @@ open class ReaderPageImageView @JvmOverloads constructor(
             translationOverlay?.cloudRetryAvailable = value
         }
 
+    /** Spins the retry button of the block currently being re-read. */
+    fun setTranslationBusyBlock(block: TranslatedBlock?) {
+        translationOverlay?.setBusyBlock(block)
+    }
+
     /**
      * For automatic background. Will be set as background color when [onImageLoaded] is called.
      */

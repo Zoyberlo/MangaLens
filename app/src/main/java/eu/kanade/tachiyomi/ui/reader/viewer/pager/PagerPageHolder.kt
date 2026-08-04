@@ -111,7 +111,7 @@ class PagerPageHolder(
     private fun cloudRetryBlock(block: mihon.feature.translate.TranslatedBlock) {
         val key = pageKey
         val streamFn = page.stream ?: return
-        viewer.activity.toast(MR.strings.cloud_ocr_in_progress)
+        setTranslationBusyBlock(block)
         scope.launchIO {
             val result = try {
                 val bytes = streamFn().use { process(item, Buffer().readFrom(it)) }.readByteArray()
@@ -120,7 +120,10 @@ class PagerPageHolder(
                 logcat(LogPriority.WARN, e)
                 mihon.feature.translate.CloudRetryResult.Failed
             }
-            withUIContext { applyCloudRetry(key, block, result) }
+            withUIContext {
+                setTranslationBusyBlock(null)
+                applyCloudRetry(key, block, result)
+            }
         }
     }
 

@@ -97,7 +97,13 @@ invents words. Do not remove this step.
   | top-right | grey ✕ — remove this block | always |
   | top-left | green + — translate in place | block is untranslated (original-first mode) |
   | bottom-left | blue pencil — open the text in the editor | always |
-  | bottom-right | purple ↻ — re-read with Cloud Vision | a Vision key is set |
+  | bottom-right | purple ↻ — re-read with the cloud engine | a cloud key is set |
+
+  The corner glyphs are `AppCompatResources` vector drawables drawn into the
+  circle, not strokes composed on the canvas — hand-drawn paths read as a
+  scribble and a letter C at 24dp. While a cloud read is in flight the ↻ button
+  becomes a spinner (`setBusyBlock`) and stops accepting taps, so a slow request
+  cannot be billed twice by an impatient double tap.
 - **Word/phrase pick:** tapping words inside the selected block's original text
   picks a word and extends to a phrase (blue highlight); the pick is sent to
   `ReaderActivity` which shows variants in the inspector panel. Word boundaries
@@ -177,7 +183,11 @@ Two settings decide who runs, each with a per-source-language override stored as
   `GEMINI`. `retryBlockWithCloud()` crops that one block from the original
   image, re-reads it, re-translates and writes **both** back. The crop is sent
   **unmodified** — the grayscale/contrast treatment in `enhanceForOcr` exists
-  for ML Kit and only degrades what the cloud engines see. On failure or spent
+  for ML Kit and only degrades what the cloud engines see. Gemini requests set
+  `thinkingConfig.thinkingBudget = 0`: flash models reason before answering by
+  default, which costs seconds on a request the user is watching, and there is
+  nothing to reason about in "copy out this text". Models predating the field
+  reject it, so a `HTTP 400` retries once without it. On failure or spent
   quota the on-device result is left alone.
 
   If recognition succeeds but the translation fails, the result is

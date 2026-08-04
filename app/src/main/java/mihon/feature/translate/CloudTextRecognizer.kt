@@ -343,14 +343,22 @@ class CloudTextRecognizer(
         language: TranslationSourceLanguage,
     ): List<RecognizedBlock> {
         return try {
-            requestGemini(resolveGeminiModel(), bitmap, language)
+            requestGemini(resolveGeminiModel(), bitmap, language, noThinking = true)
         } catch (e: IllegalStateException) {
-            // "This model is no longer available to new users" arrives as a 404
-            // at request time. Forget the stored id, ask the API what exists
-            // now, and try once more rather than dead-ending the user.
-            if (e.message?.contains(HTTP_NOT_FOUND) != true) throw e
-            readerPreferences.geminiModel.set("")
-            requestGemini(resolveGeminiModel(), bitmap, language)
+            val message = e.message.orEmpty()
+            when {
+                // "This model is no longer available to new users" arrives as a
+                // 404 at request time. Forget the stored id, ask the API what
+                // exists now, and try once more rather than dead-ending.
+                HTTP_NOT_FOUND in message -> {
+                    readerPreferences.geminiModel.set("")
+                    requestGemini(resolveGeminiModel(), bitmap, language, noThinking = true)
+                }
+                // Models predating thinkingConfig reject the field outright
+                HTTP_BAD_REQUEST in message ->
+                    requestGemini(resolveGeminiModel(), bitmap, language, noThinking = false)
+                else -> throw e
+            }
         }
     }
 
@@ -372,6 +380,7 @@ class CloudTextRecognizer(
         model: String,
         bitmap: Bitmap,
         language: TranslationSourceLanguage,
+        noThinking: Boolean,
     ): List<RecognizedBlock> {
         val encoded = Base64.encodeToString(bitmap.toJpegBytes(), Base64.NO_WRAP)
         val languageName = language.name.lowercase().replaceFirstChar { it.uppercase() }
@@ -395,6 +404,13 @@ class CloudTextRecognizer(
             }
             putJsonObject("generationConfig") {
                 put("temperature", 0)
+                put("maxOutputTokens", MAX_OUTPUT_TOKENS)
+                if (noThinking) {
+                    // Flash models reason before answering by default, which
+                    // costs seconds the user spends staring at a bubble. There
+                    // is nothing to reason about in "copy out this text".
+                    putJsonObject("thinkingConfig") { put("thinkingBudget", 0) }
+                }
             }
         }
 
@@ -473,6 +489,8 @@ class CloudTextRecognizer(
         const val MAX_ERROR_CHARS = 400
         const val TEST_BITMAP_PX = 64
         const val HTTP_NOT_FOUND = "HTTP 404"
+        const val HTTP_BAD_REQUEST = "HTTP 400"
+        const val MAX_OUTPUT_TOKENS = 1024
         val OCTET_STREAM = "application/octet-stream".toMediaType()
 
         // Models that answer generateContent but cannot read a picture of text

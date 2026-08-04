@@ -53,6 +53,30 @@ class TranslationOverlayView(context: Context) : View(context) {
     var cloudRetryAvailable = false
 
     /**
+     * The block currently being re-read in the cloud. Its retry button becomes
+     * a spinner: these calls take seconds, and without it the page just sits
+     * there looking like nothing happened.
+     */
+    private var busyBlock: TranslatedBlock? = null
+
+    fun setBusyBlock(block: TranslatedBlock?) {
+        busyBlock = block
+        invalidate()
+    }
+
+    // Real icons rather than hand-drawn strokes, which read as a scribble and a
+    // letter C at 24dp
+    private val editIcon = androidx.appcompat.content.res.AppCompatResources
+        .getDrawable(context, eu.kanade.tachiyomi.R.drawable.ic_edit_24dp)
+        ?.mutate()
+        ?.apply { setTint(0xFFFFFFFF.toInt()) }
+
+    private val retryIcon = androidx.appcompat.content.res.AppCompatResources
+        .getDrawable(context, eu.kanade.tachiyomi.R.drawable.ic_refresh_24dp)
+        ?.mutate()
+        ?.apply { setTint(0xFFFFFFFF.toInt()) }
+
+    /**
      * Called with the currently picked word/phrase (taps on further words
      * extend the range), or null when the pick is cleared.
      */
@@ -291,52 +315,63 @@ class TranslationOverlayView(context: Context) : View(context) {
                 )
             }
 
-            drawEditButton(canvas, radius, arm)
-            if (cloudRetryAvailable) drawRetryButton(canvas, radius, arm)
+            drawEditButton(canvas, radius)
+            if (cloudRetryAvailable || isBusy) drawRetryButton(canvas, radius)
         }
     }
 
-    /**
-     * Edit button on the selected block's bottom-left corner: a blue circle
-     * with a pencil over a baseline, i.e. "fix this recognized text".
-     */
-    private fun drawEditButton(canvas: Canvas, radius: Float, arm: Float) {
+    /** True while this overlay's selected block is waiting on a cloud read. */
+    private val isBusy: Boolean
+        get() = busyBlock != null && busyBlock === selectedBlock
+
+    /** Edit button on the selected block's bottom-left corner. */
+    private fun drawEditButton(canvas: Canvas, radius: Float) {
         canvas.drawCircle(editButtonCenterX, editButtonCenterY, radius, editCirclePaint)
-        canvas.drawLine(
-            editButtonCenterX - arm,
-            editButtonCenterY + arm * 0.9f,
-            editButtonCenterX + arm,
-            editButtonCenterY + arm * 0.9f,
-            closeCrossPaint,
-        )
-        canvas.drawLine(
-            editButtonCenterX - arm * 0.7f,
-            editButtonCenterY + arm * 0.3f,
-            editButtonCenterX + arm * 0.7f,
-            editButtonCenterY - arm * 0.9f,
-            closeCrossPaint,
-        )
+        editIcon.drawCentered(canvas, editButtonCenterX, editButtonCenterY, radius)
     }
 
     /**
-     * Cloud re-recognition button on the selected block's bottom-right corner:
-     * a purple circle with a refresh arrow, i.e. "read this again, properly".
+     * Cloud re-recognition on the selected block's bottom-right corner, or the
+     * spinner that replaces it while that request is in flight.
      */
-    private fun drawRetryButton(canvas: Canvas, radius: Float, arm: Float) {
+    private fun drawRetryButton(canvas: Canvas, radius: Float) {
         canvas.drawCircle(retryButtonCenterX, retryButtonCenterY, radius, retryCirclePaint)
-        val arcRect = RectF(
-            retryButtonCenterX - arm,
-            retryButtonCenterY - arm,
-            retryButtonCenterX + arm,
-            retryButtonCenterY + arm,
+        if (isBusy) {
+            val arm = radius * 0.55f
+            val sweepStart = (android.os.SystemClock.uptimeMillis() % SPIN_PERIOD_MS) * 360f / SPIN_PERIOD_MS
+            canvas.drawArc(
+                RectF(
+                    retryButtonCenterX - arm,
+                    retryButtonCenterY - arm,
+                    retryButtonCenterX + arm,
+                    retryButtonCenterY + arm,
+                ),
+                sweepStart,
+                SPIN_SWEEP_DEGREES,
+                false,
+                closeCrossPaint,
+            )
+            postInvalidateOnAnimation()
+        } else {
+            retryIcon.drawCentered(canvas, retryButtonCenterX, retryButtonCenterY, radius)
+        }
+    }
+
+    private fun android.graphics.drawable.Drawable?.drawCentered(
+        canvas: Canvas,
+        centerX: Float,
+        centerY: Float,
+        radius: Float,
+    ) {
+        val icon = this ?: return
+        val half = (radius * ICON_SCALE).toInt()
+        icon.setBounds(
+            (centerX - half).toInt(),
+            (centerY - half).toInt(),
+            (centerX + half).toInt(),
+            (centerY + half).toInt(),
         )
-        canvas.drawArc(arcRect, 40f, 280f, false, closeCrossPaint)
-        // Arrowhead closing the open end of the arc
-        val head = arm * 0.5f
-        val tipX = retryButtonCenterX + arm * 0.77f
-        val tipY = retryButtonCenterY - arm * 0.64f
-        canvas.drawLine(tipX, tipY, tipX - head, tipY - head * 0.2f, closeCrossPaint)
-        canvas.drawLine(tipX, tipY, tipX + head * 0.2f, tipY + head, closeCrossPaint)
+        icon.draw(canvas)
     }
 
     /**
@@ -469,7 +504,10 @@ class TranslationOverlayView(context: Context) : View(context) {
             if (hypot(x - editButtonCenterX, y - editButtonCenterY) <= touchRadius) {
                 return TouchTarget.EditButton
             }
+            // Swallow taps while a request is in flight rather than firing a
+            // second billed one
             if (cloudRetryAvailable &&
+                !isBusy &&
                 hypot(x - retryButtonCenterX, y - retryButtonCenterY) <= touchRadius
             ) {
                 return TouchTarget.RetryButton
@@ -589,5 +627,8 @@ class TranslationOverlayView(context: Context) : View(context) {
         private const val MAX_WIDTH_GROWTH = 1.6f
         private const val CLOSE_RADIUS_DP = 12f
         private const val FIT_SEARCH_STEPS = 8
+        private const val ICON_SCALE = 0.62f
+        private const val SPIN_PERIOD_MS = 1000L
+        private const val SPIN_SWEEP_DEGREES = 100f
     }
 }
