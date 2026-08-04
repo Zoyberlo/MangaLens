@@ -190,6 +190,21 @@ class TranslationOverlayView(context: Context) : View(context) {
         style = Paint.Style.FILL
     }
 
+    // Amber on a block whose reading is a guess: this is where re-reading in
+    // the cloud is actually worth a request
+    private val retryUrgedCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFEF6C00.toInt()
+        style = Paint.Style.FILL
+    }
+
+    // Marks a block the two recognition passes disagreed about, so a guess
+    // does not sit on the page looking like a fact
+    private val uncertainBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFF9A825.toInt()
+        style = Paint.Style.STROKE
+        strokeWidth = 2f * density
+    }
+
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0x33000000
         style = Paint.Style.STROKE
@@ -257,7 +272,7 @@ class TranslationOverlayView(context: Context) : View(context) {
             // translation; untranslated blocks (original-first mode) always
             // show the original
             val text = if (isSelected || block.translatedText.isBlank()) block.sourceText else block.translatedText
-            val drawnRect = drawBlock(canvas, text, rect, cornerRadius, isSelected)
+            val drawnRect = drawBlock(canvas, text, rect, cornerRadius, isSelected, block.confident)
             hitRects += drawnRect to block
 
             if (isSelected) {
@@ -335,7 +350,8 @@ class TranslationOverlayView(context: Context) : View(context) {
      * spinner that replaces it while that request is in flight.
      */
     private fun drawRetryButton(canvas: Canvas, radius: Float) {
-        canvas.drawCircle(retryButtonCenterX, retryButtonCenterY, radius, retryCirclePaint)
+        val circle = if (selectedBlock?.confident == false) retryUrgedCirclePaint else retryCirclePaint
+        canvas.drawCircle(retryButtonCenterX, retryButtonCenterY, radius, circle)
         if (isBusy) {
             val arm = radius * 0.55f
             val sweepStart = (android.os.SystemClock.uptimeMillis() % SPIN_PERIOD_MS) * 360f / SPIN_PERIOD_MS
@@ -386,6 +402,7 @@ class TranslationOverlayView(context: Context) : View(context) {
         rect: RectF,
         cornerRadius: Float,
         isSelected: Boolean = false,
+        confident: Boolean = true,
     ): RectF {
         val padding = 3 * density
         val minTextPx = MIN_TEXT_SP * density
@@ -432,7 +449,12 @@ class TranslationOverlayView(context: Context) : View(context) {
         }
 
         canvas.drawRoundRect(drawRect, cornerRadius, cornerRadius, if (isSelected) selectedBoxPaint else boxPaint)
-        canvas.drawRoundRect(drawRect, cornerRadius, cornerRadius, borderPaint)
+        canvas.drawRoundRect(
+            drawRect,
+            cornerRadius,
+            cornerRadius,
+            if (confident) borderPaint else uncertainBorderPaint,
+        )
         val textLeft = drawRect.left + padding
         val textTop = drawRect.top + ((drawRect.height() - layout.height) / 2).coerceAtLeast(padding)
         if (isSelected) {

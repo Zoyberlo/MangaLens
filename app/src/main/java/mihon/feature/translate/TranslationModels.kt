@@ -96,6 +96,12 @@ val TARGET_LANGUAGES = listOf("en", "uk", "de", "fr", "es", "it", "pl", "pt", "r
 data class RecognizedBlock(
     val text: String,
     val bounds: Rect,
+    /**
+     * False when the two recognition passes disagreed about this text, i.e.
+     * the model was guessing. Shown to the user rather than hidden — a
+     * confident translation of an unreadable bubble is worse than none.
+     */
+    val confident: Boolean = true,
 )
 
 /**
@@ -114,6 +120,8 @@ data class TranslatedBlock(
     val sourceText: String,
     val translatedText: String,
     val bounds: Rect,
+    /** See [RecognizedBlock.confident]. */
+    val confident: Boolean = true,
 )
 
 /**

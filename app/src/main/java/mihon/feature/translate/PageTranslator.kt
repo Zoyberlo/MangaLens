@@ -213,7 +213,12 @@ class PageTranslator(
                 } else {
                     primary
                 }
-                block.copy(text = best)
+                // Two readings of the same bubble that disagree mean the model
+                // was guessing. Neither is trustworthy, and the user is better
+                // told than handed a confident translation of nonsense.
+                val confident = refined == null ||
+                    OcrText.agreementRatio(primary, refined) >= OcrText.MIN_PASS_AGREEMENT
+                block.copy(text = best, confident = confident)
             }
         }
 
@@ -222,7 +227,7 @@ class PageTranslator(
         val originalFirst = readerPreferences.translateShowOriginalFirst.get() &&
             readerPreferences.translateResultDisplay.get() == TranslateResultDisplay.OVERLAY
         if (originalFirst) {
-            val blocks = candidates.map { TranslatedBlock(it.text, "", it.bounds) }
+            val blocks = candidates.map { TranslatedBlock(it.text, "", it.bounds, it.confident) }
             return RegionTranslateResult.Success(PageTranslation(bounds.outWidth, bounds.outHeight, blocks))
         }
 
@@ -474,7 +479,7 @@ class PageTranslator(
                             logcat(LogPriority.WARN, e) { "Translation failed for block" }
                             null
                         }
-                        translated?.let { TranslatedBlock(block.text, it, block.bounds) }
+                        translated?.let { TranslatedBlock(block.text, it, block.bounds, block.confident) }
                     }
                 }
             }

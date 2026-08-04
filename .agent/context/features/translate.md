@@ -103,6 +103,20 @@ with a worse one. Both candidates are digit-repaired before they are compared,
 or a correct-but-digit-speckled reading loses to a garbled one that merely has
 no digits.
 
+**Confidence.** The two passes are also a free reliability signal: when they
+read the same bubble differently the model was guessing, and the block is marked
+`confident = false` — an amber border, and an amber retry button to say this is
+where a cloud request is worth spending. `OcrText.MIN_PASS_AGREEMENT` is
+measured rather than guessed: a real garbled bubble scores 0.81 and a single
+misread character in a full sentence scores 0.98, so the boundary sits at 0.9.
+A confident translation of an unreadable bubble is worse than none — "COWVE
+duST VEARNED" became a fluent, wrong Ukrainian sentence before this.
+
+`textQuality` also rejects a mid-word case change ("JuST", "duST"): comic
+lettering is uniformly cased, so that is the recognizer guessing at a glyph. It
+misfires on names like "McDonald", accepted knowingly — the score only ranks two
+OCR passes.
+
 The vowel test is **Latin only, deliberately**. Every source language is Latin
 or CJK (`TranslationSourceLanguage`) and ML Kit ships no Cyrillic model, so
 Cyrillic never reaches this. Applying a vowel test to Japanese, Chinese and

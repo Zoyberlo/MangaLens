@@ -110,6 +110,87 @@ class OcrTextTest {
         fun `accepts short words without demanding a vowel`() {
             OcrText.textQuality("MY GO") shouldBe 1f
         }
+
+        @Test
+        fun `punishes a lowercase letter stranded among capitals`() {
+            // Comic lettering is uniformly cased, so "JuST" is the recognizer
+            // guessing at a letter it could not read
+            (OcrText.textQuality("JuST") < 1f) shouldBe true
+            (OcrText.textQuality("duST") < 1f) shouldBe true
+        }
+
+        @Test
+        fun `accepts ordinary capitalization`() {
+            OcrText.textQuality("Just") shouldBe 1f
+            OcrText.textQuality("JUST") shouldBe 1f
+            OcrText.textQuality("just") shouldBe 1f
+        }
+
+        @Test
+        fun `treats a mid-word case change as suspect even in a real name`() {
+            // "McDonald" is a false positive, accepted knowingly: this only
+            // ranks two OCR passes, and in comic lettering a case change
+            // mid-word is a misread glyph far more often than a name
+            (OcrText.textQuality("McDonald") < 1f) shouldBe true
+        }
+    }
+
+    @Nested
+    inner class PassAgreement {
+
+        @Test
+        fun `identical readings agree completely`() {
+            OcrText.agreementRatio("SWORDSMANSHIP", "SWORDSMANSHIP") shouldBe 1f
+        }
+
+        @Test
+        fun `ignores case and spacing, which carry no meaning here`() {
+            OcrText.agreementRatio("SWORDS MANSHIP", "swordsmanship") shouldBe 1f
+        }
+
+        @Test
+        fun `flags the real garbled reading from the reader`() {
+            // What the two passes actually produced on one bubble. Every token
+            // has a vowel, so textQuality rates this a perfect 1.0 and sees
+            // nothing wrong — the passes disagreeing is what gives it away.
+            val first = "YOU COWVE duST VEARNED SWORDS MANSHTP NSTEAD"
+            val second = "YOU COULD'VE JUST LEARNED SWORDS MANSHIP INSTEAD"
+            OcrText.textQuality(second) shouldBe 1f
+            (OcrText.agreementRatio(first, second) < OcrText.MIN_PASS_AGREEMENT) shouldBe true
+        }
+
+        @Test
+        fun `tolerates a single character of difference in a long reading`() {
+            // Together with the case above, this pins the threshold: real
+            // garbling must fall below it and a single slip must stay above
+            val ratio = OcrText.agreementRatio(
+                "YOU COULD HAVE LEARNED SWORDSMANSHIP INSTEAD",
+                "YOU COULD HAVE LEARNED SWORDSMANSH1P INSTEAD",
+            )
+            (ratio > OcrText.MIN_PASS_AGREEMENT) shouldBe true
+        }
+
+        @Test
+        fun `is symmetric`() {
+            OcrText.agreementRatio("ABCDEF", "ABXDEF") shouldBe OcrText.agreementRatio("ABXDEF", "ABCDEF")
+        }
+
+        @Test
+        fun `treats one empty reading as total disagreement`() {
+            OcrText.agreementRatio("SOMETHING", "") shouldBe 0f
+            OcrText.agreementRatio("", "SOMETHING") shouldBe 0f
+        }
+
+        @Test
+        fun `treats two empty readings as agreement`() {
+            OcrText.agreementRatio("", "") shouldBe 1f
+            OcrText.agreementRatio("   ", "\n") shouldBe 1f
+        }
+
+        @Test
+        fun `rates completely different text near zero`() {
+            (OcrText.agreementRatio("HELLO THERE", "XKCDQRT ZZZ") < 0.3f) shouldBe true
+        }
     }
 
     @Nested
