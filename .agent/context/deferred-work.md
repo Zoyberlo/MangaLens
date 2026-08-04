@@ -64,11 +64,13 @@ packages, `.tachibk` folder scan → `RestoreBackupScreen`).
   bypasses the translation cache. Worth revisiting once the transcription path
   has been used in anger.
 
-- **CI secrets are pending a human step.** `.github/workflows/build-fork.yml`
-  expects `STORE_FILE_BASE64` / `STORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` in
-  the repo secrets; the owner uploads them with
-  `A:\Projects\.keys\set-github-secrets.ps1` (outside the repo). Until then CI
-  release builds fail at signing.
+- **CI signing secrets — done, no longer pending.** `STORE_FILE_BASE64` /
+  `STORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` were uploaded 2026-08-03 and
+  CI signed the v1.0.2 release with them. They come from
+  `A:\Projects\.keys\set-github-secrets.ps1` (outside the repo), which reads
+  `keystore.properties` and `mangalens.jks`; re-run it only if the key changes.
+  The CI key and the local one are the same: a locally built release APK
+  installs over the CI-published one without a signature conflict.
 
 ## Extension trust after migration
 

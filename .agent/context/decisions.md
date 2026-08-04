@@ -32,7 +32,8 @@ a read-only lookup. The code is recoverable from git history if that changes.
 are **off by default** and turned on by `-Psplit-abis`, which the tag workflow
 passes; a universal APK is always built alongside the per-ABI ones.
 
-Measured at v1.0.2, signed release:
+Measured on this branch, signed release build (**not** what the v1.0.2 tag
+shipped — that predates PaddleOCR and its arm64 APK was 39 MB):
 
 | APK | size |
 | --- | --- |
