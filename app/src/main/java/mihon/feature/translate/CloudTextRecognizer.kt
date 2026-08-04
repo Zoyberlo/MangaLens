@@ -342,6 +342,37 @@ class CloudTextRecognizer(
         bitmap: Bitmap,
         language: TranslationSourceLanguage,
     ): List<RecognizedBlock> {
+        return try {
+            requestGemini(resolveGeminiModel(), bitmap, language)
+        } catch (e: IllegalStateException) {
+            // "This model is no longer available to new users" arrives as a 404
+            // at request time. Forget the stored id, ask the API what exists
+            // now, and try once more rather than dead-ending the user.
+            if (e.message?.contains(HTTP_NOT_FOUND) != true) throw e
+            readerPreferences.geminiModel.set("")
+            requestGemini(resolveGeminiModel(), bitmap, language)
+        }
+    }
+
+    /**
+     * The model id to call. An empty preference means "work it out", which is
+     * the default: Google retires ids on its own schedule, so anything baked
+     * into the app eventually 404s with no way to discover the replacement.
+     * The resolved id is stored so the extra round trip happens once.
+     */
+    private suspend fun resolveGeminiModel(): String {
+        readerPreferences.geminiModel.get().trim().takeIf { it.isNotEmpty() }?.let { return it }
+        val resolved = listGeminiModels().getOrThrow().let(::preferredGeminiModel)
+            ?: throw IllegalStateException("This key cannot call any usable Gemini model")
+        readerPreferences.geminiModel.set(resolved)
+        return resolved
+    }
+
+    private suspend fun requestGemini(
+        model: String,
+        bitmap: Bitmap,
+        language: TranslationSourceLanguage,
+    ): List<RecognizedBlock> {
         val encoded = Base64.encodeToString(bitmap.toJpegBytes(), Base64.NO_WRAP)
         val languageName = language.name.lowercase().replaceFirstChar { it.uppercase() }
         val payload = buildJsonObject {
@@ -368,7 +399,6 @@ class CloudTextRecognizer(
         }
 
         val apiKey = readerPreferences.geminiApiKey.get().trim()
-        val model = readerPreferences.geminiModel.get().trim().ifEmpty { DEFAULT_GEMINI_MODEL }
         val request = POST(
             url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey",
             body = payload.toString().toRequestBody(jsonMime),
@@ -382,6 +412,46 @@ class CloudTextRecognizer(
         "Transcribe the $languageName text in this comic panel exactly as written, in reading order. " +
             "Join words split across lines. Do not translate, explain, or add anything. " +
             "Reply with the transcription alone, or with nothing at all if there is no text."
+
+    /**
+     * Picks the best model for reading a speech bubble out of whatever this key
+     * can actually call. Ranked on substrings rather than a known list, so a
+     * generation Google has not shipped yet still sorts correctly:
+     *
+     * - **flash** first — strong enough for stylised lettering and cheap;
+     * - **flash-lite** next — weaker, but its free daily allowance is larger;
+     * - **pro** last — best reader, but the smallest free allowance by far, and
+     *   slow for something a user is waiting on.
+     *
+     * Within a tier the newest generation wins, and a stable id beats a
+     * preview one.
+     */
+    internal fun preferredGeminiModel(models: List<String>): String? = models
+        .filter { it.startsWith("gemini-") }
+        .filterNot { model -> NON_TEXT_MODEL_HINTS.any { it in model } }
+        // Every selector is "bigger is better", so the maximum is the pick
+        .maxWithOrNull(
+            compareBy(
+                { geminiTierRank(it) },
+                { geminiGeneration(it) },
+                { if (PREVIEW_HINTS.any { hint -> hint in it }) 0 else 1 },
+                { -it.length },
+            ),
+        )
+
+    /** `flash-lite` has to be tested before `flash`, being a superstring of it. */
+    private fun geminiTierRank(model: String): Int = when {
+        "flash-lite" in model -> 2
+        "flash" in model -> 3
+        "pro" in model -> 1
+        else -> 0
+    }
+
+    /** Generation in e.g. `gemini-2.5-flash`, scaled by ten; 0 when unreadable. */
+    private fun geminiGeneration(model: String): Int {
+        val version = model.removePrefix("gemini-").takeWhile { it.isDigit() || it == '.' }
+        return ((version.toFloatOrNull() ?: 0f) * 10).toInt()
+    }
 
     private fun parseGemini(body: String): String {
         val root = json.parseToJsonElement(body).jsonObject
@@ -402,7 +472,11 @@ class CloudTextRecognizer(
         const val JPEG_QUALITY = 90
         const val MAX_ERROR_CHARS = 400
         const val TEST_BITMAP_PX = 64
-        const val DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
+        const val HTTP_NOT_FOUND = "HTTP 404"
         val OCTET_STREAM = "application/octet-stream".toMediaType()
+
+        // Models that answer generateContent but cannot read a picture of text
+        val NON_TEXT_MODEL_HINTS = listOf("embedding", "tts", "audio", "image", "veo", "imagen")
+        val PREVIEW_HINTS = listOf("preview", "-exp", "experimental")
     }
 }

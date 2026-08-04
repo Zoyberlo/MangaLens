@@ -267,6 +267,7 @@ object SettingsRecognitionScreen : SearchableSettings {
     ): Preference.PreferenceGroup {
         val key by readerPreferences.geminiApiKey.collectAsState()
         val limit by readerPreferences.geminiMonthlyLimit.collectAsState()
+        val model by readerPreferences.geminiModel.collectAsState()
         val used = rememberUsage(OcrEngine.GEMINI, key, limit)
         return Preference.PreferenceGroup(
             title = OcrEngine.GEMINI.displayName,
@@ -280,7 +281,11 @@ object SettingsRecognitionScreen : SearchableSettings {
                 Preference.PreferenceItem.EditTextPreference(
                     preference = readerPreferences.geminiModel,
                     title = stringResource(MR.strings.pref_gemini_model),
-                    subtitle = stringResource(MR.strings.pref_gemini_model_summary),
+                    subtitle = if (model.isBlank()) {
+                        stringResource(MR.strings.pref_gemini_model_auto)
+                    } else {
+                        "$model\n${stringResource(MR.strings.pref_gemini_model_summary)}"
+                    },
                 ),
                 Preference.PreferenceItem.TextPreference(
                     title = stringResource(MR.strings.pref_gemini_fetch_models),

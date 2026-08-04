@@ -431,7 +431,8 @@
     <string name="pref_gemini_api_key">Gemini API key</string>
     <string name="pref_gemini_api_key_summary">Reads stylised lettering better than a plain OCR engine because it reads for meaning. Its free tier resets daily. Note that free-tier requests may be used by Google to improve their models.</string>
     <string name="pref_gemini_model">Gemini model</string>
-    <string name="pref_gemini_model_summary">Change this if the model is renamed or retired</string>
+    <string name="pref_gemini_model_summary">Clear this field to go back to picking automatically</string>
+    <string name="pref_gemini_model_auto">Chosen automatically on first use, and again if the model is retired</string>
     <string name="pref_gemini_monthly_limit">Gemini requests per month</string>
     <string name="pref_gemini_monthly_limit_summary">Add a Gemini key to enable this engine</string>
     <string name="gemini_ocr_approaching_limit">Gemini recognition is close to your monthly limit</string>

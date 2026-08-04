@@ -156,9 +156,10 @@ class ReaderPreferences(
     // limit here is only a backstop against an accidental billing account.
     val geminiApiKey: Preference<String> = preferenceStore.getString("pref_gemini_api_key", "")
 
-    // Google renames these often enough that pinning it in code would strand
-    // users on a dead model with no way out
-    val geminiModel: Preference<String> = preferenceStore.getString("pref_gemini_model", "gemini-2.5-flash-lite")
+    // Empty means "ask the API and pick". Google retires model ids on its own
+    // schedule — a hardcoded default eventually 404s with "no longer available
+    // to new users" and no way to discover the replacement from inside the app.
+    val geminiModel: Preference<String> = preferenceStore.getString("pref_gemini_model", "")
 
     val geminiMonthlyLimit: Preference<Int> = preferenceStore.getInt("pref_gemini_monthly_limit", 3000)
 

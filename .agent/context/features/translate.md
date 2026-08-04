@@ -192,10 +192,17 @@ Everything lives in **Settings → Translation → Text recognition**
 (`SettingsRecognitionScreen`).
 
 Every engine group has a **Test key** row that makes one real request and shows
-the service's own reply verbatim, and Gemini additionally has **Available
-models**, which asks the API which models the key may call for `generateContent`
-and lets the user pick one — Google retires model ids often enough that a
-hardcoded default eventually 404s with no way to discover the replacement.
+the service's own reply verbatim.
+
+**Gemini model ids are never hardcoded.** `geminiModel` defaults to empty,
+meaning "resolve it": `resolveGeminiModel()` lists what the key can call and
+`preferredGeminiModel()` ranks by substring — flash, then flash-lite, then pro;
+newest generation first; stable over preview — so a generation Google has not
+shipped yet still sorts correctly. The result is stored so the extra round trip
+happens once. A `HTTP 404` at request time clears it and re-resolves, because
+that is how Google reports a retired id ("no longer available to new users"),
+and it must self-heal rather than dead-end. **Available models** exposes the same
+list for a manual pick; clearing the field returns to automatic.
 
 This exists because `awaitSuccess()` closes the response and throws bare
 `HttpException(code)`, discarding the JSON body that says *why* — a disabled
