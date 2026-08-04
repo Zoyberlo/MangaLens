@@ -1,5 +1,3 @@
-# What's new
-
 ## 1.0.3
 
 ### Text recognition rebuilt around PaddleOCR
@@ -11,13 +9,8 @@ engine turned into nonsense.
 
 Two things that used to quietly ruin a result are gone:
 
-- **A tall selection is no longer squashed to fit.** Selecting a large area
-  used to shrink the image before reading it, so the smallest lettering
-  dissolved. Big selections are now read in bands at full size.
-- **Misread letters are repaired against an English dictionary.** This lettering
-  fails in patterns — every L coming back as V, every R as Z — so LEARN became
-  VEARN and REASON became ZEASON. Those are now corrected. A name the dictionary
-  has never heard of is left exactly as it was.
+- **A tall selection is no longer squashed to fit.** Selecting a large area used to shrink the image before reading it, so the smallest lettering dissolved. Big selections are now read in bands at full size.
+- **Misread letters are repaired against an English dictionary.** This lettering fails in patterns — every L coming back as V, every R as Z — so LEARN became VEARN and REASON became ZEASON. Those are now corrected. A name the dictionary has never heard of is left exactly as it was.
 
 When a reading is too garbled to trust, the app says so instead of handing you a
 confident translation of gibberish.
@@ -54,13 +47,9 @@ Releases now ship one build per processor architecture. Updating downloads about
 
 ### Elsewhere
 
-- **Check for updates** moved onto the More screen, next to the version you are
-  running, instead of being three screens deep.
-- Sharing a crash log now opens an email to the developer rather than pointing
-  at a chat channel this app has nothing to do with.
-- Extensions are re-checked after migrating from another app, so restoring your
-  extension repos stops the trust prompts immediately instead of after a
-  restart.
+- **Check for updates** moved onto the More screen, next to the version you are running, instead of being three screens deep.
+- Sharing a crash log now opens an email to the developer rather than pointing at a chat channel this app has nothing to do with.
+- Extensions are re-checked after migrating from another app, so restoring your extension repos stops the trust prompts immediately instead of after a restart.
 
 ## 1.0.2
 

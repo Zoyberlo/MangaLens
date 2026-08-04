@@ -54,6 +54,8 @@ fun LogoHeader(
  * smaller than the silhouette it replaces, so the canvas is scaled up by that
  * factor and the resulting margin taken back out of the caller's padding.
  */
-private val MarkSize = 64.dp
+// Larger than the 64.dp silhouette it replaces: the artwork has lettering
+// inside the lens, which at that size is a smudge
+private val MarkSize = 88.dp
 private val CanvasSize = MarkSize / 0.56f
 private val SafeZonePadding = (CanvasSize - MarkSize) / 2

@@ -155,3 +155,19 @@ adb shell dumpsys activity exit-info app.mangalens | head -12
 
 `reason=5 (APP CRASH(NATIVE))` there is the signature — check
 `adb logcat -b crash -d` for the abort message before changing anything.
+
+## The changelog
+
+`app/src/main/assets/CHANGELOG.md` is shown in the app under About → What's new,
+and `release-fork.yml` lifts the section matching the tag into the GitHub
+release body — which is also what the in-app update prompt quotes. One text,
+three places.
+
+**Update it before tagging.** A tag with no matching `## <version>` section
+falls back to generated notes, which are commit subjects: a description of the
+work, aimed at the wrong reader.
+
+Keep each list item on a single line. The renderer joins wrapped lines but
+leaves the continuation indent behind, so a hard-wrapped bullet renders with
+stray double spaces mid-sentence. Plain paragraphs wrap fine. HTML comments are
+rendered as text, so notes for maintainers go here, not in the file.
