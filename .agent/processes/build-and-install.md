@@ -79,10 +79,11 @@ build additionally carries the `.dev` suffix.
 
 ## 5. Verify
 
-There are no automated tests for the fork's feature. Check by hand on the device
-and report exactly what was and was not verified. For the translation feature:
+The pure text rules have unit tests (section 7); everything else is verified by
+hand on the device. Report exactly what was and was not verified. For the
+translation feature:
 
-1. Settings → Reader → Translation: language pair and provider are set.
+1. Settings → Translation: language pair and provider are set.
 2. Open a chapter, wait a moment for warm-up.
 3. Translate button → drag over a bubble → overlay appears with sensible text.
 4. Zoom and pan — the box stays on the bubble.
@@ -104,3 +105,20 @@ logged at `WARN` (which is what the translate feature uses for failures) appears
 in both. Turning on **Settings → Advanced → Verbose logging** drops either build
 to `VERBOSE`. The reason to prefer the dev build is that it does not overwrite
 the owner's app, not that release is silent.
+
+## 7. Tests
+
+```bash
+./gradlew :app:testDebugUnitTest --tests "mihon.feature.translate.OcrTextTest"
+```
+
+`OcrText` holds the pure text rules of the translation pipeline — digit repair,
+the two-pass quality comparison, and normalization — deliberately kept out of
+the classes that own ML Kit, network clients and preferences so they can be
+called directly from a test.
+
+Every case in `OcrTextTest` is one that once went the wrong way in the app, so
+treat a failure as a real regression rather than a strict assertion. When
+changing a rule there, confirm the suite still has teeth: break the rule on
+purpose, watch the matching test fail, then restore it. A test that passes
+either way is not protecting anything.

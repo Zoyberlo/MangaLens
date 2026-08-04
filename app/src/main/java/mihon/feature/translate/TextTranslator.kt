@@ -102,7 +102,7 @@ class TextTranslator(
      * of the cache key.
      */
     suspend fun translate(text: String, from: String, to: String, context: String? = null): String? {
-        val trimmed = normalizeForTranslation(text)
+        val trimmed = OcrText.normalizeForTranslation(text)
         if (trimmed.isEmpty() || from == to) return null
 
         val key = "$from:$to:${trimmed.lowercase()}"
@@ -148,38 +148,6 @@ class TextTranslator(
     }
 
     /**
-     * Comic lettering is typically all-caps and hard-wrapped, both of which
-     * badly degrade machine translation. Rejoin hyphenated line breaks,
-     * collapse whitespace, and convert shouty text to sentence case.
-     */
-    private fun normalizeForTranslation(text: String): String {
-        val joined = text
-            .replace(HYPHEN_LINE_BREAK, "")
-            .replace(WHITESPACE, " ")
-            .trim()
-        if (joined.isEmpty()) return joined
-
-        val letters = joined.filter { it.isLetter() }
-        val isShouting = letters.length >= 4 && letters.count { it.isUpperCase() } > letters.length * 0.8
-        if (!isShouting) return joined
-
-        val builder = StringBuilder(joined.lowercase())
-        var startOfSentence = true
-        for (i in builder.indices) {
-            val c = builder[i]
-            when {
-                startOfSentence && c.isLetter() -> {
-                    builder[i] = c.uppercaseChar()
-                    startOfSentence = false
-                }
-                c in SENTENCE_END -> startOfSentence = true
-            }
-        }
-        // Standalone "i" is a proper word in English and must stay capitalized
-        return builder.toString().replace(STANDALONE_I, " I ")
-    }
-
-    /**
      * Word/phrase lookup with alternatives: the main translation first, then
      * dictionary variants from Google's gtx endpoint (dt=bd). Falls back to
      * just the main translation when the dictionary section is unavailable.
@@ -193,7 +161,7 @@ class TextTranslator(
                 .addQueryParameter("sl", from)
                 .addQueryParameter("tl", to)
                 .addQueryParameter("dt", "bd")
-                .addQueryParameter("q", normalizeForTranslation(text))
+                .addQueryParameter("q", OcrText.normalizeForTranslation(text))
                 .build()
             val body = client.newCall(GET(url)).awaitSuccess().body.string()
             val root = json.parseToJsonElement(body).jsonArray
@@ -343,11 +311,6 @@ class TextTranslator(
         private const val DISK_CACHE_VERSION = 1
         private const val DISK_CACHE_SIZE_BYTES = 4L * 1024 * 1024
         private const val MAX_VARIANTS = 8
-
-        private val HYPHEN_LINE_BREAK = Regex("(?<=\\p{L})-\\s+(?=\\p{L})")
-        private val WHITESPACE = Regex("\\s+")
-        private val SENTENCE_END = charArrayOf('.', '!', '?', '…')
-        private val STANDALONE_I = Regex(" i (?=\\p{L})")
 
         private val LINGVA_INSTANCES = listOf(
             "https://lingva.ml",

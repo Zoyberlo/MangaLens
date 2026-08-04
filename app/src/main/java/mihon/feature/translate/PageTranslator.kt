@@ -205,10 +205,10 @@ class PageTranslator(
             merged.map { block ->
                 // Repair before comparing, or a correct-but-digit-speckled
                 // reading loses to a garbled one that merely has no digits
-                val primary = repairDigitConfusions(block.text)
+                val primary = OcrText.repairDigitConfusions(block.text)
                 val refined = refineBlockText(imageBytes, block, recognizedLanguage)
-                    ?.let(::repairDigitConfusions)
-                val best = if (refined != null && textQuality(refined) > textQuality(primary)) {
+                    ?.let(OcrText::repairDigitConfusions)
+                val best = if (refined != null && OcrText.textQuality(refined) > OcrText.textQuality(primary)) {
                     refined
                 } else {
                     primary
@@ -277,84 +277,6 @@ class PageTranslator(
             null
         }
     }
-
-    /**
-     * Repairs digits the on-device model produced where a letter belongs.
-     *
-     * Comic lettering is all-caps, and at that weight `O/0`, `I/1`, `S/5`,
-     * `B/8` and `Z/2` are near-identical shapes — so "SW0RD5" comes back
-     * instead of "SWORDS", and the translator then faithfully mangles it.
-     *
-     * Only digits *inside* a word are touched, and only when the word is
-     * mostly letters already, so genuine numbers survive: "CHAPTER 12", "1999"
-     * and "LEVEL 5" all pass through untouched. Cloud engines do not need this
-     * and never see it.
-     */
-    private fun repairDigitConfusions(text: String): String {
-        if (text.none { it.isDigit() }) return text
-        return WORD_LIKE.replace(text) { match ->
-            val token = match.value
-            val letters = token.count { it.isLetter() }
-            val digits = token.count { it.isDigit() }
-            if (letters < 2 || digits == 0 || digits > letters) return@replace token
-
-            val upperCase = token.count { it.isUpperCase() } >= letters - 1
-            token.mapIndexed { index, char ->
-                val replacement = DIGIT_LOOKALIKES[char]
-                if (replacement != null && token.hasLetterBeside(index)) {
-                    if (upperCase) replacement else replacement.lowercaseChar()
-                } else {
-                    char
-                }
-            }.joinToString("")
-        }
-    }
-
-    /** A digit flanked by a letter is a misread glyph, not a number. */
-    private fun String.hasLetterBeside(index: Int): Boolean =
-        (index > 0 && this[index - 1].isLetter()) ||
-            (index + 1 < length && this[index + 1].isLetter())
-
-    /**
-     * Rough share of tokens that look like real words, used to decide whether
-     * a second recognition pass actually improved on the first. Garbled OCR
-     * shows up as tokens with stray punctuation, digits or no vowels.
-     *
-     * Apostrophes and hyphens are deliberately not treated as stray: they sit
-     * *inside* ordinary comic dialogue ("COULD'VE", and hyphens wherever a word
-     * breaks across lines). Counting them against a token scored correct text
-     * below garbled text — "COULD'VE" failed while "COLDVE" passed — which let
-     * the second pass replace a good reading with a worse one.
-     *
-     * The vowel test only applies to alphabetic scripts. Japanese, Chinese and
-     * Korean have no vowel letters, so applying it there marked every token
-     * garbled, both passes scored zero, and the comparison silently always kept
-     * the first — the refinement pass may as well not have existed for three of
-     * the four source languages. For those, a run of kana/ideographs/hangul
-     * with no stray digits is as good a signal as this heuristic can give.
-     */
-    private fun textQuality(text: String): Float {
-        val tokens = text.split(Regex("\\s+")).filter { it.any(Char::isLetter) }
-        if (tokens.isEmpty()) return 0f
-        val good = tokens.count { token ->
-            val body = token.trim(*TRIMMED_PUNCTUATION).filterNot { it in WORD_PUNCTUATION }
-            val letters = body.count { it.isLetter() }
-            when {
-                letters < body.length -> false
-                body.any { it.isCjk() } -> true
-                else -> letters <= 2 || body.any { it.lowercaseChar() in VOWELS }
-            }
-        }
-        return good.toFloat() / tokens.size
-    }
-
-    /** Kana, CJK ideographs and hangul — the scripts with no vowel letters. */
-    private fun Char.isCjk(): Boolean =
-        this in '぀'..'ヿ' || // hiragana and katakana
-            this in '㐀'..'䶿' || // CJK unified extension A
-            this in '一'..'鿿' || // CJK unified
-            this in 'ᄀ'..'ᇿ' || // hangul jamo
-            this in '가'..'힯' // hangul syllables
 
     /**
      * How much to enlarge a region before OCR. Small selections carry too few
@@ -645,20 +567,6 @@ class PageTranslator(
     // endregion
 
     companion object {
-        private val WORD_LIKE = Regex("[\\p{L}\\p{Nd}'’-]+")
-
-        // Only the pairs that are genuinely ambiguous in heavy all-caps
-        // lettering. 4/A and 6/G are a stretch and stay out.
-        private val DIGIT_LOOKALIKES = mapOf('0' to 'O', '1' to 'I', '5' to 'S', '8' to 'B', '2' to 'Z')
-
-        private val TRIMMED_PUNCTUATION = charArrayOf('.', ',', '!', '?', '"', '\'', '’', '-', '…')
-        private const val WORD_PUNCTUATION = "'’-"
-
-        // Latin only, on purpose. Every source language is Latin or CJK
-        // (`TranslationSourceLanguage`), and ML Kit ships no Cyrillic model, so
-        // Cyrillic text never reaches this — it was dead weight that implied a
-        // support we do not have.
-        private const val VOWELS = "aeiouy"
 
         private const val MAX_BLOCKS_PER_PAGE = 24
         private const val MAX_PARALLEL_TRANSLATIONS = 4

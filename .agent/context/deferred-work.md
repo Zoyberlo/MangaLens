@@ -95,9 +95,11 @@ Two fixes shipped for this:
 - **Overlay is per-page state.** Translations persist on disk (`TextTranslator`'s
   DiskLruCache), so re-translating is instant — but the boxes themselves are not
   restored when re-entering a page; the user re-selects.
-- **No tests.** The feature is verified by hand on a device. Pure functions worth
-  covering if tests are ever added: `normalizeForTranslation`, `mergeBlocks`,
-  `shouldMerge`, `orderForReading`, `diskKey`.
+- **Thin test coverage.** `OcrText` (digit repair, `textQuality`,
+  `normalizeForTranslation`) has unit tests in `app/src/test`. Still uncovered
+  and worth doing next: `mergeBlocks`, `shouldMerge`, `orderForReading` — all
+  pure, but they take `Rect`, so they need either Robolectric or a small
+  geometry type of their own.
 - **`foss` flavor and ML Kit.** Bundled ML Kit needs no Play Services but is still a
   Google library; if the flavor's policy matters, the feature needs flavor-gating.
 - **Stale preference keys.** `pref_auto_translate_source_lang` /
