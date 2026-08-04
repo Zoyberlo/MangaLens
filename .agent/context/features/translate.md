@@ -46,10 +46,16 @@ Upstream call-outs are listed in `context/fork-vs-upstream.md`.
    `sourceWidth()` so `PageTranslator` can rescale into *full-image* space (a long
    strip displayed through Coil is downsampled; the region decoder needs original
    pixels).
-5. **OCR** — `PageTranslator.translateRegion()` pads the region by 35% (min 48px),
-   decodes just that area with `BitmapRegionDecoder`, runs ML Kit, then keeps only
-   blocks intersecting the *unpadded* selection. So a sloppy selection still
-   captures a whole bubble.
+5. **OCR** — `PageTranslator.translateRegion()` pads the region by 35% (min 48px)
+   and decodes just that area with `BitmapRegionDecoder`. A region taller than
+   `MAX_OCR_DIMENSION` is **split into overlapping bands** rather than
+   downsampled to fit: downsampling shrinks the lettering, and a small selection
+   gets upscaled 3x while a large one got nothing, so **selecting more of a
+   bubble used to read it worse** and lose the smaller lines outright. Bands
+   overlap by `BAND_OVERLAP_PX` so no line sits on a seam, and
+   `OcrLayout.dedupeOverlapping` drops the lines two bands both caught.
+   Blocks are merged first and filtered against the selection after, so a
+   sloppy selection still captures a whole bubble.
 6. **Merge** — `mergeBlocks()` unions blocks whose gap is under ~one line height,
    so a multi-line bubble is translated as one sentence (Japanese vertical columns
    are ordered right-to-left).

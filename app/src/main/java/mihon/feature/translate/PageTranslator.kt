@@ -146,63 +146,42 @@ class PageTranslator(
         }
         padded.intersect(imageRect)
 
-        var sampleSize = 1
-        while (maxOf(padded.width(), padded.height()) / (sampleSize * 2) >= MAX_OCR_DIMENSION) {
-            sampleSize *= 2
-        }
+        // A tall selection used to be downsampled to fit the recognizer's
+        // input, which shrank the lettering and lost the smaller lines — so
+        // selecting more of a bubble read it worse. Bands keep every part of
+        // the selection at the resolution a small selection would have got.
+        val bands = OcrLayout.splitIntoBands(
+            TextBox(padded.left, padded.top, padded.right, padded.bottom),
+            MAX_OCR_DIMENSION,
+            BAND_OVERLAP_PX,
+        )
 
-        @Suppress("DEPRECATION")
-        val decoder = android.graphics.BitmapRegionDecoder.newInstance(imageBytes, 0, imageBytes.size, false)
-        val decoded = try {
-            decoder.decodeRegion(padded, BitmapFactory.Options().apply { inSampleSize = sampleSize })
-        } finally {
-            decoder.recycle()
-        } ?: return RegionTranslateResult.NoText
-
-        // Comic lettering is stylised and often small on the page; enlarging
-        // and hardening the contrast before OCR is what turns "swolos manshe"
-        // back into "swordsmanship"
-        val upscale = ocrUpscaleFor(decoded)
-        val bitmap = if (upscale > 1f) enhanceForOcr(decoded, upscale) else decoded
-
-        // Defaults to on-device: a cloud engine here bills for every selection,
-        // so choosing one is a deliberate act in settings.
         var fromCloud = false
         val recognition = try {
-            when (val engine = primaryEngineFor(from)) {
-                OcrEngine.ON_DEVICE_PADDLE -> recognizeWithPaddle(bitmap, from)
-                else ->
-                    cloudRecognizer.recognize(engine, bitmap, from)
-                        ?.takeIf { it.isNotEmpty() }
-                        ?.also { fromCloud = true }
-                        ?.let { RecognitionResult(it, from) }
-                        ?: recognizer.recognize(bitmap, from)
+            val engine = primaryEngineFor(from)
+            val perBand = bands.map { band ->
+                val rect = android.graphics.Rect(band.left, band.top, band.right, band.bottom)
+                recognizeBand(imageBytes, rect, engine, from).also { if (it.second) fromCloud = true }
             }
+            val blocks = perBand.flatMap { (result, _) -> result.blocks }
+            val language = perBand.firstOrNull { it.first.blocks.isNotEmpty() }?.first?.language ?: from
+            RecognitionResult(blocks, language)
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Text recognition failed" }
             return RegionTranslateResult.NoText
-        } finally {
-            if (bitmap !== decoded) bitmap.recycle()
-            decoded.recycle()
         }
+
         // The recognizer may have fallen back to another script's model; the
         // translation has to follow it, not the configured setting
         val recognizedLanguage = recognition.language
         val recognized = recognition.blocks
         if (recognizedLanguage.langCode == to) return RegionTranslateResult.Failed
 
-        // Map block bounds back through the upscale and the decode sampling
-        val toImage = sampleSize / upscale
-        val onPage = recognized.map { block ->
-            block.copy(
-                bounds = android.graphics.Rect(
-                    padded.left + (block.bounds.left * toImage).toInt(),
-                    padded.top + (block.bounds.top * toImage).toInt(),
-                    padded.left + (block.bounds.right * toImage).toInt(),
-                    padded.top + (block.bounds.bottom * toImage).toInt(),
-                ),
-            )
-        }
+        val onPage = OcrLayout.dedupeOverlapping(
+            recognized.map {
+                TextItem(it.text, TextBox(it.bounds.left, it.bounds.top, it.bounds.right, it.bounds.bottom))
+            },
+        ).map { RecognizedBlock(it.text, android.graphics.Rect(it.box.left, it.box.top, it.box.right, it.box.bottom)) }
 
         // Merge first, filter second. The other way round drops a bubble's
         // first line whenever the selection starts just below it — the line is
@@ -431,6 +410,62 @@ class PageTranslator(
     }
 
     /**
+     * Decodes one band, enhances it and recognizes it, returning blocks in
+     * **full-image** coordinates. The second value says whether a cloud engine
+     * produced them, which decides later whether the free refinement pass is
+     * allowed to overwrite the result.
+     */
+    private suspend fun recognizeBand(
+        imageBytes: ByteArray,
+        band: android.graphics.Rect,
+        engine: OcrEngine,
+        language: TranslationSourceLanguage,
+    ): Pair<RecognitionResult, Boolean> {
+        @Suppress("DEPRECATION")
+        val decoder = android.graphics.BitmapRegionDecoder.newInstance(imageBytes, 0, imageBytes.size, false)
+        val decoded = try {
+            decoder.decodeRegion(band, BitmapFactory.Options())
+        } finally {
+            decoder.recycle()
+        } ?: return RecognitionResult(emptyList(), language) to false
+
+        // Comic lettering is stylised and often small on the page; enlarging
+        // and hardening the contrast before OCR is what turns "swolos manshe"
+        // back into "swordsmanship"
+        val upscale = ocrUpscaleFor(decoded)
+        val bitmap = if (upscale > 1f) enhanceForOcr(decoded, upscale) else decoded
+
+        var fromCloud = false
+        val result = try {
+            when (engine) {
+                OcrEngine.ON_DEVICE_PADDLE -> recognizeWithPaddle(bitmap, language)
+                else ->
+                    cloudRecognizer.recognize(engine, bitmap, language)
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.also { fromCloud = true }
+                        ?.let { RecognitionResult(it, language) }
+                        ?: recognizer.recognize(bitmap, language)
+            }
+        } finally {
+            if (bitmap !== decoded) bitmap.recycle()
+            decoded.recycle()
+        }
+
+        val toImage = 1f / upscale
+        val moved = result.blocks.map { block ->
+            block.copy(
+                bounds = android.graphics.Rect(
+                    band.left + (block.bounds.left * toImage).toInt(),
+                    band.top + (block.bounds.top * toImage).toInt(),
+                    band.left + (block.bounds.right * toImage).toInt(),
+                    band.top + (block.bounds.bottom * toImage).toInt(),
+                ),
+            )
+        }
+        return RecognitionResult(moved, result.language) to fromCloud
+    }
+
+    /**
      * ML Kit finds the lines, PaddleOCR reads them.
      *
      * The layout ML Kit produces is accurate even on lettering it cannot read,
@@ -603,6 +638,9 @@ class PageTranslator(
     // endregion
 
     companion object {
+
+        // Bands overlap so a line of text never falls on a seam
+        private const val BAND_OVERLAP_PX = 160
 
         private const val MAX_BLOCKS_PER_PAGE = 24
         private const val MAX_PARALLEL_TRANSLATIONS = 4

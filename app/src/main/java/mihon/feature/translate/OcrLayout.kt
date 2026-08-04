@@ -94,6 +94,55 @@ object OcrLayout {
         }
     }
 
+    /**
+     * Splits a tall region into horizontal bands no taller than [maxHeight],
+     * overlapping by [overlap] so no line of text falls on a seam.
+     *
+     * Without this a generous selection is downsampled to fit the recognizer's
+     * input limit, which shrinks the lettering and loses the smaller lines
+     * outright — selecting *more* of a bubble made it read *worse*, which is
+     * the opposite of what anyone expects.
+     */
+    fun splitIntoBands(region: TextBox, maxHeight: Int, overlap: Int): List<TextBox> {
+        if (region.height <= maxHeight || maxHeight <= 0) return listOf(region)
+        val step = (maxHeight - overlap).coerceAtLeast(1)
+        val bands = mutableListOf<TextBox>()
+        var top = region.top
+        while (top < region.bottom) {
+            val bottom = (top + maxHeight).coerceAtMost(region.bottom)
+            bands += TextBox(region.left, top, region.right, bottom)
+            if (bottom >= region.bottom) break
+            top += step
+        }
+        return bands
+    }
+
+    /**
+     * Drops repeats of the same text produced by the overlap between bands.
+     * Without it a line caught by two bands is merged into "TEXT TEXT".
+     */
+    fun dedupeOverlapping(items: List<TextItem>): List<TextItem> {
+        val kept = mutableListOf<TextItem>()
+        for (item in items) {
+            val duplicate = kept.any { other ->
+                other.text.equals(item.text, ignoreCase = true) && overlapRatio(other.box, item.box) > DUPLICATE_OVERLAP
+            }
+            if (!duplicate) kept += item
+        }
+        return kept
+    }
+
+    /** Shared area over the smaller box, so a sliver never counts as a repeat. */
+    private fun overlapRatio(a: TextBox, b: TextBox): Float {
+        val width = minOf(a.right, b.right) - maxOf(a.left, b.left)
+        val height = minOf(a.bottom, b.bottom) - maxOf(a.top, b.top)
+        if (width <= 0 || height <= 0) return 0f
+        val smaller = minOf(a.width * a.height, b.width * b.height)
+        if (smaller <= 0) return 0f
+        return width.toFloat() * height / smaller
+    }
+
+    private const val DUPLICATE_OVERLAP = 0.5f
     private const val VERTICAL_GAP_RATIO = 0.9f
     private const val HORIZONTAL_GAP_RATIO = 1.5f
 }

@@ -233,6 +233,78 @@ class OcrLayoutTest {
     }
 
     @Nested
+    inner class Banding {
+
+        @Test
+        fun `leaves a region that already fits as one band`() {
+            val region = TextBox(0, 0, 800, 1000)
+            OcrLayout.splitIntoBands(region, 2560, 160) shouldBe listOf(region)
+        }
+
+        @Test
+        fun `splits a tall region and covers all of it`() {
+            val region = TextBox(0, 0, 800, 6000)
+            val bands = OcrLayout.splitIntoBands(region, 2560, 160)
+            (bands.size > 1) shouldBe true
+            bands.first().top shouldBe 0
+            bands.last().bottom shouldBe 6000
+            bands.all { it.height <= 2560 } shouldBe true
+        }
+
+        @Test
+        fun `leaves no gap between bands, so no line can fall through`() {
+            val bands = OcrLayout.splitIntoBands(TextBox(0, 0, 800, 6000), 2560, 160)
+            bands.zipWithNext().all { (a, b) -> b.top < a.bottom } shouldBe true
+        }
+
+        @Test
+        fun `keeps the full width of the region`() {
+            val bands = OcrLayout.splitIntoBands(TextBox(40, 0, 900, 9000), 2560, 160)
+            bands.all { it.left == 40 && it.right == 900 } shouldBe true
+        }
+
+        @Test
+        fun `terminates even when the overlap swallows the band height`() {
+            // A step of zero would loop forever; this pins the guard
+            val bands = OcrLayout.splitIntoBands(TextBox(0, 0, 100, 5000), 200, 500)
+            (bands.size in 1..5000) shouldBe true
+            bands.last().bottom shouldBe 5000
+        }
+    }
+
+    @Nested
+    inner class Deduplication {
+
+        @Test
+        fun `drops the same line caught by two overlapping bands`() {
+            val first = item("FOR NO REASON", 0, 2400)
+            val nearlySame = TextItem("FOR NO REASON", TextBox(2, 2402, 102, 2422))
+            OcrLayout.dedupeOverlapping(listOf(first, nearlySame)) shouldBe listOf(first)
+        }
+
+        @Test
+        fun `keeps the same words when they sit in different places`() {
+            val top = item("HUNTER", 0, 0)
+            val far = item("HUNTER", 0, 900)
+            OcrLayout.dedupeOverlapping(listOf(top, far)) shouldBe listOf(top, far)
+        }
+
+        @Test
+        fun `keeps different text in the same place`() {
+            val a = item("HUNTER", 0, 0)
+            val b = item("NOBLE", 0, 0)
+            OcrLayout.dedupeOverlapping(listOf(a, b)) shouldBe listOf(a, b)
+        }
+
+        @Test
+        fun `ignores case when comparing`() {
+            val a = item("HUNTER", 0, 0)
+            val b = TextItem("hunter", TextBox(1, 1, 101, 21))
+            OcrLayout.dedupeOverlapping(listOf(a, b)) shouldBe listOf(a)
+        }
+    }
+
+    @Nested
     inner class ScriptFallback {
 
         @Test
