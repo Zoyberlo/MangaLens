@@ -3,9 +3,10 @@ package mihon.feature.translate
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.util.Base64
+import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.POST
-import eu.kanade.tachiyomi.network.awaitSuccess
+import eu.kanade.tachiyomi.network.await
 import eu.kanade.tachiyomi.network.jsonMime
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import kotlinx.serialization.json.Json
@@ -19,6 +20,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import logcat.LogPriority
+import okhttp3.Call
 import okhttp3.Headers
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -84,6 +86,100 @@ class CloudTextRecognizer(
 
     fun monthlyLimit(engine: OcrEngine): Int = quotas[engine]?.limit() ?: 0
 
+    private val lastErrors = mutableMapOf<OcrEngine, String>()
+
+    /**
+     * Why [engine] last failed, verbatim from the service. A generic "it did
+     * not work" is useless when the cause is invariably something only the
+     * user can fix — a disabled API, a retired model name, a wrong endpoint.
+     */
+    fun lastError(engine: OcrEngine): String? = lastErrors[engine]
+
+    /**
+     * Runs a real (billed) request against [engine] with a throwaway image.
+     * Returns null when it worked, or the service's own error message.
+     */
+    suspend fun testEngine(engine: OcrEngine): String? {
+        if (!isConfigured(engine)) return "Not configured"
+        val bitmap = Bitmap.createBitmap(TEST_BITMAP_PX, TEST_BITMAP_PX, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(android.graphics.Color.WHITE)
+        return try {
+            when (engine) {
+                OcrEngine.GOOGLE_VISION -> requestGoogleVision(bitmap, TranslationSourceLanguage.ENGLISH)
+                OcrEngine.AZURE_READ -> requestAzureRead(bitmap)
+                OcrEngine.GEMINI -> requestGemini(bitmap, TranslationSourceLanguage.ENGLISH)
+                OcrEngine.ON_DEVICE -> emptyList()
+            }
+            lastErrors.remove(engine)
+            null
+        } catch (e: Exception) {
+            e.readableMessage().also { lastErrors[engine] = it }
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    /**
+     * Lists the Gemini models this key may call for generateContent. Google
+     * retires model ids often enough that hardcoding one strands users on a
+     * 404 with no way to discover the replacement.
+     */
+    suspend fun listGeminiModels(): Result<List<String>> {
+        val apiKey = readerPreferences.geminiApiKey.get().trim()
+        if (apiKey.isEmpty()) return Result.failure(IllegalStateException("No API key"))
+        return try {
+            val request = GET("https://generativelanguage.googleapis.com/v1beta/models?key=$apiKey&pageSize=200")
+            val body = client.newCall(request).awaitBody()
+            val root = json.parseToJsonElement(body).jsonObject
+            root["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content?.let {
+                throw IllegalStateException(it)
+            }
+            val models = root["models"]?.jsonArray.orEmpty().mapNotNull { element ->
+                val model = element.jsonObject
+                val methods = model["supportedGenerationMethods"]?.jsonArray.orEmpty()
+                    .mapNotNull { it.jsonPrimitive.content }
+                if ("generateContent" !in methods) return@mapNotNull null
+                model["name"]?.jsonPrimitive?.content?.removePrefix("models/")
+            }
+            Result.success(models)
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Listing Gemini models failed" }
+            lastErrors[OcrEngine.GEMINI] = e.readableMessage()
+            Result.failure(e)
+        }
+    }
+
+    private fun Exception.readableMessage(): String {
+        val direct = message?.takeIf { it.isNotBlank() } ?: this::class.simpleName.orEmpty()
+        return direct.take(MAX_ERROR_CHARS)
+    }
+
+    /**
+     * Reads the body whether or not the call succeeded, and puts the service's
+     * own explanation into the exception. `awaitSuccess` closes the response
+     * and throws bare `HttpException(code)` — which discards exactly the text
+     * that says *why*: a disabled API, a retired model id, a wrong endpoint.
+     * All three services return `{"error":{"message":…}}`.
+     */
+    private suspend fun Call.awaitBody(): String {
+        val response = await()
+        val body = response.use { it.body.string() }
+        if (!response.isSuccessful) {
+            throw IllegalStateException("HTTP ${response.code}: ${body.errorMessage()}")
+        }
+        return body
+    }
+
+    private fun String.errorMessage(): String {
+        val parsed = try {
+            json.parseToJsonElement(this).jsonObject["error"]?.jsonObject
+                ?.get("message")?.jsonPrimitive?.content
+        } catch (_: Exception) {
+            null
+        }
+        return (parsed ?: trim()).take(MAX_ERROR_CHARS)
+    }
+
     /**
      * Recognizes [bitmap] with [engine], or returns null when the engine is
      * not configured, out of quota, or the request failed.
@@ -105,9 +201,11 @@ class CloudTextRecognizer(
                 OcrEngine.ON_DEVICE -> emptyList()
             }
             quota.record(1)
+            lastErrors.remove(engine)
             blocks
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Cloud text recognition failed on ${engine.displayName}" }
+            lastErrors[engine] = e.readableMessage()
             quota.reportFailure()
             null
         }
@@ -146,7 +244,7 @@ class CloudTextRecognizer(
             url = "https://vision.googleapis.com/v1/images:annotate?key=$apiKey",
             body = payload.toString().toRequestBody(jsonMime),
         )
-        return parseGoogleVision(client.newCall(request).awaitSuccess().body.string())
+        return parseGoogleVision(client.newCall(request).awaitBody())
     }
 
     /**
@@ -200,7 +298,7 @@ class CloudTextRecognizer(
             headers = Headers.headersOf("Ocp-Apim-Subscription-Key", apiKey),
             body = bitmap.toJpegBytes().toRequestBody(OCTET_STREAM),
         )
-        return parseAzureRead(client.newCall(request).awaitSuccess().body.string())
+        return parseAzureRead(client.newCall(request).awaitBody())
     }
 
     /**
@@ -275,7 +373,7 @@ class CloudTextRecognizer(
             url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey",
             body = payload.toString().toRequestBody(jsonMime),
         )
-        val text = parseGemini(client.newCall(request).awaitSuccess().body.string())
+        val text = parseGemini(client.newCall(request).awaitBody())
         if (text.isBlank()) return emptyList()
         return listOf(RecognizedBlock(text, Rect(0, 0, bitmap.width, bitmap.height)))
     }
@@ -302,6 +400,8 @@ class CloudTextRecognizer(
 
     private companion object {
         const val JPEG_QUALITY = 90
+        const val MAX_ERROR_CHARS = 400
+        const val TEST_BITMAP_PX = 64
         const val DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
         val OCTET_STREAM = "application/octet-stream".toMediaType()
     }

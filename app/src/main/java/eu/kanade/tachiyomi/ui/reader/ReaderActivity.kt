@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.ui.reader
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.assist.AssistContent
 import android.content.ClipData
@@ -14,6 +15,9 @@ import android.graphics.RectF
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -157,15 +161,16 @@ class ReaderActivity : BaseActivity() {
      */
     private var pendingEditTarget: ((String, String) -> Unit)? = null
 
-    private val speechRecognitionLauncher = registerForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        val spoken = result.data
-            ?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
-            ?.firstOrNull()
-            ?.takeIf { it.isNotBlank() }
-            ?: return@registerForActivityResult
-        wordInspectorView?.setEditorText(spoken)
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var isDictating = false
+
+    /** Editor content when dictation started, so speech appends instead of replacing. */
+    private var dictationPrefix = ""
+
+    private val recordAudioPermission = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) startDictation() else toast(MR.strings.voice_input_permission_required)
     }
     private var readingModeToast: Toast? = null
     private val displayRefreshHost = DisplayRefreshHost()
@@ -400,6 +405,8 @@ class ReaderActivity : BaseActivity() {
         config = null
         menuToggleToast?.cancel()
         readingModeToast?.cancel()
+        speechRecognizer?.destroy()
+        speechRecognizer = null
     }
 
     override fun onPause() {
@@ -701,26 +708,103 @@ class ReaderActivity : BaseActivity() {
     }
 
     /**
-     * Hands off to the system's speech recognizer, dictating in the configured
-     * source language. Its result lands back in the editor.
+     * Toggles dictation. Deliberately *not* the system's speech dialog: that
+     * covers the middle of the screen, i.e. the very bubble the user is reading
+     * the text off. Recognition runs in-process and streams into the editor,
+     * so the page stays visible the whole time.
      */
     private fun startVoiceInput() {
+        if (isDictating) {
+            stopDictation()
+            return
+        }
+        if (
+            androidx.core.content.ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            recordAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+        startDictation()
+    }
+
+    private fun startDictation() {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            toast(MR.strings.voice_input_unavailable)
+            return
+        }
+        val inspector = wordInspectorView ?: return
+        val recognizer = speechRecognizer
+            ?: SpeechRecognizer.createSpeechRecognizer(this).also { speechRecognizer = it }
+
+        dictationPrefix = inspector.editorText().trimEnd()
+        recognizer.setRecognitionListener(dictationListener)
+
         val language = readerPreferences.autoTranslateSourceLanguage.get().langCode
-        val intent = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(
-                android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
-            )
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            // Some recognizer implementations reject requests without it
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
             if (language.isNotBlank() && language != "auto") {
-                putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, language)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
             }
         }
-        try {
-            speechRecognitionLauncher.launch(intent)
-        } catch (_: android.content.ActivityNotFoundException) {
-            toast(MR.strings.voice_input_unavailable)
-        }
+        isDictating = true
+        inspector.setListening(true)
+        recognizer.startListening(intent)
     }
+
+    private fun stopDictation() {
+        if (!isDictating) return
+        isDictating = false
+        wordInspectorView?.setListening(false)
+        speechRecognizer?.stopListening()
+    }
+
+    /** Writes [spoken] after whatever was already in the editor. */
+    private fun applyDictation(spoken: String) {
+        if (spoken.isBlank()) return
+        val combined = if (dictationPrefix.isBlank()) spoken else "$dictationPrefix $spoken"
+        wordInspectorView?.setEditorText(combined)
+    }
+
+    private val dictationListener = object : RecognitionListener {
+        override fun onPartialResults(partialResults: Bundle?) {
+            partialResults?.spokenText()?.let(::applyDictation)
+        }
+
+        override fun onResults(results: Bundle?) {
+            results?.spokenText()?.let(::applyDictation)
+            isDictating = false
+            wordInspectorView?.setListening(false)
+        }
+
+        override fun onError(error: Int) {
+            isDictating = false
+            wordInspectorView?.setListening(false)
+            // Silence and "no match" are normal ways to stop talking, not failures
+            if (
+                error != SpeechRecognizer.ERROR_NO_MATCH &&
+                error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+            ) {
+                toast(MR.strings.voice_input_unavailable)
+            }
+        }
+
+        override fun onEndOfSpeech() {
+            wordInspectorView?.setListening(false)
+        }
+
+        override fun onReadyForSpeech(params: Bundle?) = Unit
+        override fun onBeginningOfSpeech() = Unit
+        override fun onRmsChanged(rmsdB: Float) = Unit
+        override fun onBufferReceived(buffer: ByteArray?) = Unit
+        override fun onEvent(eventType: Int, params: Bundle?) = Unit
+    }
+
+    private fun Bundle.spokenText(): String? =
+        getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.takeIf { it.isNotBlank() }
 
     private fun ensureWordInspector(): WordInspectorView {
         return wordInspectorView ?: WordInspectorView(this).also { view ->
@@ -742,6 +826,7 @@ class ReaderActivity : BaseActivity() {
 
     private fun hideWordInspector() {
         inspectorLookupJob?.cancel()
+        stopDictation()
         pendingEditTarget = null
         wordInspectorView?.onHidden()
         wordInspectorView?.visibility = View.GONE

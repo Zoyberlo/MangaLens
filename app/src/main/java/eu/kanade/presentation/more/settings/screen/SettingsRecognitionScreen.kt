@@ -6,10 +6,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.system.LocaleHelper
+import kotlinx.coroutines.launch
 import mihon.feature.translate.CloudTextRecognizer
 import mihon.feature.translate.OcrEngine
 import mihon.feature.translate.TranslationSourceLanguage
@@ -39,6 +41,57 @@ object SettingsRecognitionScreen : SearchableSettings {
         var guide by remember { mutableStateOf<ApiKeyGuide?>(null) }
         guide?.let { ApiKeyGuideDialog(guide = it, onDismissRequest = { guide = null }) }
         val showGuide: (ApiKeyGuide) -> Unit = { guide = it }
+
+        val scope = rememberCoroutineScope()
+        val recognizer = remember { Injekt.get<CloudTextRecognizer>() }
+        var report by remember { mutableStateOf<String?>(null) }
+        var busy by remember { mutableStateOf(false) }
+        var models by remember { mutableStateOf<List<String>?>(null) }
+
+        val testingLabel = stringResource(MR.strings.pref_engine_testing)
+        val okLabel = stringResource(MR.strings.pref_engine_test_ok)
+
+        report?.let { message ->
+            EngineReportDialog(message = message, onDismissRequest = { report = null })
+        }
+        models?.let { list ->
+            GeminiModelDialog(
+                models = list,
+                onPick = {
+                    readerPreferences.geminiModel.set(it)
+                    models = null
+                },
+                onDismissRequest = { models = null },
+            )
+        }
+
+        val testEngine: (OcrEngine) -> Unit = { engine ->
+            if (!busy) {
+                busy = true
+                report = testingLabel
+                scope.launch {
+                    val error = recognizer.testEngine(engine)
+                    report = error ?: okLabel
+                    busy = false
+                }
+            }
+        }
+        val fetchModels: () -> Unit = {
+            if (!busy) {
+                busy = true
+                report = testingLabel
+                scope.launch {
+                    recognizer.listGeminiModels()
+                        .onSuccess {
+                            report = null
+                            models = it
+                        }
+                        .onFailure { report = it.message ?: okLabel }
+                    busy = false
+                }
+            }
+        }
+
         return listOf(
             Preference.PreferenceItem.InfoPreference(
                 stringResource(MR.strings.pref_recognition_info),
@@ -55,9 +108,23 @@ object SettingsRecognitionScreen : SearchableSettings {
                 MR.strings.pref_category_recognition_retry_per_language,
                 OcrEngine.entries,
             ),
-            getVisionGroup(readerPreferences, showGuide),
-            getAzureGroup(readerPreferences, showGuide),
-            getGeminiGroup(readerPreferences, showGuide),
+            getVisionGroup(readerPreferences, showGuide, testEngine),
+            getAzureGroup(readerPreferences, showGuide, testEngine),
+            getGeminiGroup(readerPreferences, showGuide, testEngine, fetchModels),
+        )
+    }
+
+    /** "Test key" row: runs one real request and reports exactly what came back. */
+    @Composable
+    private fun testItem(
+        engine: OcrEngine,
+        onTest: (OcrEngine) -> Unit,
+    ): Preference.PreferenceItem.TextPreference {
+        val recognizer = remember { Injekt.get<CloudTextRecognizer>() }
+        return Preference.PreferenceItem.TextPreference(
+            title = stringResource(MR.strings.pref_engine_test),
+            subtitle = recognizer.lastError(engine) ?: stringResource(MR.strings.pref_engine_test_summary),
+            onClick = { onTest(engine) },
         )
     }
 
@@ -125,6 +192,7 @@ object SettingsRecognitionScreen : SearchableSettings {
     private fun getVisionGroup(
         readerPreferences: ReaderPreferences,
         showGuide: (ApiKeyGuide) -> Unit,
+        onTest: (OcrEngine) -> Unit,
     ): Preference.PreferenceGroup {
         val key by readerPreferences.visionApiKey.collectAsState()
         val limit by readerPreferences.visionMonthlyLimit.collectAsState()
@@ -147,6 +215,7 @@ object SettingsRecognitionScreen : SearchableSettings {
                     valueString = limitLabel(limit),
                     onValueChanged = { readerPreferences.visionMonthlyLimit.set(it) },
                 ),
+                testItem(OcrEngine.GOOGLE_VISION, onTest),
             ),
         )
     }
@@ -155,6 +224,7 @@ object SettingsRecognitionScreen : SearchableSettings {
     private fun getAzureGroup(
         readerPreferences: ReaderPreferences,
         showGuide: (ApiKeyGuide) -> Unit,
+        onTest: (OcrEngine) -> Unit,
     ): Preference.PreferenceGroup {
         val key by readerPreferences.azureApiKey.collectAsState()
         val limit by readerPreferences.azureMonthlyLimit.collectAsState()
@@ -183,6 +253,7 @@ object SettingsRecognitionScreen : SearchableSettings {
                     valueString = limitLabel(limit),
                     onValueChanged = { readerPreferences.azureMonthlyLimit.set(it) },
                 ),
+                testItem(OcrEngine.AZURE_READ, onTest),
             ),
         )
     }
@@ -191,6 +262,8 @@ object SettingsRecognitionScreen : SearchableSettings {
     private fun getGeminiGroup(
         readerPreferences: ReaderPreferences,
         showGuide: (ApiKeyGuide) -> Unit,
+        onTest: (OcrEngine) -> Unit,
+        onFetchModels: () -> Unit,
     ): Preference.PreferenceGroup {
         val key by readerPreferences.geminiApiKey.collectAsState()
         val limit by readerPreferences.geminiMonthlyLimit.collectAsState()
@@ -209,6 +282,11 @@ object SettingsRecognitionScreen : SearchableSettings {
                     title = stringResource(MR.strings.pref_gemini_model),
                     subtitle = stringResource(MR.strings.pref_gemini_model_summary),
                 ),
+                Preference.PreferenceItem.TextPreference(
+                    title = stringResource(MR.strings.pref_gemini_fetch_models),
+                    subtitle = stringResource(MR.strings.pref_gemini_fetch_models_summary),
+                    onClick = onFetchModels,
+                ),
                 Preference.PreferenceItem.SliderPreference(
                     value = limit,
                     valueRange = 0..10000,
@@ -218,6 +296,7 @@ object SettingsRecognitionScreen : SearchableSettings {
                     valueString = limitLabel(limit),
                     onValueChanged = { readerPreferences.geminiMonthlyLimit.set(it) },
                 ),
+                testItem(OcrEngine.GEMINI, onTest),
             ),
         )
     }

@@ -112,6 +112,13 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
         context.stringResource(MR.strings.action_voice_input),
     ) { onVoiceInput?.invoke() }
 
+    private val listeningLabel = TextView(context).apply {
+        text = context.stringResource(MR.strings.voice_input_listening)
+        setTextColor(0xFFEF5350.toInt())
+        textSize = 13f
+        isVisible = false
+    }
+
     private val applyButton = TextView(context).apply {
         text = context.stringResource(MR.strings.action_translate)
         setTextColor(Color.WHITE)
@@ -132,6 +139,12 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
         addView(
             applyButton,
             LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { marginStart = (8 * dp).toInt() },
+        )
+        addView(
+            listeningLabel,
+            LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
+                marginStart = (12 * dp).toInt()
+            },
         )
     }
 
@@ -305,6 +318,21 @@ class WordInspectorView(context: Context) : LinearLayout(context) {
         editView.setText(text)
         editView.setSelection(text.length)
     }
+
+    /**
+     * Marks the panel as recording. Dictation runs in-panel rather than through
+     * the system's speech dialog, which would cover the very text the user is
+     * reading off the page.
+     */
+    fun setListening(listening: Boolean) {
+        listeningLabel.isVisible = listening
+        micButton.imageTintList = android.content.res.ColorStateList.valueOf(
+            if (listening) 0xFFEF5350.toInt() else 0xDEFFFFFF.toInt(),
+        )
+    }
+
+    /** Text in the editor, so dictation can append to it instead of replacing. */
+    fun editorText(): String = editView.text.toString()
 
     /** Shows a spinner while the edited text is being translated. */
     fun showTranslating() {

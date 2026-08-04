@@ -136,10 +136,15 @@ button and a Translate button. It is reached three ways:
 - **keyboard button in the reader's bottom bar** — an empty editor, for text
   that is not on the page at all.
 
-Dictation goes through the system recognizer
-(`RecognizerIntent.ACTION_RECOGNIZE_SPEECH`, in the configured source language);
-its result is dropped into the editor rather than translated directly, so it can
-be corrected first. Devices without a recognizer just get a toast.
+Dictation runs **in-process** via `SpeechRecognizer` with partial results
+streaming into the editor, in the configured source language. It deliberately
+does not use `startActivityForResult` with `ACTION_RECOGNIZE_SPEECH`: the system
+speech dialog covers the middle of the screen, which is exactly the bubble the
+user is reading the text off. The mic turns red and a "listening" label appears;
+tapping it again stops. Speech is appended after whatever was already typed.
+
+This needs `RECORD_AUDIO` (requested at first use) and a `<queries>` entry for
+`android.speech.RecognitionService`, without which binding fails on API 30+.
 
 The panel raises the keyboard itself and pads for
 `WindowInsetsCompat.Type.ime()`. `ReaderActivity` sets `SOFT_INPUT_ADJUST_RESIZE`
@@ -185,6 +190,19 @@ engine (`isRetryEngineUsable`), so it never appears as a dead control.
 
 Everything lives in **Settings → Reader → Text recognition**
 (`SettingsRecognitionScreen`), off the translation group.
+
+Every engine group has a **Test key** row that makes one real request and shows
+the service's own reply verbatim, and Gemini additionally has **Available
+models**, which asks the API which models the key may call for `generateContent`
+and lets the user pick one — Google retires model ids often enough that a
+hardcoded default eventually 404s with no way to discover the replacement.
+
+This exists because `awaitSuccess()` closes the response and throws bare
+`HttpException(code)`, discarding the JSON body that says *why* — a disabled
+Generative Language API, a retired model, a wrong endpoint. `CloudTextRecognizer`
+uses its own `awaitBody()` that reads the body first and puts `error.message`
+into the exception, keeps it in `lastError(engine)`, and shows it as the Test
+key row's subtitle. Never swallow an error only the user can fix.
 
 Every key field carries a **?** button (`EditTextPreference.onHelpClick` →
 `ApiKeyGuideDialog`) with the steps to obtain that key and a button that opens

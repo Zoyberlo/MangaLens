@@ -33,6 +33,9 @@
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
+    <!-- Optional: dictating text to translate, in-panel so the page stays visible -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- Optional: lets the migrate screen search storage for backups itself.
          Never required — the folder picker works without it. -->
     <uses-permission
@@ -41,6 +44,10 @@
 
     <!-- Mihon-family apps the migrate-from-app screen can detect (Android 11+ package visibility) -->
     <queries>
+        <!-- Required on API 30+ to bind the on-device speech recognizer -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
         <package android:name="app.mihon" />
         <package android:name="app.mihon.debug" />
         <package android:name="app.mihon.tl" />
