@@ -234,7 +234,7 @@ class MainActivity : BaseActivity() {
                 HandleOnNewIntent(context = context, navigator = navigator)
 
                 if (!isBenchmarkBuildType) {
-                    CheckForUpdates()
+                    if (isLaunch) CheckForUpdates()
                     ShowOnboarding()
                     // Upstream's donation campaign sheet is not shown in this
                     // fork: it asks for money on behalf of a project we are
