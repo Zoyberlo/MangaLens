@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Strings the fork adds. Kept out of strings.xml because both this fork and
+  upstream append to the end of that file, which is exactly how a merge
+  conflict is manufactured — the same way app/proguard-rules.pro conflicted.
+
+  moko-resources merges every XML in this directory, so MR sees no difference.
+  Strings this fork *changes* rather than adds stay in strings.xml: those keys
+  are upstream's, and a duplicate here would be ambiguous.
+-->
+<resources>
+    <string name="pref_category_auto_translate">Translation</string>
+    <string name="pref_auto_translate_source">Translate from</string>
+    <string name="pref_auto_translate_target">Translate to</string>
+    <string name="pref_translation_provider">Translation service</string>
+    <string name="pref_deepl_api_key">DeepL API key</string>
+    <string name="pref_deepl_api_key_summary">Required only for the DeepL service (free key at deepl.com/pro-api)</string>
+    <string name="pref_vision_api_key">Cloud text recognition key</string>
+    <string name="pref_vision_api_key_summary">Google Cloud Vision reads stylised lettering far better than the on-device model, but is billed per request, so it only runs when you tap the retry button on a badly recognized block. Leave empty to stay fully offline.</string>
+    <string name="pref_vision_monthly_limit">Cloud requests per month</string>
+    <string name="pref_vision_monthly_limit_summary">Google bills beyond its free tier of 1000 per month, so this caps usage on your behalf</string>
+    <string name="pref_vision_usage">Used %1$d of %2$d this month</string>
+    <string name="pref_vision_no_limit">No limit</string>
+    <string name="cloud_ocr_approaching_limit">Cloud recognition is close to your monthly limit</string>
+    <string name="cloud_ocr_limit_reached">Monthly cloud limit reached — the on-device result is kept</string>
+    <string name="cloud_ocr_failed">Cloud recognition failed — the on-device result is kept</string>
+    <string name="cloud_ocr_in_progress">Reading again with cloud recognition…</string>
+    <string name="cloud_ocr_rate_limited">Too many requests just now — wait a moment and try again</string>
+    <string name="cloud_ocr_not_configured">Set up a recognition engine in Reader → Text recognition first</string>
+    <string name="pref_category_recognition">Text recognition</string>
+    <string name="pref_recognition_summary">Retry button uses %1$s</string>
+    <string name="pref_recognition_info">On-device recognition is free, offline and used by default. Everything else here runs on your own paid account and is capped by a monthly limit you set.</string>
+    <string name="pref_category_recognition_engines">Engines</string>
+    <string name="pref_category_recognition_per_language">Automatic pass per language</string>
+    <string name="pref_category_recognition_retry_per_language">Retry button per language</string>
+    <string name="pref_ocr_engine">Automatic recognition</string>
+    <string name="pref_ocr_engine_summary">Runs on every area you select, so a cloud engine here is billed every time</string>
+    <string name="pref_ocr_retry_engine">Retry button</string>
+    <string name="pref_ocr_retry_engine_summary">Runs only when you tap retry on a badly recognized block</string>
+    <string name="pref_ocr_engine_default">Follow the global setting</string>
+    <string name="pref_repair_words">Fix misread letters</string>
+    <string name="pref_repair_words_summary">Checks English words against a built-in dictionary and repairs single misread letters, which is how LEARN comes back as VEARN. Turn off for pages full of invented names.</string>
+    <string name="pref_azure_endpoint">Azure endpoint</string>
+    <string name="pref_azure_endpoint_summary">Your resource URL, e.g. https://my-vision.cognitiveservices.azure.com</string>
+    <string name="pref_azure_api_key">Azure API key</string>
+    <string name="pref_azure_api_key_summary">The free F0 tier allows 5,000 requests per month. Leave empty to stay fully offline.</string>
+    <string name="pref_azure_monthly_limit">Azure requests per month</string>
+    <string name="pref_azure_monthly_limit_summary">Add an Azure key to enable this engine</string>
+    <string name="azure_ocr_approaching_limit">Azure recognition is close to your monthly limit</string>
+    <string name="azure_ocr_limit_reached">Monthly Azure limit reached — the on-device result is kept</string>
+    <string name="azure_ocr_failed">Azure recognition failed — the on-device result is kept</string>
+    <string name="pref_gemini_api_key">Gemini API key</string>
+    <string name="pref_gemini_api_key_summary">Reads stylised lettering better than a plain OCR engine because it reads for meaning. Its free tier resets daily. Note that free-tier requests may be used by Google to improve their models.</string>
+    <string name="pref_gemini_model">Gemini model</string>
+    <string name="pref_gemini_model_summary">Clear this field to go back to picking automatically</string>
+    <string name="pref_gemini_model_auto">Chosen automatically on first use, and again if the model is retired</string>
+    <string name="pref_gemini_monthly_limit">Gemini requests per month</string>
+    <string name="pref_gemini_monthly_limit_summary">Add a Gemini key to enable this engine</string>
+    <string name="gemini_ocr_approaching_limit">Gemini recognition is close to your monthly limit</string>
+    <string name="gemini_ocr_limit_reached">Monthly Gemini limit reached — the on-device result is kept</string>
+    <string name="gemini_ocr_failed">Gemini recognition failed — the on-device result is kept</string>
+    <string name="action_help">Where do I get this?</string>
+    <string name="pref_engine_test">Test key</string>
+    <string name="pref_engine_test_summary">Sends one tiny request and shows exactly what came back</string>
+    <string name="pref_engine_testing">Testing…</string>
+    <string name="pref_paddle_test">Test on-device recognition</string>
+    <string name="pref_paddle_test_summary">Reads a line of text this app renders itself, and shows what came back</string>
+    <string name="pref_paddle_test_ok">Works. On-device recognition read the test line back correctly.</string>
+    <string name="pref_paddle_unavailable">The model or its runtime failed to load, so this engine falls back to ML Kit.</string>
+    <string name="pref_paddle_mismatch">Read something, but not the text it was given.
+
+Expected:
+%1$s
+
+Got:
+%2$s</string>
+    <string name="pref_engine_test_ok">Works. The key, and everything else it needs, is set up correctly.</string>
+    <string name="pref_gemini_fetch_models">Available models</string>
+    <string name="pref_gemini_fetch_models_summary">Ask the API which models this key can use, and pick one</string>
+    <string name="pref_gemini_no_models">This key cannot call any model that supports generateContent.</string>
+    <string name="guide_gemini_steps">The quickest one to set up — no card needed.\n\n1. Open Google AI Studio and sign in with a Google account.\n2. Press “Create API key” and pick or create a project.\n3. Copy the key and paste it here.\n\nThe free tier resets every day rather than every month, so the monthly limit here is only a backstop in case you ever attach billing.\n\nBe aware that Google may use free-tier requests to improve their models. Pages you send are not private to you.</string>
+    <string name="guide_vision_steps">1. Open Google Cloud Console and create or pick a project.\n2. In “APIs and services” enable the Cloud Vision API.\n3. Go to Credentials, press “Create credentials” and choose API key.\n4. Copy the key and paste it here.\n\nGoogle requires a billing account on the project even to use the free 1,000 requests a month. Keep the monthly limit below 1,000 and you will not be charged.\n\nWorth restricting the key to the Cloud Vision API in its settings, so a leak cannot be spent on anything else.</string>
+    <string name="guide_azure_steps">The most generous free tier here: 5,000 requests a month.\n\n1. Open the Azure portal and create a “Computer Vision” resource.\n2. Choose the Free F0 pricing tier while creating it.\n3. Open the resource, go to “Keys and Endpoint”.\n4. Paste KEY 1 into the key field, and the endpoint URL into the endpoint field.\n\nThe endpoint looks like https://your-resource.cognitiveservices.azure.com — both fields are needed.\n\nAn Azure account is required, and it asks for a card at sign-up, but the F0 tier itself is not billed.</string>
+    <string name="guide_deepl_steps">Noticeably better than the free translators, especially on short lines.\n\n1. Open the DeepL API page and sign up for “DeepL API Free”.\n2. Find your key in Account → API keys.\n3. Copy it and paste it here.\n\nFree keys end in “:fx” — leave that suffix in place, it is how the app knows which server to use.\n\nDeepL asks for a card to verify the account, but the free tier of 500,000 characters a month is not billed.</string>
+    <string name="pref_deepl_monthly_limit">DeepL characters per month</string>
+    <string name="pref_deepl_monthly_limit_summary">DeepL bills beyond its free tier of 500,000 characters per month</string>
+    <string name="pref_deepl_usage">Used %1$d of %2$d characters this month</string>
+    <string name="deepl_approaching_limit">DeepL is close to your monthly character limit</string>
+    <string name="deepl_limit_reached">Monthly DeepL limit reached — using another service</string>
+    <string name="action_translate_selection">Translate area</string>
+    <string name="translate_selection_hint">Drag to select the area to translate</string>
+    <string name="translate_selection_no_text">No text recognized in the selected area</string>
+    <string name="translate_selection_failed">Translation failed — check the translation service in settings</string>
+    <string name="translate_in_progress">Translating…</string>
+    <string name="translate_engine_used">Read with %1$s</string>
+    <string name="translate_engine_fallback">%1$s could not run — read with %2$s instead</string>
+    <string name="action_manual_translate">Type or dictate text</string>
+    <string name="action_edit_text">Edit text</string>
+    <string name="action_voice_input">Dictate</string>
+    <string name="action_translate">Translate</string>
+    <string name="translate_editor_hint">Type or dictate the text to translate</string>
+    <string name="voice_input_unavailable">No speech recognition available on this device</string>
+    <string name="voice_input_listening">Listening… tap the mic to stop</string>
+    <string name="voice_input_permission_required">Dictation needs microphone access</string>
+    <string name="supportUsScreen_forkIntro">MangaLens is a free, unofficial fork of Mihon that adds on-device translation. It asks for nothing and collects nothing — the best way to help is to report what breaks.</string>
+    <string name="supportUsScreen_sourceCode">Source code</string>
+    <string name="supportUsScreen_reportIssue">Report an issue</string>
+    <string name="supportUsScreen_tip">Buy me a coffee</string>
+    <string name="about_upstream_project">Mihon</string>
+    <string name="upstream_docs_title">Mihon's documentation</string>
+    <string name="upstream_docs_message">MangaLens has no documentation of its own yet, so this opens the docs of Mihon, the app it is built on. Nearly all of it still applies. Translation is only in this fork and is not covered there.</string>
+    <string name="about_fork_notice_title">Fork notice</string>
+    <string name="about_fork_notice_summary">MangaLens is an unofficial fork of Mihon, licensed under Apache 2.0</string>
+    <string name="supportUsScreen_upstreamCredit">Everything except the translation features comes from Mihon. If you want to support the app this is built on, donate to them:</string>
+    <string name="onboarding_translation_info">Pick the languages you read in. In the reader, select an area of a page to translate it — you can change this later in Settings → Reader.</string>
+    <string name="migrate_restore_extension_repos">Extension repos</string>
+    <string name="migrate_restore_extension_repos_summary">Brings back the repos you added. Extensions signed by them stop asking to be trusted one by one — the trust list itself is never stored in a backup, by any app in the family.</string>
+    <string name="pref_category_translation">Translation</string>
+    <string name="pref_translation_summary">Languages, translation service, text recognition</string>
+    <string name="pref_category_translation_languages">Languages</string>
+    <string name="pref_category_translation_service">Translation service</string>
+    <string name="pref_translate_original_first">Show original text first</string>
+    <string name="pref_translate_original_first_summary">Recognized blocks appear untranslated; tap + on one to translate it</string>
+    <string name="pref_translate_original_first_summary">Selections show recognized text untranslated; tap a block\'s + to translate it, tap words to look them up</string>
+    <string name="pref_translate_result_display">Translation display</string>
+    <string name="translate_display_overlay">On the page</string>
+    <string name="translate_display_panel">Bottom panel</string>
+    <string name="label_migrate_from_app">Migrate from another app</string>
+    <string name="migrate_from_app_info">Apps can\'t read each other\'s data directly, so migration works through backup files. Open the detected app, create a backup (Settings → Data and storage), then find it below and restore it.</string>
+    <string name="migrate_from_app_find_backups">Find backup files…</string>
+    <string name="migrate_from_app_none_found">No backup files found in that folder</string>
+    <string name="migrate_from_app_scan_device">Scan device automatically</string>
+    <string name="migrate_from_app_scan_needs_permission">Needs all-files access to search storage for backups</string>
+    <string name="migrate_from_app_scanning">Searching for backups…</string>
+    <string name="migrate_from_app_own_backup">%s (this app)</string>
+    <string name="migrate_restore_title">Import backup</string>
+    <string name="migrate_restore_summary">This backup has %1$d entries: %2$d are new to your library, %3$d you already have.</string>
+    <string name="migrate_restore_conflict">Entries you already have</string>
+    <string name="migrate_restore_only_new">Skip them</string>
+    <string name="migrate_restore_add_and_update">Update them</string>
+    <string name="pref_nav_tap_zone_width">Side tap zones width</string>
+    <string name="pref_nav_tap_zone_height">Top and bottom tap zones height</string>
+    <string name="pref_nav_tap_zone_size_summary">Smaller zones leave more room in the center for opening the menu</string>
+    <string name="whats_new_summary">Release notes for this version and the ones before it</string>
+</resources>
