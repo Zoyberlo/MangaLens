@@ -5,6 +5,17 @@ discussed and consciously postponed, plus known rough edges.
 
 ## Agreed queue (in order)
 
+0. **The bottom translation panel's interaction is awkward.** Reported by the
+   owner after v1.0.4 was verified working: recognition, dictation and the
+   overlay all do the right thing, but *handling* the panel does not feel
+   right. No specific defect was named, so the first job is to sit with it and
+   write down what actually goes wrong — candidates seen while testing: it
+   covers a third of the page with the keyboard up, the mic and Translate
+   buttons sit far apart at the bottom-left, dismissing means finding a small
+   ×, and nothing indicates the panel can be scrolled. **Do not start
+   redesigning until the specific complaints are written down**; guessing here
+   would produce a different panel, not a better one.
+
 1. **Edit info**: per-manga custom title/cover/notes overrides.
 2. **Merged series**: one library entry fed by several sources (largest, last).
 

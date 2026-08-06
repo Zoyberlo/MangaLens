@@ -52,12 +52,12 @@ android {
 
         // Fork versioning, independent of upstream: release tags are "v<name>"
         // and the in-app updater compares against them. Upstream was on
-        // 0.20.4 (versionCode 29) at this merge; do not take theirs, or every
+        // 0.20.4 (versionCode 29) at the last merge; do not take theirs, or every
         // installed copy sees a downgrade and stops updating. This is the one
         // conflict no amount of file-splitting removes — both sides must own
         // these two lines — and resolving it is always "keep ours".
-        versionCode = 103
-        versionName = "1.0.3"
+        versionCode = 104
+        versionName = "1.0.4"
 
         buildConfigField("String", "COMMIT_COUNT", "\"${getLatestCommitCount()}\"")
         buildConfigField("String", "COMMIT_SHA", "\"${getLatestCommitSha()}\"")
