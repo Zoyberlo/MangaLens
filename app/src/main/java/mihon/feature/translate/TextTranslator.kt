@@ -23,7 +23,7 @@ class TextTranslator(
     private val context: android.app.Application,
     private val networkHelper: NetworkHelper,
     private val json: Json,
-    private val readerPreferences: eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences,
+    private val translationPreferences: TranslationPreferences,
     quotaNotifier: QuotaNotifier,
 ) {
 
@@ -31,9 +31,9 @@ class TextTranslator(
     // whose cost is the length of the text
     private val deeplQuota = QuotaTracker(
         QuotaKind.DEEPL,
-        readerPreferences.deeplMonthlyCharLimit,
-        readerPreferences.deeplUsageChars,
-        readerPreferences.deeplUsagePeriod,
+        translationPreferences.deeplMonthlyCharLimit,
+        translationPreferences.deeplUsageChars,
+        translationPreferences.deeplUsagePeriod,
         quotaNotifier,
     )
 
@@ -112,12 +112,12 @@ class TextTranslator(
             return it
         }
 
-        val selectedProvider = readerPreferences.translationProvider.get()
+        val selectedProvider = translationPreferences.translationProvider.get()
             .let {
                 // A DeepL selection that cannot run — no key, or the monthly
                 // character budget is spent — falls back to the automatic chain
                 if (it == TranslationProvider.DEEPL &&
-                    (readerPreferences.deeplApiKey.get().isBlank() || !deeplQuota.canSpend(trimmed.length))
+                    (translationPreferences.deeplApiKey.get().isBlank() || !deeplQuota.canSpend(trimmed.length))
                 ) {
                     TranslationProvider.AUTO
                 } else {
@@ -206,7 +206,7 @@ class TextTranslator(
      * Free-tier keys end in ":fx" and use the api-free host.
      */
     private suspend fun translateViaDeepL(text: String, from: String, to: String, context: String? = null): String? {
-        val apiKey = readerPreferences.deeplApiKey.get().trim()
+        val apiKey = translationPreferences.deeplApiKey.get().trim()
         if (apiKey.isEmpty()) {
             logcat(LogPriority.WARN) { "DeepL selected but no API key is set" }
             return null

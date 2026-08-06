@@ -13,6 +13,7 @@ import eu.kanade.tachiyomi.util.system.LocaleHelper
 import mihon.feature.translate.PageTranslator
 import mihon.feature.translate.TARGET_LANGUAGES
 import mihon.feature.translate.TranslateResultDisplay
+import mihon.feature.translate.TranslationPreferences
 import mihon.feature.translate.TranslationProvider
 import mihon.feature.translate.TranslationSourceLanguage
 import mihon.feature.translate.labelWithAutoHint
@@ -27,26 +28,29 @@ import uy.kohesive.injekt.api.get
 
 @Composable
 internal fun ColumnScope.TranslationSettingsPage(viewModel: ReaderSettingsViewModel) {
-    val sourceLanguage by viewModel.preferences.autoTranslateSourceLanguage.collectAsState()
+    // Its own store now: these preferences left ReaderPreferences so they
+    // would stop living inside a file upstream maintains
+    val translationPreferences = remember { Injekt.get<TranslationPreferences>() }
+    val sourceLanguage by translationPreferences.autoTranslateSourceLanguage.collectAsState()
     SelectItem(
         label = stringResource(MR.strings.pref_auto_translate_source),
         options = TranslationSourceLanguage.entries
             .map { LocaleHelper.getDisplayName(it.langCode) }
             .toTypedArray(),
         selectedIndex = TranslationSourceLanguage.entries.indexOf(sourceLanguage).coerceAtLeast(0),
-        onSelect = { viewModel.preferences.autoTranslateSourceLanguage.set(TranslationSourceLanguage.entries[it]) },
+        onSelect = { translationPreferences.autoTranslateSourceLanguage.set(TranslationSourceLanguage.entries[it]) },
     )
 
-    val targetLanguage by viewModel.preferences.autoTranslateTargetLanguage.collectAsState()
+    val targetLanguage by translationPreferences.autoTranslateTargetLanguage.collectAsState()
     SelectItem(
         label = stringResource(MR.strings.pref_auto_translate_target),
         options = TARGET_LANGUAGES.map { LocaleHelper.getDisplayName(it) }.toTypedArray(),
         selectedIndex = TARGET_LANGUAGES.indexOf(targetLanguage).coerceAtLeast(0),
-        onSelect = { viewModel.preferences.autoTranslateTargetLanguage.set(TARGET_LANGUAGES[it]) },
+        onSelect = { translationPreferences.autoTranslateTargetLanguage.set(TARGET_LANGUAGES[it]) },
     )
 
-    val provider by viewModel.preferences.translationProvider.collectAsState()
-    val deeplApiKey by viewModel.preferences.deeplApiKey.collectAsState()
+    val provider by translationPreferences.translationProvider.collectAsState()
+    val deeplApiKey by translationPreferences.deeplApiKey.collectAsState()
     val pageTranslator = remember { Injekt.get<PageTranslator>() }
     val lastAutoProvider by pageTranslator.lastAutoProvider.collectAsState()
     SettingsChipRow(MR.strings.pref_translation_provider) {
@@ -56,17 +60,17 @@ internal fun ColumnScope.TranslationSettingsPage(viewModel: ReaderSettingsViewMo
             FilterChip(
                 selected = it == provider,
                 enabled = enabled,
-                onClick = { viewModel.preferences.translationProvider.set(it) },
+                onClick = { translationPreferences.translationProvider.set(it) },
                 label = { Text(it.labelWithAutoHint(lastAutoProvider)) },
             )
         }
     }
-    val resultDisplay by viewModel.preferences.translateResultDisplay.collectAsState()
+    val resultDisplay by translationPreferences.translateResultDisplay.collectAsState()
     SettingsChipRow(MR.strings.pref_translate_result_display) {
         TranslateResultDisplay.entries.map {
             FilterChip(
                 selected = it == resultDisplay,
-                onClick = { viewModel.preferences.translateResultDisplay.set(it) },
+                onClick = { translationPreferences.translateResultDisplay.set(it) },
                 label = {
                     Text(
                         stringResource(
@@ -84,7 +88,7 @@ internal fun ColumnScope.TranslationSettingsPage(viewModel: ReaderSettingsViewMo
     if (resultDisplay == TranslateResultDisplay.OVERLAY) {
         CheckboxItem(
             label = stringResource(MR.strings.pref_translate_original_first),
-            pref = viewModel.preferences.translateShowOriginalFirst,
+            pref = translationPreferences.translateShowOriginalFirst,
         )
     }
 

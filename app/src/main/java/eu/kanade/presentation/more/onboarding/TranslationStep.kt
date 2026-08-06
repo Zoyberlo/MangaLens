@@ -8,9 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import mihon.feature.translate.TARGET_LANGUAGES
+import mihon.feature.translate.TranslationPreferences
 import mihon.feature.translate.TranslationSourceLanguage
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.SelectItem
@@ -27,12 +27,12 @@ internal class TranslationStep : OnboardingStep {
 
     override val isComplete: Boolean = true
 
-    private val readerPreferences: ReaderPreferences = Injekt.get()
+    private val translationPreferences: TranslationPreferences = Injekt.get()
 
     @Composable
     override fun Content() {
-        val sourceLanguage by readerPreferences.autoTranslateSourceLanguage.collectAsState()
-        val targetLanguage by readerPreferences.autoTranslateTargetLanguage.collectAsState()
+        val sourceLanguage by translationPreferences.autoTranslateSourceLanguage.collectAsState()
+        val targetLanguage by translationPreferences.autoTranslateTargetLanguage.collectAsState()
 
         Column {
             Text(
@@ -49,7 +49,7 @@ internal class TranslationStep : OnboardingStep {
                     .toTypedArray(),
                 selectedIndex = TranslationSourceLanguage.entries.indexOf(sourceLanguage).coerceAtLeast(0),
                 onSelect = {
-                    readerPreferences.autoTranslateSourceLanguage.set(TranslationSourceLanguage.entries[it])
+                    translationPreferences.autoTranslateSourceLanguage.set(TranslationSourceLanguage.entries[it])
                 },
             )
 
@@ -57,7 +57,7 @@ internal class TranslationStep : OnboardingStep {
                 label = stringResource(MR.strings.pref_auto_translate_target),
                 options = TARGET_LANGUAGES.map { LocaleHelper.getDisplayName(it) }.toTypedArray(),
                 selectedIndex = TARGET_LANGUAGES.indexOf(targetLanguage).coerceAtLeast(0),
-                onSelect = { readerPreferences.autoTranslateTargetLanguage.set(TARGET_LANGUAGES[it]) },
+                onSelect = { translationPreferences.autoTranslateTargetLanguage.set(TARGET_LANGUAGES[it]) },
             )
         }
     }

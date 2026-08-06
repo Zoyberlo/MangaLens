@@ -8,7 +8,6 @@ import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.network.await
 import eu.kanade.tachiyomi.network.jsonMime
-import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
@@ -38,7 +37,7 @@ import java.util.concurrent.TimeUnit
 class CloudTextRecognizer(
     private val networkHelper: NetworkHelper,
     private val json: Json,
-    private val readerPreferences: ReaderPreferences,
+    private val translationPreferences: TranslationPreferences,
     quotaNotifier: QuotaNotifier,
 ) {
 
@@ -51,23 +50,23 @@ class CloudTextRecognizer(
     private val quotas = mapOf(
         OcrEngine.GOOGLE_VISION to QuotaTracker(
             QuotaKind.CLOUD_OCR,
-            readerPreferences.visionMonthlyLimit,
-            readerPreferences.visionUsageCount,
-            readerPreferences.visionUsagePeriod,
+            translationPreferences.visionMonthlyLimit,
+            translationPreferences.visionUsageCount,
+            translationPreferences.visionUsagePeriod,
             quotaNotifier,
         ),
         OcrEngine.AZURE_READ to QuotaTracker(
             QuotaKind.AZURE_OCR,
-            readerPreferences.azureMonthlyLimit,
-            readerPreferences.azureUsageCount,
-            readerPreferences.azureUsagePeriod,
+            translationPreferences.azureMonthlyLimit,
+            translationPreferences.azureUsageCount,
+            translationPreferences.azureUsagePeriod,
             quotaNotifier,
         ),
         OcrEngine.GEMINI to QuotaTracker(
             QuotaKind.GEMINI_OCR,
-            readerPreferences.geminiMonthlyLimit,
-            readerPreferences.geminiUsageCount,
-            readerPreferences.geminiUsagePeriod,
+            translationPreferences.geminiMonthlyLimit,
+            translationPreferences.geminiUsageCount,
+            translationPreferences.geminiUsagePeriod,
             quotaNotifier,
         ),
     )
@@ -75,10 +74,10 @@ class CloudTextRecognizer(
     /** True once the engine has everything it needs to run. */
     fun isConfigured(engine: OcrEngine): Boolean = when (engine) {
         OcrEngine.ON_DEVICE, OcrEngine.ON_DEVICE_PADDLE -> true
-        OcrEngine.GOOGLE_VISION -> readerPreferences.visionApiKey.get().isNotBlank()
-        OcrEngine.AZURE_READ -> readerPreferences.azureApiKey.get().isNotBlank() &&
-            readerPreferences.azureEndpoint.get().isNotBlank()
-        OcrEngine.GEMINI -> readerPreferences.geminiApiKey.get().isNotBlank()
+        OcrEngine.GOOGLE_VISION -> translationPreferences.visionApiKey.get().isNotBlank()
+        OcrEngine.AZURE_READ -> translationPreferences.azureApiKey.get().isNotBlank() &&
+            translationPreferences.azureEndpoint.get().isNotBlank()
+        OcrEngine.GEMINI -> translationPreferences.geminiApiKey.get().isNotBlank()
     }
 
     /** Requests already spent this month, for the settings subtitle. */
@@ -125,7 +124,7 @@ class CloudTextRecognizer(
      * 404 with no way to discover the replacement.
      */
     suspend fun listGeminiModels(): Result<List<String>> {
-        val apiKey = readerPreferences.geminiApiKey.get().trim()
+        val apiKey = translationPreferences.geminiApiKey.get().trim()
         if (apiKey.isEmpty()) return Result.failure(IllegalStateException("No API key"))
         return try {
             val request = GET("https://generativelanguage.googleapis.com/v1beta/models?key=$apiKey&pageSize=200")
@@ -246,7 +245,7 @@ class CloudTextRecognizer(
             }
         }
 
-        val apiKey = readerPreferences.visionApiKey.get().trim()
+        val apiKey = translationPreferences.visionApiKey.get().trim()
         val request = POST(
             url = "https://vision.googleapis.com/v1/images:annotate?key=$apiKey",
             body = payload.toString().toRequestBody(jsonMime),
@@ -298,8 +297,8 @@ class CloudTextRecognizer(
      * rather than base64.
      */
     private suspend fun requestAzureRead(bitmap: Bitmap): List<RecognizedBlock> {
-        val endpoint = readerPreferences.azureEndpoint.get().trim().trimEnd('/')
-        val apiKey = readerPreferences.azureApiKey.get().trim()
+        val endpoint = translationPreferences.azureEndpoint.get().trim().trimEnd('/')
+        val apiKey = translationPreferences.azureApiKey.get().trim()
         val request = POST(
             url = "$endpoint/computervision/imageanalysis:analyze?api-version=2024-02-01&features=read",
             headers = Headers.headersOf("Ocp-Apim-Subscription-Key", apiKey),
@@ -358,7 +357,7 @@ class CloudTextRecognizer(
                 // 404 at request time. Forget the stored id, ask the API what
                 // exists now, and try once more rather than dead-ending.
                 HTTP_NOT_FOUND in message -> {
-                    readerPreferences.geminiModel.set("")
+                    translationPreferences.geminiModel.set("")
                     requestGemini(resolveGeminiModel(), bitmap, language, noThinking = true)
                 }
                 // Models predating thinkingConfig reject the field outright
@@ -376,10 +375,10 @@ class CloudTextRecognizer(
      * The resolved id is stored so the extra round trip happens once.
      */
     private suspend fun resolveGeminiModel(): String {
-        readerPreferences.geminiModel.get().trim().takeIf { it.isNotEmpty() }?.let { return it }
+        translationPreferences.geminiModel.get().trim().takeIf { it.isNotEmpty() }?.let { return it }
         val resolved = listGeminiModels().getOrThrow().let(::preferredGeminiModel)
             ?: throw IllegalStateException("This key cannot call any usable Gemini model")
-        readerPreferences.geminiModel.set(resolved)
+        translationPreferences.geminiModel.set(resolved)
         return resolved
     }
 
@@ -421,7 +420,7 @@ class CloudTextRecognizer(
             }
         }
 
-        val apiKey = readerPreferences.geminiApiKey.get().trim()
+        val apiKey = translationPreferences.geminiApiKey.get().trim()
         val request = POST(
             url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey",
             body = payload.toString().toRequestBody(jsonMime),

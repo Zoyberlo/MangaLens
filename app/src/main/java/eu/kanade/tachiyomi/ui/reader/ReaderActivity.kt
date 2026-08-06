@@ -109,6 +109,7 @@ import mihon.feature.translate.QuotaLevel
 import mihon.feature.translate.QuotaNotifier
 import mihon.feature.translate.TextTranslator
 import mihon.feature.translate.TranslateSelectionView
+import mihon.feature.translate.TranslationPreferences
 import mihon.feature.translate.WordInspectorView
 import tachiyomi.core.common.Constants
 import tachiyomi.core.common.i18n.stringResource
@@ -136,6 +137,7 @@ class ReaderActivity : BaseActivity() {
     }
 
     private val readerPreferences = Injekt.get<ReaderPreferences>()
+    private val translationPreferences = Injekt.get<TranslationPreferences>()
     private val preferences = Injekt.get<BasePreferences>()
 
     lateinit var binding: ReaderActivityBinding
@@ -643,8 +645,8 @@ class ReaderActivity : BaseActivity() {
     private fun lookupVariantsInto(inspector: WordInspectorView, phrase: String) {
         inspectorLookupJob?.cancel()
         inspectorLookupJob = lifecycleScope.launchIO {
-            val from = readerPreferences.autoTranslateSourceLanguage.get().langCode
-            val to = readerPreferences.autoTranslateTargetLanguage.get()
+            val from = translationPreferences.autoTranslateSourceLanguage.get().langCode
+            val to = translationPreferences.autoTranslateTargetLanguage.get()
             val variants = Injekt.get<TextTranslator>().lookupVariants(phrase, from, to)
             withUIContext { inspector.showVariantsFor(phrase, variants) }
         }
@@ -745,7 +747,7 @@ class ReaderActivity : BaseActivity() {
         dictationPrefix = inspector.editorText().trimEnd()
         recognizer.setRecognitionListener(dictationListener)
 
-        val language = readerPreferences.autoTranslateSourceLanguage.get().langCode
+        val language = translationPreferences.autoTranslateSourceLanguage.get().langCode
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)

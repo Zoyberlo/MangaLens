@@ -1,7 +1,6 @@
 package mihon.feature.translate
 
 import android.graphics.BitmapFactory
-import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -20,15 +19,15 @@ class PageTranslator(
     private val recognizer: PageTextRecognizer,
     private val cloudRecognizer: CloudTextRecognizer,
     private val translator: TextTranslator,
-    private val readerPreferences: ReaderPreferences,
+    private val translationPreferences: TranslationPreferences,
     private val lexicon: EnglishLexicon,
     private val paddle: PaddleTextRecognizer,
 ) {
 
     /** The engine the user asked for, before availability is considered. */
     fun requestedEngineFor(language: TranslationSourceLanguage): OcrEngine =
-        readerPreferences.ocrEngineOverrides.get().ocrOverrideFor(language)
-            ?: readerPreferences.ocrEngine.get()
+        translationPreferences.ocrEngineOverrides.get().ocrOverrideFor(language)
+            ?: translationPreferences.ocrEngine.get()
 
     /**
      * The engine that will actually read a fresh selection, for [language]. A
@@ -53,8 +52,8 @@ class PageTranslator(
 
     /** The engine the retry button on a block runs, for [language]. */
     fun retryEngineFor(language: TranslationSourceLanguage): OcrEngine =
-        readerPreferences.ocrRetryEngineOverrides.get().ocrOverrideFor(language)
-            ?: readerPreferences.ocrRetryEngine.get()
+        translationPreferences.ocrRetryEngineOverrides.get().ocrOverrideFor(language)
+            ?: translationPreferences.ocrRetryEngine.get()
 
     /**
      * Whether the retry button is worth offering at all: it is not, when the
@@ -80,8 +79,8 @@ class PageTranslator(
      * backs off dead Lingva instances). Safe to call repeatedly.
      */
     suspend fun warmUp() {
-        val from = readerPreferences.autoTranslateSourceLanguage.get()
-        val to = readerPreferences.autoTranslateTargetLanguage.get()
+        val from = translationPreferences.autoTranslateSourceLanguage.get()
+        val to = translationPreferences.autoTranslateTargetLanguage.get()
 
         try {
             val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
@@ -127,8 +126,8 @@ class PageTranslator(
         regionSpaceWidth: Int,
     ): RegionTranslateResult {
         if (regionSpaceWidth <= 0) return RegionTranslateResult.NoText
-        val from = readerPreferences.autoTranslateSourceLanguage.get()
-        val to = readerPreferences.autoTranslateTargetLanguage.get()
+        val from = translationPreferences.autoTranslateSourceLanguage.get()
+        val to = translationPreferences.autoTranslateTargetLanguage.get()
         if (from.langCode == to) return RegionTranslateResult.Failed
 
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -212,7 +211,7 @@ class PageTranslator(
         // The dictionary only knows English, so it only gets a say when English
         // is what was read
         val checkWord = lexicon::contains.takeIf {
-            readerPreferences.repairRecognizedWords.get() &&
+            translationPreferences.repairRecognizedWords.get() &&
                 recognizedLanguage == TranslationSourceLanguage.ENGLISH
         }
         val candidates = merged.map { block ->
@@ -229,8 +228,8 @@ class PageTranslator(
 
         // Original-first mode (overlay display only): show the recognized text
         // untranslated; each block is translated on demand via translateSingle
-        val originalFirst = readerPreferences.translateShowOriginalFirst.get() &&
-            readerPreferences.translateResultDisplay.get() == TranslateResultDisplay.OVERLAY
+        val originalFirst = translationPreferences.translateShowOriginalFirst.get() &&
+            translationPreferences.translateResultDisplay.get() == TranslateResultDisplay.OVERLAY
         val requested = requestedEngineFor(from)
         val used = primaryEngineFor(from)
         if (originalFirst) {
@@ -305,8 +304,8 @@ class PageTranslator(
      * help ML Kit and only degrades what the cloud engines see.
      */
     suspend fun retryBlockWithCloud(imageBytes: ByteArray, block: TranslatedBlock): CloudRetryResult {
-        val from = readerPreferences.autoTranslateSourceLanguage.get()
-        val to = readerPreferences.autoTranslateTargetLanguage.get()
+        val from = translationPreferences.autoTranslateSourceLanguage.get()
+        val to = translationPreferences.autoTranslateTargetLanguage.get()
         val engine = retryEngineFor(from)
         if (!engine.isCloud || !cloudRecognizer.isConfigured(engine)) return CloudRetryResult.NotConfigured
 
@@ -468,8 +467,8 @@ class PageTranslator(
      * the on-demand path of original-first mode.
      */
     suspend fun translateSingle(text: String): String? {
-        val from = readerPreferences.autoTranslateSourceLanguage.get()
-        val to = readerPreferences.autoTranslateTargetLanguage.get()
+        val from = translationPreferences.autoTranslateSourceLanguage.get()
+        val to = translationPreferences.autoTranslateTargetLanguage.get()
         val result = try {
             translator.translate(text, from.langCode, to)
         } catch (e: Exception) {

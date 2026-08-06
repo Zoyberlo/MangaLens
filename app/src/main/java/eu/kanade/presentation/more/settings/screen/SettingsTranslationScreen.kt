@@ -10,12 +10,12 @@ import androidx.compose.runtime.setValue
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.more.settings.Preference
-import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import mihon.feature.translate.PageTranslator
 import mihon.feature.translate.TARGET_LANGUAGES
 import mihon.feature.translate.TextTranslator
 import mihon.feature.translate.TranslateResultDisplay
+import mihon.feature.translate.TranslationPreferences
 import mihon.feature.translate.TranslationProvider
 import mihon.feature.translate.TranslationSourceLanguage
 import mihon.feature.translate.labelWithAutoHint
@@ -42,27 +42,27 @@ object SettingsTranslationScreen : SearchableSettings {
 
     @Composable
     override fun getPreferences(): List<Preference> {
-        val readerPreferences = remember { Injekt.get<ReaderPreferences>() }
+        val translationPreferences = remember { Injekt.get<TranslationPreferences>() }
         return listOf(
-            getLanguageGroup(readerPreferences),
-            getProviderGroup(readerPreferences),
-            getDisplayGroup(readerPreferences),
+            getLanguageGroup(translationPreferences),
+            getProviderGroup(translationPreferences),
+            getDisplayGroup(translationPreferences),
         )
     }
 
     @Composable
-    private fun getLanguageGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
+    private fun getLanguageGroup(translationPreferences: TranslationPreferences): Preference.PreferenceGroup {
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_category_translation_languages),
             preferenceItems = listOf(
                 Preference.PreferenceItem.ListPreference(
-                    preference = readerPreferences.autoTranslateSourceLanguage,
+                    preference = translationPreferences.autoTranslateSourceLanguage,
                     entries = TranslationSourceLanguage.entries
                         .associateWith { LocaleHelper.getDisplayName(it.langCode) },
                     title = stringResource(MR.strings.pref_auto_translate_source),
                 ),
                 Preference.PreferenceItem.ListPreference(
-                    preference = readerPreferences.autoTranslateTargetLanguage,
+                    preference = translationPreferences.autoTranslateTargetLanguage,
                     entries = TARGET_LANGUAGES.associateWith { LocaleHelper.getDisplayName(it) },
                     title = stringResource(MR.strings.pref_auto_translate_target),
                 ),
@@ -71,14 +71,14 @@ object SettingsTranslationScreen : SearchableSettings {
     }
 
     @Composable
-    private fun getProviderGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
+    private fun getProviderGroup(translationPreferences: TranslationPreferences): Preference.PreferenceGroup {
         val pageTranslator = remember { Injekt.get<PageTranslator>() }
         val lastAutoProvider by pageTranslator.lastAutoProvider.collectAsState()
-        val deeplApiKey by readerPreferences.deeplApiKey.collectAsState()
-        val deeplLimit by readerPreferences.deeplMonthlyCharLimit.collectAsState()
+        val deeplApiKey by translationPreferences.deeplApiKey.collectAsState()
+        val deeplLimit by translationPreferences.deeplMonthlyCharLimit.collectAsState()
         val textTranslator = remember { Injekt.get<TextTranslator>() }
         val deeplUsed = remember(deeplApiKey, deeplLimit) { textTranslator.deeplUsedThisMonth() }
-        val retryEngine by readerPreferences.ocrRetryEngine.collectAsState()
+        val retryEngine by translationPreferences.ocrRetryEngine.collectAsState()
         val navigator = LocalNavigator.currentOrThrow
         var guide by remember { mutableStateOf<ApiKeyGuide?>(null) }
         guide?.let { ApiKeyGuideDialog(guide = it, onDismissRequest = { guide = null }) }
@@ -87,7 +87,7 @@ object SettingsTranslationScreen : SearchableSettings {
             title = stringResource(MR.strings.pref_category_translation_service),
             preferenceItems = listOf(
                 Preference.PreferenceItem.ListPreference(
-                    preference = readerPreferences.translationProvider,
+                    preference = translationPreferences.translationProvider,
                     // DeepL has no keyless tier, so it is only offered once a key is set
                     entries = TranslationProvider.entries
                         .filter { it != TranslationProvider.DEEPL || deeplApiKey.isNotBlank() }
@@ -95,7 +95,7 @@ object SettingsTranslationScreen : SearchableSettings {
                     title = stringResource(MR.strings.pref_translation_provider),
                 ),
                 Preference.PreferenceItem.EditTextPreference(
-                    preference = readerPreferences.deeplApiKey,
+                    preference = translationPreferences.deeplApiKey,
                     title = stringResource(MR.strings.pref_deepl_api_key),
                     subtitle = stringResource(MR.strings.pref_deepl_api_key_summary),
                     onHelpClick = { guide = ApiKeyGuide.DEEPL },
@@ -116,7 +116,7 @@ object SettingsTranslationScreen : SearchableSettings {
                     } else {
                         "${deeplLimit / 1000}k"
                     },
-                    onValueChanged = { readerPreferences.deeplMonthlyCharLimit.set(it * 1000) },
+                    onValueChanged = { translationPreferences.deeplMonthlyCharLimit.set(it * 1000) },
                 ),
                 Preference.PreferenceItem.TextPreference(
                     title = stringResource(MR.strings.pref_category_recognition),
@@ -128,13 +128,13 @@ object SettingsTranslationScreen : SearchableSettings {
     }
 
     @Composable
-    private fun getDisplayGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
-        val resultDisplay by readerPreferences.translateResultDisplay.collectAsState()
+    private fun getDisplayGroup(translationPreferences: TranslationPreferences): Preference.PreferenceGroup {
+        val resultDisplay by translationPreferences.translateResultDisplay.collectAsState()
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_category_display),
             preferenceItems = listOfNotNull(
                 Preference.PreferenceItem.ListPreference(
-                    preference = readerPreferences.translateResultDisplay,
+                    preference = translationPreferences.translateResultDisplay,
                     entries = TranslateResultDisplay.entries.associateWith {
                         stringResource(
                             when (it) {
@@ -148,7 +148,7 @@ object SettingsTranslationScreen : SearchableSettings {
                 // Only overlay mode can show an untranslated block, so the
                 // option is meaningless in panel mode
                 Preference.PreferenceItem.SwitchPreference(
-                    preference = readerPreferences.translateShowOriginalFirst,
+                    preference = translationPreferences.translateShowOriginalFirst,
                     title = stringResource(MR.strings.pref_translate_original_first),
                     subtitle = stringResource(MR.strings.pref_translate_original_first_summary),
                 ).takeIf { resultDisplay == TranslateResultDisplay.OVERLAY },

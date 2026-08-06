@@ -9,7 +9,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import eu.kanade.presentation.more.settings.Preference
-import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -18,6 +17,7 @@ import mihon.feature.translate.CloudTextRecognizer
 import mihon.feature.translate.OcrEngine
 import mihon.feature.translate.PaddleSelfTest
 import mihon.feature.translate.PaddleTextRecognizer
+import mihon.feature.translate.TranslationPreferences
 import mihon.feature.translate.TranslationSourceLanguage
 import mihon.feature.translate.ocrOverrideFor
 import mihon.feature.translate.withOcrOverride
@@ -41,7 +41,7 @@ object SettingsRecognitionScreen : SearchableSettings {
 
     @Composable
     override fun getPreferences(): List<Preference> {
-        val readerPreferences = remember { Injekt.get<ReaderPreferences>() }
+        val translationPreferences = remember { Injekt.get<TranslationPreferences>() }
         var guide by remember { mutableStateOf<ApiKeyGuide?>(null) }
         guide?.let { ApiKeyGuideDialog(guide = it, onDismissRequest = { guide = null }) }
         val showGuide: (ApiKeyGuide) -> Unit = { guide = it }
@@ -75,7 +75,7 @@ object SettingsRecognitionScreen : SearchableSettings {
             GeminiModelDialog(
                 models = list,
                 onPick = {
-                    readerPreferences.geminiModel.set(it)
+                    translationPreferences.geminiModel.set(it)
                     models = null
                 },
                 onDismissRequest = { models = null },
@@ -132,22 +132,22 @@ object SettingsRecognitionScreen : SearchableSettings {
             Preference.PreferenceItem.InfoPreference(
                 stringResource(MR.strings.pref_recognition_info),
             ),
-            getEngineGroup(readerPreferences),
+            getEngineGroup(translationPreferences),
             getPerLanguageGroup(
-                readerPreferences.ocrEngineOverrides,
+                translationPreferences.ocrEngineOverrides,
                 MR.strings.pref_category_recognition_per_language,
                 // The automatic pass needs block geometry, which Gemini has none of
                 OcrEngine.entries.filter { it.canDetectLayout },
             ),
             getPerLanguageGroup(
-                readerPreferences.ocrRetryEngineOverrides,
+                translationPreferences.ocrRetryEngineOverrides,
                 MR.strings.pref_category_recognition_retry_per_language,
                 OcrEngine.entries,
             ),
             getOnDeviceGroup(testPaddle),
-            getVisionGroup(readerPreferences, showGuide, testEngine),
-            getAzureGroup(readerPreferences, showGuide, testEngine),
-            getGeminiGroup(readerPreferences, showGuide, testEngine, fetchModels),
+            getVisionGroup(translationPreferences, showGuide, testEngine),
+            getAzureGroup(translationPreferences, showGuide, testEngine),
+            getGeminiGroup(translationPreferences, showGuide, testEngine, fetchModels),
         )
     }
 
@@ -180,12 +180,12 @@ object SettingsRecognitionScreen : SearchableSettings {
     }
 
     @Composable
-    private fun getEngineGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
+    private fun getEngineGroup(translationPreferences: TranslationPreferences): Preference.PreferenceGroup {
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_category_recognition_engines),
             preferenceItems = listOf(
                 Preference.PreferenceItem.ListPreference(
-                    preference = readerPreferences.ocrEngine,
+                    preference = translationPreferences.ocrEngine,
                     entries = OcrEngine.entries
                         .filter { it.canDetectLayout }
                         .associateWith { it.displayName },
@@ -195,7 +195,7 @@ object SettingsRecognitionScreen : SearchableSettings {
                     },
                 ),
                 Preference.PreferenceItem.ListPreference(
-                    preference = readerPreferences.ocrRetryEngine,
+                    preference = translationPreferences.ocrRetryEngine,
                     entries = OcrEngine.entries.associateWith { it.displayName },
                     title = stringResource(MR.strings.pref_ocr_retry_engine),
                     subtitleProvider = { value, entries ->
@@ -241,18 +241,18 @@ object SettingsRecognitionScreen : SearchableSettings {
 
     @Composable
     private fun getVisionGroup(
-        readerPreferences: ReaderPreferences,
+        translationPreferences: TranslationPreferences,
         showGuide: (ApiKeyGuide) -> Unit,
         onTest: (OcrEngine) -> Unit,
     ): Preference.PreferenceGroup {
-        val key by readerPreferences.visionApiKey.collectAsState()
-        val limit by readerPreferences.visionMonthlyLimit.collectAsState()
+        val key by translationPreferences.visionApiKey.collectAsState()
+        val limit by translationPreferences.visionMonthlyLimit.collectAsState()
         val used = rememberUsage(OcrEngine.GOOGLE_VISION, key, limit)
         return Preference.PreferenceGroup(
             title = OcrEngine.GOOGLE_VISION.displayName,
             preferenceItems = listOf(
                 Preference.PreferenceItem.EditTextPreference(
-                    preference = readerPreferences.visionApiKey,
+                    preference = translationPreferences.visionApiKey,
                     title = stringResource(MR.strings.pref_vision_api_key),
                     subtitle = stringResource(MR.strings.pref_vision_api_key_summary),
                     onHelpClick = { showGuide(ApiKeyGuide.GOOGLE_VISION) },
@@ -264,7 +264,7 @@ object SettingsRecognitionScreen : SearchableSettings {
                     title = stringResource(MR.strings.pref_vision_monthly_limit),
                     subtitle = usageSubtitle(key, used, limit, MR.strings.pref_vision_monthly_limit_summary),
                     valueString = limitLabel(limit),
-                    onValueChanged = { readerPreferences.visionMonthlyLimit.set(it) },
+                    onValueChanged = { translationPreferences.visionMonthlyLimit.set(it) },
                 ),
                 testItem(OcrEngine.GOOGLE_VISION, onTest),
             ),
@@ -273,24 +273,24 @@ object SettingsRecognitionScreen : SearchableSettings {
 
     @Composable
     private fun getAzureGroup(
-        readerPreferences: ReaderPreferences,
+        translationPreferences: TranslationPreferences,
         showGuide: (ApiKeyGuide) -> Unit,
         onTest: (OcrEngine) -> Unit,
     ): Preference.PreferenceGroup {
-        val key by readerPreferences.azureApiKey.collectAsState()
-        val limit by readerPreferences.azureMonthlyLimit.collectAsState()
+        val key by translationPreferences.azureApiKey.collectAsState()
+        val limit by translationPreferences.azureMonthlyLimit.collectAsState()
         val used = rememberUsage(OcrEngine.AZURE_READ, key, limit)
         return Preference.PreferenceGroup(
             title = OcrEngine.AZURE_READ.displayName,
             preferenceItems = listOf(
                 Preference.PreferenceItem.EditTextPreference(
-                    preference = readerPreferences.azureEndpoint,
+                    preference = translationPreferences.azureEndpoint,
                     title = stringResource(MR.strings.pref_azure_endpoint),
                     subtitle = stringResource(MR.strings.pref_azure_endpoint_summary),
                     onHelpClick = { showGuide(ApiKeyGuide.AZURE) },
                 ),
                 Preference.PreferenceItem.EditTextPreference(
-                    preference = readerPreferences.azureApiKey,
+                    preference = translationPreferences.azureApiKey,
                     title = stringResource(MR.strings.pref_azure_api_key),
                     subtitle = stringResource(MR.strings.pref_azure_api_key_summary),
                     onHelpClick = { showGuide(ApiKeyGuide.AZURE) },
@@ -302,7 +302,7 @@ object SettingsRecognitionScreen : SearchableSettings {
                     title = stringResource(MR.strings.pref_azure_monthly_limit),
                     subtitle = usageSubtitle(key, used, limit, MR.strings.pref_azure_monthly_limit_summary),
                     valueString = limitLabel(limit),
-                    onValueChanged = { readerPreferences.azureMonthlyLimit.set(it) },
+                    onValueChanged = { translationPreferences.azureMonthlyLimit.set(it) },
                 ),
                 testItem(OcrEngine.AZURE_READ, onTest),
             ),
@@ -311,26 +311,26 @@ object SettingsRecognitionScreen : SearchableSettings {
 
     @Composable
     private fun getGeminiGroup(
-        readerPreferences: ReaderPreferences,
+        translationPreferences: TranslationPreferences,
         showGuide: (ApiKeyGuide) -> Unit,
         onTest: (OcrEngine) -> Unit,
         onFetchModels: () -> Unit,
     ): Preference.PreferenceGroup {
-        val key by readerPreferences.geminiApiKey.collectAsState()
-        val limit by readerPreferences.geminiMonthlyLimit.collectAsState()
-        val model by readerPreferences.geminiModel.collectAsState()
+        val key by translationPreferences.geminiApiKey.collectAsState()
+        val limit by translationPreferences.geminiMonthlyLimit.collectAsState()
+        val model by translationPreferences.geminiModel.collectAsState()
         val used = rememberUsage(OcrEngine.GEMINI, key, limit)
         return Preference.PreferenceGroup(
             title = OcrEngine.GEMINI.displayName,
             preferenceItems = listOf(
                 Preference.PreferenceItem.EditTextPreference(
-                    preference = readerPreferences.geminiApiKey,
+                    preference = translationPreferences.geminiApiKey,
                     title = stringResource(MR.strings.pref_gemini_api_key),
                     subtitle = stringResource(MR.strings.pref_gemini_api_key_summary),
                     onHelpClick = { showGuide(ApiKeyGuide.GEMINI) },
                 ),
                 Preference.PreferenceItem.EditTextPreference(
-                    preference = readerPreferences.geminiModel,
+                    preference = translationPreferences.geminiModel,
                     title = stringResource(MR.strings.pref_gemini_model),
                     subtitle = if (model.isBlank()) {
                         stringResource(MR.strings.pref_gemini_model_auto)
@@ -350,7 +350,7 @@ object SettingsRecognitionScreen : SearchableSettings {
                     title = stringResource(MR.strings.pref_gemini_monthly_limit),
                     subtitle = usageSubtitle(key, used, limit, MR.strings.pref_gemini_monthly_limit_summary),
                     valueString = limitLabel(limit),
-                    onValueChanged = { readerPreferences.geminiMonthlyLimit.set(it) },
+                    onValueChanged = { translationPreferences.geminiMonthlyLimit.set(it) },
                 ),
                 testItem(OcrEngine.GEMINI, onTest),
             ),

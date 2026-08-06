@@ -3,7 +3,6 @@ package mihon.feature.translate
 import android.graphics.Rect
 import android.graphics.RectF
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
-import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.CoroutineScope
@@ -43,7 +42,7 @@ class PageTranslationBinder(
 ) {
 
     private val pageTranslator: PageTranslator by injectLazy()
-    private val readerPreferences: ReaderPreferences by injectLazy()
+    private val translationPreferences: TranslationPreferences by injectLazy()
 
     /** Call from the holder's bind. */
     fun bind() = with(view) {
@@ -113,7 +112,7 @@ class PageTranslationBinder(
                         ),
                     )
                 }
-                if (readerPreferences.translateResultDisplay.get() == TranslateResultDisplay.PANEL) {
+                if (translationPreferences.translateResultDisplay.get() == TranslateResultDisplay.PANEL) {
                     activity.showTranslationResult(result.translation)
                 } else {
                     view.setTranslation(pageTranslator.storeOverlay(key, result.translation))
