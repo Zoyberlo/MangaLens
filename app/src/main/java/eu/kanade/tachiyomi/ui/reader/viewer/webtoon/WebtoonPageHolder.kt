@@ -18,14 +18,13 @@ import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderProgressIndicator
 import eu.kanade.tachiyomi.ui.webview.WebViewActivity
 import eu.kanade.tachiyomi.util.system.dpToPx
-import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import logcat.LogPriority
-import mihon.feature.translate.PageTranslator
+import mihon.feature.translate.PageTranslationBinder
 import okio.Buffer
 import okio.BufferedSource
 import tachiyomi.core.common.i18n.stringResource
@@ -35,7 +34,6 @@ import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.ImageUtil
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
-import uy.kohesive.injekt.injectLazy
 
 /**
  * Holder of the webtoon reader for a single page of a chapter.
@@ -78,70 +76,16 @@ class WebtoonPageHolder(
 
     private val scope = MainScope()
 
-    private val pageTranslator: PageTranslator by injectLazy()
-
-    private val readerPreferences: eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences by injectLazy()
-
-    /** Original-first mode: translates one block in place. */
-    private fun translateBlock(block: mihon.feature.translate.TranslatedBlock) {
-        val key = pageKey ?: return
-        scope.launchIO {
-            val translated = pageTranslator.translateSingle(block.sourceText)
-            withUIContext {
-                if (translated != null) {
-                    pageTranslator.updateOverlayBlock(key, block, translated)?.let { frame.setTranslation(it) }
-                } else {
-                    viewer.activity.toast(MR.strings.translate_selection_failed)
-                }
-            }
-        }
-    }
-
-    /**
-     * Opens the block's recognized text in the bottom panel; whatever the user
-     * translates there replaces this block in place.
-     */
-    private fun editBlock(block: mihon.feature.translate.TranslatedBlock) {
-        val key = pageKey ?: return
-        viewer.activity.openTextEditor(block.sourceText) { source, translation ->
-            pageTranslator.updateOverlayBlock(key, block, translation, source)?.let { frame.setTranslation(it) }
-        }
-    }
-
-    /** Reads one block again with the paid cloud recognizer, on request. */
-    private fun cloudRetryBlock(block: mihon.feature.translate.TranslatedBlock) {
-        val key = pageKey ?: return
-        val streamFn = page?.stream ?: return
-        frame.setTranslationBusyBlock(block)
-        scope.launchIO {
-            val result = try {
-                val bytes = streamFn().use { process(Buffer().readFrom(it)) }.readByteArray()
-                pageTranslator.retryBlockWithCloud(bytes, block)
-            } catch (e: Exception) {
-                logcat(LogPriority.WARN, e)
-                mihon.feature.translate.CloudRetryResult.Failed
-            }
-            withUIContext {
-                frame.setTranslationBusyBlock(null)
-                when (result) {
-                    is mihon.feature.translate.CloudRetryResult.Success ->
-                        pageTranslator.updateOverlayBlock(key, block, result.translation, result.sourceText)
-                            ?.let { frame.setTranslation(it) }
-                    is mihon.feature.translate.CloudRetryResult.RecognizedOnly -> {
-                        pageTranslator.updateOverlayBlock(key, block, "", result.sourceText)
-                            ?.let { frame.setTranslation(it) }
-                        viewer.activity.toast(MR.strings.translate_selection_failed)
-                    }
-                    mihon.feature.translate.CloudRetryResult.NoText ->
-                        viewer.activity.toast(MR.strings.translate_selection_no_text)
-                    mihon.feature.translate.CloudRetryResult.NotConfigured ->
-                        viewer.activity.toast(MR.strings.cloud_ocr_not_configured)
-                    mihon.feature.translate.CloudRetryResult.Failed ->
-                        viewer.activity.toast(MR.strings.translate_selection_failed)
-                }
-            }
-        }
-    }
+    /** Fork: the translation overlay and everything it can do to this page. */
+    private val translation = PageTranslationBinder(
+        scope = scope,
+        view = frame,
+        activity = { viewer.activity },
+        pageKey = { page?.let { "${it.chapter.chapter.id}:${it.index}" } },
+        pageBytes = {
+            page?.stream?.let { open -> open().use { process(Buffer().readFrom(it)) }.readByteArray() }
+        },
+    )
 
     /**
      * Job for loading the page.
@@ -156,23 +100,12 @@ class WebtoonPageHolder(
         frame.onScaleChanged = { viewer.activity.hideMenu() }
     }
 
-    private val pageKey: String?
-        get() = page?.let { "${it.chapter.chapter.id}:${it.index}" }
-
     /**
      * Binds the given [page] with this view holder, subscribing to its state.
      */
     fun bind(page: ReaderPage) {
         this.page = page
-        frame.setTranslation(null)
-        frame.onTranslationBlocksChanged = { blocks ->
-            pageKey?.let { pageTranslator.replaceOverlay(it, blocks) }
-        }
-        frame.onTranslationPhraseSelected = { phrase -> viewer.activity.onTranslatePhraseSelected(phrase) }
-        frame.onTranslationBlockTranslateRequested = { block -> translateBlock(block) }
-        frame.onTranslationBlockEditRequested = { block -> editBlock(block) }
-        frame.onTranslationBlockCloudRetryRequested = { block -> cloudRetryBlock(block) }
-        frame.translationCloudRetryAvailable = pageTranslator.isRetryEngineUsable
+        translation.bind()
         loadJob?.cancel()
         loadJob = scope.launch { loadPageAndProcessStatus() }
         refreshLayoutParams()
@@ -198,9 +131,7 @@ class WebtoonPageHolder(
         loadJob = null
 
         removeErrorLayout()
-        // Drop the overlay with the image: the view is about to be reused for
-        // another page, and a stale one would briefly draw over it
-        frame.setTranslation(null)
+        translation.recycle()
         frame.recycle()
         progressIndicator.setProgress(0)
         progressContainer.isVisible = true
@@ -289,8 +220,7 @@ class WebtoonPageHolder(
                     ),
                 )
                 removeErrorLayout()
-                // Restore translations shown on this page earlier in the session
-                pageKey?.let { key -> pageTranslator.cachedOverlay(key)?.let { frame.setTranslation(it) } }
+                translation.restoreCached()
             }
         } catch (e: Throwable) {
             logcat(LogPriority.ERROR, e)
@@ -300,63 +230,8 @@ class WebtoonPageHolder(
         }
     }
 
-    /**
-     * Translates a user-selected area. [frameRect] is in [frame]'s coordinate
-     * space. Shows the result as an overlay or a toast when nothing was
-     * recognized.
-     */
-    fun translateRegion(frameRect: android.graphics.RectF) {
-        val page = page ?: return
-        val sourceRect = frame.viewToSourceRect(frameRect) ?: return
-        val sourceWidth = frame.sourceWidth() ?: return
-        val streamFn = page.stream ?: return
-        scope.launchIO {
-            val result = try {
-                val bytes = streamFn().use { process(Buffer().readFrom(it)) }.readByteArray()
-                val region = android.graphics.Rect(
-                    sourceRect.left.toInt(),
-                    sourceRect.top.toInt(),
-                    sourceRect.right.toInt(),
-                    sourceRect.bottom.toInt(),
-                )
-                pageTranslator.translateRegion(bytes, region, sourceWidth)
-            } catch (e: Exception) {
-                logcat(LogPriority.WARN, e)
-                mihon.feature.translate.RegionTranslateResult.Failed
-            }
-            withUIContext {
-                when (result) {
-                    is mihon.feature.translate.RegionTranslateResult.Success -> {
-                        // Which engine actually read the page. Silent fallback
-                        // to ML Kit is why "I see no difference" was impossible
-                        // to tell apart from "the engine never ran".
-                        if (result.fellBack) {
-                            viewer.activity.toast(
-                                viewer.activity.stringResource(
-                                    MR.strings.translate_engine_fallback,
-                                    result.requestedEngine.displayName,
-                                    result.usedEngine.displayName,
-                                ),
-                            )
-                        }
-                        if (readerPreferences.translateResultDisplay.get() ==
-                            mihon.feature.translate.TranslateResultDisplay.PANEL
-                        ) {
-                            viewer.activity.showTranslationResult(result.translation)
-                        } else {
-                            val merged = pageKey?.let { pageTranslator.storeOverlay(it, result.translation) }
-                                ?: result.translation
-                            frame.setTranslation(merged)
-                        }
-                    }
-                    mihon.feature.translate.RegionTranslateResult.NoText ->
-                        viewer.activity.toast(MR.strings.translate_selection_no_text)
-                    mihon.feature.translate.RegionTranslateResult.Failed ->
-                        viewer.activity.toast(MR.strings.translate_selection_failed)
-                }
-            }
-        }
-    }
+    /** Translates a user-selected area. [frameRect] is in [frame]'s space. */
+    fun translateRegion(frameRect: android.graphics.RectF) = translation.translateRegion(frameRect)
 
     private fun process(imageSource: BufferedSource): BufferedSource {
         if (viewer.config.dualPageRotateToFit) {
