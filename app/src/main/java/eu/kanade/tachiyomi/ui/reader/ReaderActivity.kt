@@ -11,7 +11,6 @@ import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
-import android.graphics.RectF
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -49,7 +48,6 @@ import androidx.lifecycle.lifecycleScope
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
 import com.google.android.material.transition.platform.MaterialContainerTransform
 import com.hippo.unifile.UniFile
-import dev.icerock.moko.resources.StringResource
 import eu.kanade.core.util.ifSourcesLoaded
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.presentation.reader.DisplayRefreshHost
@@ -80,9 +78,7 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderSettingsViewModel
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderProgressIndicator
-import eu.kanade.tachiyomi.ui.reader.viewer.pager.PagerViewer
 import eu.kanade.tachiyomi.ui.reader.viewer.pager.R2LPagerViewer
-import eu.kanade.tachiyomi.ui.reader.viewer.webtoon.WebtoonViewer
 import eu.kanade.tachiyomi.ui.webview.WebViewActivity
 import eu.kanade.tachiyomi.util.system.isNightMode
 import eu.kanade.tachiyomi.util.system.openInBrowser
@@ -100,20 +96,14 @@ import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
 import logcat.LogPriority
 import mihon.feature.translate.PageTranslator
-import mihon.feature.translate.QuotaEvent
-import mihon.feature.translate.QuotaKind
-import mihon.feature.translate.QuotaLevel
 import mihon.feature.translate.QuotaNotifier
 import mihon.feature.translate.ReaderDictation
-import mihon.feature.translate.TextTranslator
-import mihon.feature.translate.TranslateSelectionView
+import mihon.feature.translate.ReaderTranslationController
 import mihon.feature.translate.TranslationPreferences
-import mihon.feature.translate.WordInspectorView
 import tachiyomi.core.common.Constants
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.launchNonCancellable
-import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.util.collectAsState
@@ -150,14 +140,29 @@ class ReaderActivity : BaseActivity() {
 
     private var menuToggleToast: Toast? = null
 
-    private var translateSelectionView: TranslateSelectionView? = null
-
-    private var wordInspectorView: WordInspectorView? = null
+    /**
+     * Fork: the bottom panel, the area selector and the quota notices. The two
+     * reference each other — the panel owns the editor dictation writes into,
+     * dictation owns the mic button the panel shows — so both look the other up
+     * through a lambda rather than at construction.
+     */
+    private val translation: ReaderTranslationController = ReaderTranslationController(
+        activity = this,
+        container = binding.readerContainer,
+        scope = lifecycleScope,
+        currentViewer = { viewModel.state.value.viewer },
+        closeMenu = { setMenuVisibility(false) },
+        showHint = { message ->
+            menuToggleToast?.cancel()
+            menuToggleToast = toast(message)
+        },
+        dictation = { dictation },
+    )
 
     /** Speech-to-text for the translation editor. */
     private val dictation: ReaderDictation = ReaderDictation(
         activity = this,
-        editor = { wordInspectorView },
+        editor = { translation.editor },
         requestPermission = { recordAudioPermission.launch(Manifest.permission.RECORD_AUDIO) },
     )
     private var inspectorLookupJob: kotlinx.coroutines.Job? = null
@@ -232,7 +237,7 @@ class ReaderActivity : BaseActivity() {
         // Surface metered-service quota news where the user will see it: those
         // services bill their account, not ours
         Injekt.get<QuotaNotifier>().events
-            .onEach { event -> toast(quotaMessage(event)) }
+            .onEach { event -> toast(translation.quotaMessage(event)) }
             .launchIn(lifecycleScope)
 
         // The word-inspector panel is tied to what's on screen: hide it when
@@ -241,7 +246,7 @@ class ReaderActivity : BaseActivity() {
             .map { it.currentPage }
             .distinctUntilChanged()
             .drop(1)
-            .onEach { hideWordInspector() }
+            .onEach { translation::hidePanel.invoke() }
             .launchIn(lifecycleScope)
 
         NotificationReceiver.dismissNotification(
@@ -590,228 +595,16 @@ class ReaderActivity : BaseActivity() {
                 menuToggleToast?.cancel()
                 menuToggleToast = toast(if (enabled) MR.strings.on else MR.strings.off)
             },
-            onClickTranslateSelection = ::startTranslateSelection.takeIf { state.viewer != null },
-            onLongClickTranslateSelection = ::translateFullPage.takeIf { state.viewer != null },
-            onClickManualTranslate = ::startManualTranslate.takeIf { state.viewer != null },
+            onClickTranslateSelection = translation::startSelection.takeIf { state.viewer != null },
+            onLongClickTranslateSelection = {
+                translation.translateFullPage(
+                    binding.viewerContainer.width,
+                    binding.viewerContainer.height,
+                )
+            }.takeIf { state.viewer != null },
+            onClickManualTranslate = translation::startManualTranslate.takeIf { state.viewer != null },
             onClickSettings = viewModel::openSettingsDialog,
         )
-    }
-
-    private fun quotaMessage(event: QuotaEvent): StringResource = when (event.kind) {
-        QuotaKind.CLOUD_OCR -> when (event.level) {
-            QuotaLevel.APPROACHING -> MR.strings.cloud_ocr_approaching_limit
-            QuotaLevel.REACHED -> MR.strings.cloud_ocr_limit_reached
-            QuotaLevel.RATE_LIMITED -> MR.strings.cloud_ocr_rate_limited
-            QuotaLevel.FAILED -> MR.strings.cloud_ocr_failed
-        }
-        QuotaKind.AZURE_OCR -> when (event.level) {
-            QuotaLevel.APPROACHING -> MR.strings.azure_ocr_approaching_limit
-            QuotaLevel.REACHED -> MR.strings.azure_ocr_limit_reached
-            QuotaLevel.RATE_LIMITED -> MR.strings.cloud_ocr_rate_limited
-            QuotaLevel.FAILED -> MR.strings.azure_ocr_failed
-        }
-        QuotaKind.GEMINI_OCR -> when (event.level) {
-            QuotaLevel.APPROACHING -> MR.strings.gemini_ocr_approaching_limit
-            QuotaLevel.REACHED -> MR.strings.gemini_ocr_limit_reached
-            QuotaLevel.RATE_LIMITED -> MR.strings.cloud_ocr_rate_limited
-            QuotaLevel.FAILED -> MR.strings.gemini_ocr_failed
-        }
-        QuotaKind.DEEPL -> when (event.level) {
-            QuotaLevel.APPROACHING -> MR.strings.deepl_approaching_limit
-            QuotaLevel.REACHED -> MR.strings.deepl_limit_reached
-            QuotaLevel.RATE_LIMITED -> MR.strings.cloud_ocr_rate_limited
-            QuotaLevel.FAILED -> MR.strings.translate_selection_failed
-        }
-    }
-
-    /**
-     * Shows the word-inspector panel for a word/phrase picked in a
-     * translation overlay (null hides it): looks up translation variants and
-     * lets the user pick one before saving to the vocabulary.
-     */
-    fun onTranslatePhraseSelected(phrase: String?) {
-        if (phrase == null) {
-            hideWordInspector()
-            return
-        }
-        pendingEditTarget = null
-        val inspector = ensureWordInspector()
-        inspectorScrollAccum = 0f
-        inspector.showLoading(phrase)
-        inspector.visibility = View.VISIBLE
-        inspector.bringToFront()
-        lookupVariantsInto(inspector, phrase)
-    }
-
-    private fun lookupVariantsInto(inspector: WordInspectorView, phrase: String) {
-        inspectorLookupJob?.cancel()
-        inspectorLookupJob = lifecycleScope.launchIO {
-            val from = translationPreferences.autoTranslateSourceLanguage.get().langCode
-            val to = translationPreferences.autoTranslateTargetLanguage.get()
-            val variants = Injekt.get<TextTranslator>().lookupVariants(phrase, from, to)
-            withUIContext { inspector.showVariantsFor(phrase, variants) }
-        }
-    }
-
-    /**
-     * Panel result-display mode: shows a whole selection's translation in the
-     * bottom panel instead of overlay boxes.
-     */
-    fun showTranslationResult(translation: mihon.feature.translate.PageTranslation) {
-        val original = translation.blocks.joinToString("\n\n") { it.sourceText }
-        val translated = translation.blocks
-            .mapNotNull { it.translatedText.takeIf(String::isNotBlank) }
-            .joinToString("\n\n")
-        if (original.isBlank() || translated.isBlank()) return
-        pendingEditTarget = null
-        val inspector = ensureWordInspector()
-        inspectorScrollAccum = 0f
-        inspector.showResult(original, translated)
-        inspector.visibility = View.VISIBLE
-        inspector.bringToFront()
-    }
-
-    /**
-     * Opens the bottom panel's text editor on [initial] — empty for typing or
-     * dictating from scratch. [onTranslated] is called with the final text and
-     * its translation when the editor is confirmed, so the caller can write the
-     * result back (e.g. into the overlay block the text came from).
-     */
-    fun openTextEditor(initial: String, onTranslated: ((String, String) -> Unit)? = null) {
-        pendingEditTarget = onTranslated
-        val inspector = ensureWordInspector()
-        inspectorLookupJob?.cancel()
-        inspectorScrollAccum = 0f
-        inspector.visibility = View.VISIBLE
-        inspector.bringToFront()
-        inspector.startEditing(initial)
-    }
-
-    /**
-     * Manual entry: opens the editor with nothing in it, for typing or
-     * dictating text that is not on the page (or that OCR cannot read).
-     */
-    private fun startManualTranslate() {
-        setMenuVisibility(false)
-        openTextEditor("")
-    }
-
-    /** Translates whatever the user typed, dictated or corrected. */
-    private fun onEditorTextSubmitted(text: String) {
-        val inspector = wordInspectorView ?: return
-        inspector.showTranslating()
-        inspectorLookupJob?.cancel()
-        inspectorLookupJob = lifecycleScope.launchIO {
-            val translated = Injekt.get<PageTranslator>().translateSingle(text)
-            withUIContext {
-                if (translated.isNullOrBlank()) {
-                    toast(MR.strings.translate_selection_failed)
-                    inspector.startEditing(text)
-                } else {
-                    inspector.showResult(text, translated)
-                    pendingEditTarget?.invoke(text, translated)
-                }
-            }
-        }
-    }
-
-    /**
-     * Toggles dictation. Deliberately *not* the system's speech dialog: that
-     * covers the middle of the screen, i.e. the very bubble the user is reading
-     * the text off. Recognition runs in-process and streams into the editor,
-     * so the page stays visible the whole time.
-     */
-    private fun ensureWordInspector(): WordInspectorView {
-        return wordInspectorView ?: WordInspectorView(this).also { view ->
-            view.onDismiss = { hideWordInspector() }
-            view.onPhraseTap = { phrase -> lookupVariantsInto(view, phrase) }
-            view.onTextSubmitted = { text -> onEditorTextSubmitted(text) }
-            view.onVoiceInput = dictation::toggle
-            wordInspectorView = view
-            binding.readerContainer.addView(
-                view,
-                android.widget.FrameLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                    android.view.Gravity.BOTTOM,
-                ),
-            )
-        }
-    }
-
-    private fun hideWordInspector() {
-        inspectorLookupJob?.cancel()
-        dictation.stop()
-        pendingEditTarget = null
-        wordInspectorView?.onHidden()
-        wordInspectorView?.visibility = View.GONE
-    }
-
-    private var inspectorScrollAccum = 0f
-
-    /**
-     * Called by the webtoon viewer on every scroll: once the reader has moved
-     * on (about a third of a screen), the inspector panel is stale — hide it.
-     */
-    fun onReaderScrolled(dy: Int) {
-        val inspector = wordInspectorView ?: return
-        if (inspector.visibility != View.VISIBLE) return
-        // Never yank the panel away mid-edit
-        if (inspector.isEditingText) return
-        inspectorScrollAccum += kotlin.math.abs(dy)
-        if (inspectorScrollAccum > binding.readerContainer.height / 3f) {
-            hideWordInspector()
-        }
-    }
-
-    /**
-     * Long-press on the translate button: translate everything currently on
-     * screen without drawing a selection.
-     */
-    private fun translateFullPage() {
-        setMenuVisibility(false)
-        menuToggleToast?.cancel()
-        menuToggleToast = toast(MR.strings.translate_in_progress)
-        when (val viewer = viewModel.state.value.viewer) {
-            is PagerViewer -> viewer.currentPageHolder()?.let { holder ->
-                holder.translateRegion(RectF(0f, 0f, holder.width.toFloat(), holder.height.toFloat()))
-            }
-            is WebtoonViewer -> viewer.translateRegionAt(
-                RectF(0f, 0f, binding.viewerContainer.width.toFloat(), binding.viewerContainer.height.toFloat()),
-            )
-            else -> {}
-        }
-    }
-
-    /**
-     * Shows the "translate area" rubber-band selector over the current page.
-     */
-    private fun startTranslateSelection() {
-        setMenuVisibility(false)
-        val selector = translateSelectionView ?: TranslateSelectionView(this).also { view ->
-            view.onSelectionFinished = { rect ->
-                view.visibility = View.GONE
-                if (rect != null) {
-                    menuToggleToast?.cancel()
-                    menuToggleToast = toast(MR.strings.translate_in_progress)
-                    when (val viewer = viewModel.state.value.viewer) {
-                        is PagerViewer -> viewer.currentPageHolder()?.translateRegion(rect)
-                        is WebtoonViewer -> viewer.translateRegionAt(rect)
-                        else -> {}
-                    }
-                }
-            }
-            translateSelectionView = view
-            binding.readerContainer.addView(
-                view,
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-            )
-        }
-        selector.visibility = View.VISIBLE
-        selector.bringToFront()
-        menuToggleToast?.cancel()
-        menuToggleToast = toast(MR.strings.translate_selection_hint)
     }
 
     /**
@@ -1022,6 +815,17 @@ class ReaderActivity : BaseActivity() {
     /**
      * Called from the viewer to hide the menu.
      */
+    // Fork: what the page holders and viewers call on the activity
+    fun onTranslatePhraseSelected(phrase: String?) = translation.onPhraseSelected(phrase)
+
+    fun showTranslationResult(translation: mihon.feature.translate.PageTranslation) =
+        this.translation.showTranslationResult(translation)
+
+    fun openTextEditor(initial: String, onTranslated: ((String, String) -> Unit)? = null) =
+        translation.openTextEditor(initial, onTranslated)
+
+    fun onReaderScrolled(dy: Int) = translation.onReaderScrolled(dy)
+
     fun hideMenu() {
         if (viewModel.state.value.menuVisible) {
             setMenuVisibility(false)
