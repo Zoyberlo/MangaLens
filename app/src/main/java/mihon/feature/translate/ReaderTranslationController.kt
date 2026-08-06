@@ -36,7 +36,12 @@ import kotlin.math.abs
  */
 class ReaderTranslationController(
     private val activity: ReaderActivity,
-    private val container: FrameLayout,
+    /**
+     * Resolved on each use, never at construction: the activity holds its
+     * binding in a lateinit that only onCreate assigns, so reading it while
+     * the activity's fields initialise throws.
+     */
+    private val container: () -> FrameLayout,
     private val scope: CoroutineScope,
     private val currentViewer: () -> Any?,
     private val closeMenu: () -> Unit,
@@ -142,7 +147,7 @@ class ReaderTranslationController(
         // Never yank the panel away mid-edit
         if (panel.isEditingText) return
         scrollAccumulator += abs(dy)
-        if (scrollAccumulator > container.height / 3f) {
+        if (scrollAccumulator > container().height / 3f) {
             hidePanel()
         }
     }
@@ -188,7 +193,7 @@ class ReaderTranslationController(
             view.onTextSubmitted = ::onEditorTextSubmitted
             view.onVoiceInput = { dictation().toggle() }
             panel = view
-            container.addView(
+            container().addView(
                 view,
                 FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -215,7 +220,7 @@ class ReaderTranslationController(
                 }
             }
             selector = view
-            container.addView(
+            container().addView(
                 view,
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,

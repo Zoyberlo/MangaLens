@@ -148,7 +148,7 @@ class ReaderActivity : BaseActivity() {
      */
     private val translation: ReaderTranslationController = ReaderTranslationController(
         activity = this,
-        container = binding.readerContainer,
+        container = { binding.readerContainer },
         scope = lifecycleScope,
         currentViewer = { viewModel.state.value.viewer },
         closeMenu = { setMenuVisibility(false) },
