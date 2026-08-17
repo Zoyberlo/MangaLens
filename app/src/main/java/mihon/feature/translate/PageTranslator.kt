@@ -434,7 +434,19 @@ class PageTranslator(
                 (line.bounds.top / upscale).toInt(),
                 (line.bounds.right / upscale).toInt(),
                 (line.bounds.bottom / upscale).toInt(),
-            )
+            ).apply {
+                // ML Kit's box hugs the glyphs it found, and the recognizer is
+                // handed exactly that — so a box a few pixels tight costs a
+                // whole letter: "SAID SHE" came back as "AID SHE", with the S
+                // still visible on the page beside the overlay. The pixels were
+                // never in the image the model was given.
+                //
+                // Sideways is where it matters, because that is where a line
+                // begins and ends; vertically a generous inset would drag in
+                // the line above, so it gets half.
+                val pad = (height() * LINE_CROP_PADDING).toInt().coerceAtLeast(MIN_LINE_CROP_PADDING_PX)
+                inset(-pad, -pad / 2)
+            }
             val crop = cropSafely(source, bounds) ?: return@map line
             val text = try {
                 paddle.recognize(crop)
@@ -615,5 +627,13 @@ class PageTranslator(
         private const val BLOCK_PADDING = 0.14f
         private const val TARGET_BLOCK_HEIGHT = 640f
         private const val MAX_BLOCK_UPSCALE = 4f
+
+        /**
+         * Margin added around a detected line before it is handed to the
+         * recognizer, as a share of the line's height — letters are roughly that
+         * wide, so this is about one tenth of a character on each side.
+         */
+        private const val LINE_CROP_PADDING = 0.12f
+        private const val MIN_LINE_CROP_PADDING_PX = 3
     }
 }
