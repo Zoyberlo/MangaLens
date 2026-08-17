@@ -13,6 +13,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,8 +23,13 @@ import androidx.compose.ui.res.painterResource
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderOrientation
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
+import mihon.feature.translate.ReaderBarAction
+import mihon.feature.translate.TranslationPreferences
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
+import tachiyomi.presentation.core.util.collectAsState
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 
 @Composable
 fun ReaderBottomBar(
@@ -38,34 +45,45 @@ fun ReaderBottomBar(
     onClickSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Fork: which buttons the user chose to keep. Read here rather than passed
+    // down, so the change stops at this file instead of threading a parameter
+    // through ReaderAppBars as well. The gear is deliberately not gated — it is
+    // the way back to the screen that edits this list.
+    val visibleActions by remember { Injekt.get<TranslationPreferences>().readerBarActions }.collectAsState()
+
     Row(
         modifier = modifier
             .pointerInput(Unit) {},
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onClickReadingMode) {
-            Icon(
-                painter = painterResource(readingMode.iconRes),
-                contentDescription = stringResource(MR.strings.viewer),
-            )
+        if (ReaderBarAction.READING_MODE.id in visibleActions) {
+            IconButton(onClick = onClickReadingMode) {
+                Icon(
+                    painter = painterResource(readingMode.iconRes),
+                    contentDescription = stringResource(MR.strings.viewer),
+                )
+            }
         }
-
-        IconButton(onClick = onClickOrientation) {
-            Icon(
-                imageVector = orientation.icon,
-                contentDescription = stringResource(MR.strings.rotation_type),
-            )
+        if (ReaderBarAction.ORIENTATION.id in visibleActions) {
+            IconButton(onClick = onClickOrientation) {
+                Icon(
+                    imageVector = orientation.icon,
+                    contentDescription = stringResource(MR.strings.rotation_type),
+                )
+            }
         }
-
-        IconButton(onClick = onClickCropBorder) {
-            Icon(
-                painter = painterResource(if (cropEnabled) R.drawable.ic_crop_24dp else R.drawable.ic_crop_off_24dp),
-                contentDescription = stringResource(MR.strings.pref_crop_borders),
-            )
+        if (ReaderBarAction.CROP_BORDERS.id in visibleActions) {
+            IconButton(onClick = onClickCropBorder) {
+                Icon(
+                    painter = painterResource(
+                        if (cropEnabled) R.drawable.ic_crop_24dp else R.drawable.ic_crop_off_24dp,
+                    ),
+                    contentDescription = stringResource(MR.strings.pref_crop_borders),
+                )
+            }
         }
-
-        if (onClickTranslateSelection != null) {
+        if (onClickTranslateSelection != null && ReaderBarAction.TRANSLATE.id in visibleActions) {
             // Tap = select an area; long-press = translate the whole page
             Box(
                 modifier = Modifier
@@ -84,7 +102,7 @@ fun ReaderBottomBar(
             }
         }
 
-        if (onClickManualTranslate != null) {
+        if (onClickManualTranslate != null && ReaderBarAction.MANUAL_TRANSLATE.id in visibleActions) {
             IconButton(onClick = onClickManualTranslate) {
                 Icon(
                     imageVector = Icons.Outlined.Keyboard,

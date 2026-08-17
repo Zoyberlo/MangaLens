@@ -228,7 +228,16 @@ class ReaderTranslationController(
         }
         selector.visibility = View.VISIBLE
         selector.bringToFront()
-        showHint(MR.strings.translate_selection_hint)
+        // The long-press that translates the whole screen has existed since the
+        // beginning and is invisible: nothing on screen suggests a gesture is
+        // there. Say so the first few times, then stop nagging.
+        val shown = translationPreferences.translateHintsShown.get()
+        if (shown < LONG_PRESS_HINTS) {
+            translationPreferences.translateHintsShown.set(shown + 1)
+            showHint(MR.strings.translate_selection_hint_long_press)
+        } else {
+            showHint(MR.strings.translate_selection_hint)
+        }
     }
 
     /**
@@ -258,6 +267,11 @@ class ReaderTranslationController(
     }
 
     // endregion
+
+    private companion object {
+        /** Enough to be noticed, few enough not to become wallpaper. */
+        const val LONG_PRESS_HINTS = 5
+    }
 
     /** Which notice a metered service's quota event deserves. */
     fun quotaMessage(event: QuotaEvent): StringResource = when (event.kind) {

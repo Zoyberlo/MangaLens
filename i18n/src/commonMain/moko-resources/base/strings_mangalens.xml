@@ -89,6 +89,9 @@ Got:
     <string name="deepl_limit_reached">Monthly DeepL limit reached — using another service</string>
     <string name="action_translate_selection">Translate area</string>
     <string name="translate_selection_hint">Drag to select the area to translate</string>
+    <string name="translate_selection_hint_long_press">Drag to select — or long-press for the whole screen</string>
+    <string name="pref_reader_bar_actions">Reader buttons</string>
+    <string name="pref_reader_bar_actions_summary">Which buttons the bar at the bottom of the reader shows. The settings button always stays.</string>
     <string name="translate_selection_no_text">No text recognized in the selected area</string>
     <string name="translate_selection_failed">Translation failed — check the translation service in settings</string>
     <string name="translate_in_progress">Translating…</string>

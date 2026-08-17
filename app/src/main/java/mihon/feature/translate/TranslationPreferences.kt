@@ -111,6 +111,27 @@ class TranslationPreferences(
         false,
     )
 
+    /**
+     * Which buttons the reader's bottom bar shows. Lives here rather than in
+     * ReaderPreferences because that is upstream's file, and the bar only
+     * became configurable to make room for this fork's own buttons.
+     *
+     * Unknown ids are ignored on read, so an action dropped in a future build
+     * does not resurrect as a blank button.
+     */
+    val readerBarActions: Preference<Set<String>> = preferenceStore.getStringSet(
+        "pref_reader_bar_actions",
+        ReaderBarAction.DEFAULT,
+    )
+
+    /**
+     * How many times the "drag to select" hint has been shown. The first few
+     * also mention that a long-press translates the whole screen — a gesture
+     * that has been in the app since the beginning and that nobody could
+     * discover, because nothing anywhere said it existed.
+     */
+    val translateHintsShown: Preference<Int> = preferenceStore.getInt("pref_translate_hints_shown", 0)
+
     val translateResultDisplay: Preference<TranslateResultDisplay> = preferenceStore.getEnum(
         "pref_translate_result_display",
         TranslateResultDisplay.OVERLAY,
