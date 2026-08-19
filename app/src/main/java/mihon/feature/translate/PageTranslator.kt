@@ -226,6 +226,12 @@ class PageTranslator(
             block.copy(text = repaired, confident = confident)
         }
 
+        // The failure mode here is probabilistic — the detector's box lands a
+        // few pixels differently per selection, and one drag in a dozen clips
+        // a letter. A single good read proves nothing, so leave a trace that a
+        // jittered stress run can count. DEBUG: dev builds only.
+        logcat(LogPriority.DEBUG) { "region read: " + candidates.joinToString(" | ") { it.text } }
+
         // Original-first mode (overlay display only): show the recognized text
         // untranslated; each block is translated on demand via translateSingle
         val originalFirst = translationPreferences.translateShowOriginalFirst.get() &&

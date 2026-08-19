@@ -171,3 +171,27 @@ Keep each list item on a single line. The renderer joins wrapped lines but
 leaves the continuation indent behind, so a hard-wrapped bullet renders with
 stray double spaces mid-sentence. Plain paragraphs wrap fine. HTML comments are
 rendered as text, so notes for maintainers go here, not in the file.
+
+## Stress-testing recognition
+
+Recognition failures are probabilistic: the detector's box lands a few pixels
+differently per selection, so a bug can skip ten attempts and hit the
+eleventh. **One good read proves nothing** — measure a series.
+
+Dev builds log every region read at DEBUG. Automate a dozen jittered
+selections of the same bubble and count distinct readings:
+
+```bash
+adb logcat -c
+# per iteration: open the menu (tap dead center, verify the Translate button
+# appeared via uiautomator dump), tap it, then swipe the same bubble with
+# ±25..60px of random jitter on each corner; sleep ~3s between
+adb logcat -d | grep -oE "region read: .*" | sort | uniq -c | sort -rn
+```
+
+Read the variants, not just the count: a *dropped line* usually means the
+jittered drag genuinely did not cover it (selection filtering, by design),
+while *garbled letters* mean the recognizer got a clipped crop — those are the
+real failures. Measured 2026-08-17 on the "THE LADY SAID SHE" bubble after the
+letter-sized crop margin: 24 runs, zero garbled readings; 5 of the 12
+harsh-jitter runs dropped the first line because the drag started below it.
