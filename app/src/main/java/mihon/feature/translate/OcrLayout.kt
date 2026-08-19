@@ -132,6 +132,17 @@ object OcrLayout {
         return kept
     }
 
+    /**
+     * True when [old] is being re-translated by [new] and must yield.
+     *
+     * Selections accumulate on a page on purpose — bubble A's overlay must
+     * survive translating bubble B. But a *repeat* of the same bubble arrives
+     * as a slightly different box with slightly different text, so equality
+     * never catches it and every retry stacked another copy on the page, the
+     * previous attempts ghosting through behind the newest one.
+     */
+    fun replacedBy(old: TextBox, new: TextBox): Boolean = overlapRatio(old, new) > REPLACED_OVERLAP
+
     /** Shared area over the smaller box, so a sliver never counts as a repeat. */
     private fun overlapRatio(a: TextBox, b: TextBox): Float {
         val width = minOf(a.right, b.right) - maxOf(a.left, b.left)
@@ -143,6 +154,10 @@ object OcrLayout {
     }
 
     private const val DUPLICATE_OVERLAP = 0.5f
+
+    // Half of the smaller box: a repeat selection never lands pixel-perfect,
+    // but the same bubble's text region overlaps far more than half
+    private const val REPLACED_OVERLAP = 0.5f
     private const val VERTICAL_GAP_RATIO = 0.9f
     private const val HORIZONTAL_GAP_RATIO = 1.5f
 }

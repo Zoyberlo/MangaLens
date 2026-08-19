@@ -355,4 +355,41 @@ class OcrLayoutTest {
             OcrText.hasCjk("!?…") shouldBe false
         }
     }
+
+    @Nested
+    inner class ReplacedBy {
+
+        // The bubble at 100..300 x 100..200, and the same bubble re-selected
+        // by a slightly different drag
+        private val first = TextBox(100, 100, 300, 200)
+        private val retry = TextBox(90, 95, 310, 210)
+
+        @Test
+        fun `a repeat of the same bubble replaces the previous attempt`() {
+            // This is the stacking bug: retrying a translation drew a new
+            // block over the old one, the old text ghosting through behind it
+            OcrLayout.replacedBy(first, retry) shouldBe true
+        }
+
+        @Test
+        fun `a different bubble on the same page does not evict the first`() {
+            val other = TextBox(400, 500, 600, 600)
+            OcrLayout.replacedBy(first, other) shouldBe false
+        }
+
+        @Test
+        fun `a neighbouring bubble touching the edge is not a repeat`() {
+            // Shares a 20px strip — a sliver, not a re-selection
+            val neighbour = TextBox(280, 100, 480, 200)
+            OcrLayout.replacedBy(first, neighbour) shouldBe false
+        }
+
+        @Test
+        fun `a small block inside a full-page selection is replaced`() {
+            // Long-press translates the whole screen; every earlier
+            // per-bubble block is being re-read and must yield
+            val page = TextBox(0, 0, 1080, 2400)
+            OcrLayout.replacedBy(first, page) shouldBe true
+        }
+    }
 }

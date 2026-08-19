@@ -580,10 +580,19 @@ class PageTranslator(
             existing.imageWidth == translation.imageWidth &&
             existing.imageHeight == translation.imageHeight
         ) {
+            // Selections accumulate, but an old block a new one substantially
+            // covers is a re-translation of the same text and yields. This
+            // used to be distinct(), and a repeat read never comes back
+            // byte-identical — so retrying a bubble stacked a fresh copy over
+            // the previous attempt every time, the old text ghosting through.
+            val incoming = translation.blocks.map { it.bounds.asTextBox() }
+            val survivors = existing.blocks.filter { old ->
+                incoming.none { OcrLayout.replacedBy(old.bounds.asTextBox(), it) }
+            }
             PageTranslation(
                 translation.imageWidth,
                 translation.imageHeight,
-                (existing.blocks + translation.blocks).distinct(),
+                survivors + translation.blocks,
             )
         } else {
             translation
@@ -591,6 +600,8 @@ class PageTranslator(
         overlayCache.put(pageKey, merged)
         return merged
     }
+
+    private fun android.graphics.Rect.asTextBox() = TextBox(left, top, right, bottom)
 
     /** Replaces the stored overlay blocks after the user dismissed some. */
     fun replaceOverlay(pageKey: String, blocks: List<TranslatedBlock>) {
