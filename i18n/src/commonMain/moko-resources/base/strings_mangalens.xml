@@ -90,6 +90,9 @@ Got:
     <string name="action_translate_selection">Translate area</string>
     <string name="translate_selection_hint">Drag to select the area to translate</string>
     <string name="translate_selection_hint_long_press">Drag to select — or long-press for the whole screen</string>
+    <string name="reader_tab_reading">Reading</string>
+    <string name="reader_tab_filter">Filter</string>
+    <string name="reader_tab_translate">Translate</string>
     <string name="pref_reader_bar_actions">Reader buttons</string>
     <string name="pref_reader_bar_actions_summary">Which buttons the bar at the bottom of the reader shows. The settings button always stays.</string>
     <string name="translate_selection_no_text">No text recognized in the selected area</string>

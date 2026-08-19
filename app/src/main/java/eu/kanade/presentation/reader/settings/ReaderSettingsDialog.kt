@@ -25,11 +25,13 @@ fun ReaderSettingsDialog(
     onHideMenus: () -> Unit,
     viewModel: ReaderSettingsViewModel,
 ) {
+    // Fork: one-word labels of its own. Four of upstream's category names in
+    // an equal-width row truncated every single tab ("Readin…", "Custo…").
     val tabTitles = listOf(
-        stringResource(MR.strings.pref_category_reading_mode),
+        stringResource(MR.strings.reader_tab_reading),
         stringResource(MR.strings.pref_category_general),
-        stringResource(MR.strings.custom_filter),
-        stringResource(MR.strings.pref_category_auto_translate),
+        stringResource(MR.strings.reader_tab_filter),
+        stringResource(MR.strings.reader_tab_translate),
     )
     val pagerState = rememberPagerState { tabTitles.size }
 
