@@ -442,10 +442,14 @@ class PageTranslator(
                 // never in the image the model was given.
                 //
                 // Sideways is where it matters, because that is where a line
-                // begins and ends; vertically a generous inset would drag in
-                // the line above, so it gets half.
-                val pad = (height() * LINE_CROP_PADDING).toInt().coerceAtLeast(MIN_LINE_CROP_PADDING_PX)
-                inset(-pad, -pad / 2)
+                // begins and ends — and where the detector clips a letter, it
+                // clips a whole one, so the margin must be letter-sized: 12%
+                // of the height recovered only a sliver of a clipped S, which
+                // the model then read as P. Vertically the margin stays small
+                // so it cannot drag in the line above.
+                val sideways = (height() * LINE_CROP_SIDE_PADDING).toInt().coerceAtLeast(MIN_LINE_CROP_PADDING_PX)
+                val vertical = (height() * LINE_CROP_VERTICAL_PADDING).toInt().coerceAtLeast(MIN_LINE_CROP_PADDING_PX)
+                inset(-sideways, -vertical)
             }
             val crop = cropSafely(source, bounds) ?: return@map line
             val text = try {
@@ -640,11 +644,13 @@ class PageTranslator(
         private const val MAX_BLOCK_UPSCALE = 4f
 
         /**
-         * Margin added around a detected line before it is handed to the
-         * recognizer, as a share of the line's height — letters are roughly that
-         * wide, so this is about one tenth of a character on each side.
+         * Margins around a detected line before it is handed to the
+         * recognizer, as shares of the line's height. Comic capitals are
+         * roughly 0.6 of their height wide, so the sideways margin fits about
+         * one whole letter — the unit the detector clips in.
          */
-        private const val LINE_CROP_PADDING = 0.12f
+        private const val LINE_CROP_SIDE_PADDING = 0.55f
+        private const val LINE_CROP_VERTICAL_PADDING = 0.12f
         private const val MIN_LINE_CROP_PADDING_PX = 3
     }
 }
