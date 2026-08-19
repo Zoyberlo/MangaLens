@@ -165,4 +165,7 @@ internal fun ColumnScope.GeneralPage(viewModel: ReaderSettingsViewModel) {
             }
         }
     }
+
+    // Fork: which buttons the bottom bar shows
+    ReaderBarActionsSetting()
 }

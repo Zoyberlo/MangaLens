@@ -11,7 +11,6 @@ import eu.kanade.presentation.more.settings.widget.InfoWidget
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderSettingsViewModel
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import mihon.feature.translate.PageTranslator
-import mihon.feature.translate.ReaderBarAction
 import mihon.feature.translate.TARGET_LANGUAGES
 import mihon.feature.translate.TranslateResultDisplay
 import mihon.feature.translate.TranslationPreferences
@@ -96,31 +95,4 @@ internal fun ColumnScope.TranslationSettingsPage(viewModel: ReaderSettingsViewMo
     if (deeplApiKey.isBlank()) {
         InfoWidget(text = stringResource(MR.strings.pref_deepl_api_key_summary))
     }
-
-    ReaderBarActionsSetting(translationPreferences)
-}
-
-/**
- * Picks which buttons the reader's bottom bar shows.
- *
- * Reached through the gear on that very bar, which is why the gear itself is
- * not on the list: hiding it would leave no way back here.
- */
-@Composable
-private fun ColumnScope.ReaderBarActionsSetting(preferences: TranslationPreferences) {
-    val enabled by preferences.readerBarActions.collectAsState()
-    SettingsChipRow(MR.strings.pref_reader_bar_actions) {
-        ReaderBarAction.entries.forEach { action ->
-            FilterChip(
-                selected = action.id in enabled,
-                onClick = {
-                    preferences.readerBarActions.set(
-                        if (action.id in enabled) enabled - action.id else enabled + action.id,
-                    )
-                },
-                label = { Text(stringResource(action.label)) },
-            )
-        }
-    }
-    InfoWidget(text = stringResource(MR.strings.pref_reader_bar_actions_summary))
 }
