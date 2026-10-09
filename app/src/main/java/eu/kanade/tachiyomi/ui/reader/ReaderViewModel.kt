@@ -64,6 +64,7 @@ import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.chapter.interactor.GetChaptersByMangaId
 import tachiyomi.domain.chapter.interactor.UpdateChapter
+import tachiyomi.domain.chapter.model.Chapter
 import tachiyomi.domain.chapter.model.ChapterUpdate
 import tachiyomi.domain.chapter.service.getChapterSort
 import tachiyomi.domain.download.service.DownloadPreferences
@@ -569,9 +570,23 @@ class ReaderViewModel @JvmOverloads constructor(
         // If chapter is completely read, no need to download it
         chapterToDownload = null
 
-        if (chapterToDelete != null) {
-            enqueueDeleteReadChapters(chapterToDelete)
+        if (chapterToDelete == null || !chapterToDelete.chapter.read) return
+
+        val markDuplicateAsRead = libraryPreferences.markDuplicateReadChapterAsRead.get()
+            .contains(LibraryPreferences.MARK_DUPLICATE_CHAPTER_READ_EXISTING)
+        val duplicateChapters = if (markDuplicateAsRead) {
+            unfilteredChapterList
+                .filter {
+                    it.id != chapterToDelete.chapter.id &&
+                        it.isRecognizedNumber &&
+                        it.chapterNumber.toFloat() == chapterToDelete.chapter.chapter_number
+                }
+                // The list is loaded once, before these were marked read along with chapterToDelete
+                .map { it.copy(read = true) }
+        } else {
+            emptyList()
         }
+        enqueueDeleteChapters(listOf(chapterToDelete.chapter.toDomainChapter()!!) + duplicateChapters)
     }
 
     /**
@@ -969,15 +984,14 @@ class ReaderViewModel @JvmOverloads constructor(
     }
 
     /**
-     * Enqueues this [chapter] to be deleted when [deletePendingChapters] is called. The download
-     * manager handles persisting it across process deaths.
+     * Enqueues these [chapters] to be deleted when [deletePendingChapters] is called. The download
+     * manager handles persisting them across process deaths.
      */
-    private fun enqueueDeleteReadChapters(chapter: ReaderChapter) {
-        if (!chapter.chapter.read) return
+    private fun enqueueDeleteChapters(chapters: List<Chapter>) {
         val manga = manga ?: return
 
         viewModelScope.launchNonCancellable {
-            downloadManager.enqueueChaptersToDelete(listOf(chapter.chapter.toDomainChapter()!!), manga)
+            downloadManager.enqueueChaptersToDelete(chapters, manga)
         }
     }
 
