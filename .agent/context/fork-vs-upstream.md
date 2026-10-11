@@ -53,6 +53,8 @@ found. Changing it again would orphan installs the same way — avoid.
 Plus fork-only files outside that package:
 
 - `app/src/main/java/eu/kanade/presentation/reader/settings/TranslationSettingsPage.kt`
+- `app/src/main/java/mihon/feature/devlog/` — the dev build's persistent log and
+  its two Settings → Advanced entries
 - `.github/workflows/build-fork.yml` — CI building signed release APKs (upstream's
   own workflows are untouched)
 
@@ -109,6 +111,8 @@ conflict when syncing with upstream.
 | `presentation/reader/appbars/ReaderAppBars.kt`, `ReaderBottomBar.kt` | translate button |
 | `presentation/reader/settings/ReaderSettingsDialog.kt` | 4th tab |
 | `presentation/more/settings/screen/SettingsReaderScreen.kt` | translation preference group |
+| `App.kt` | one line after the logcat install: `PersistentLog.install` in debug builds |
+| `presentation/more/settings/screen/SettingsAdvancedScreen.kt` | one spread line `*devLogPreferences()` after "Dump crash logs" |
 
 **Rule:** prefer adding a method to a fork-only class over adding logic to an
 upstream file. When an upstream file must change, keep it to a call-out (one

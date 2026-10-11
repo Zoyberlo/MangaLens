@@ -13,8 +13,18 @@
 
 ## 2. Reproduce with logs
 
+If it happened on the dev build, read the **persistent log** first — it holds
+every day since the last clear, so the failure may already be in it without
+reproducing anything (`processes/build-and-install.md`, section 6):
+
 ```bash
-adb logcat --pid $(adb shell pidof app.mihon.tl.dev)
+adb shell run-as app.mangalens.dev ls files/devlog
+```
+
+Otherwise, live:
+
+```bash
+adb logcat --pid $(adb shell pidof app.mangalens.dev)
 ```
 
 The fork logs failures at WARN with identifying prefixes: `OCR warm-up failed`,
@@ -54,7 +64,7 @@ The fork logs failures at WARN with identifying prefixes: `OCR warm-up failed`,
 
 ```bash
 ./gradlew spotlessApply :app:assembleDebug
-adb install -r app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 Re-run the repro **in the same reading mode**, then sanity-check the other one.

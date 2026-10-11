@@ -55,6 +55,7 @@ import eu.kanade.tachiyomi.util.system.setDefaultSettings
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.launch
 import logcat.LogPriority
+import mihon.feature.devlog.devLogPreferences
 import okhttp3.Headers
 import tachiyomi.core.common.util.lang.launchNonCancellable
 import tachiyomi.core.common.util.lang.withUIContext
@@ -95,6 +96,7 @@ object SettingsAdvancedScreen : SearchableSettings {
                     }
                 },
             ),
+            *devLogPreferences(),
             Preference.PreferenceItem.SwitchPreference(
                 preference = networkPreferences.verboseLogging,
                 title = stringResource(MR.strings.pref_verbose_logging),

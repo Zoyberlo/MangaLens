@@ -148,4 +148,9 @@ Got:
     <string name="pref_nav_tap_zone_height">Top and bottom tap zones height</string>
     <string name="pref_nav_tap_zone_size_summary">Smaller zones leave more room in the center for opening the menu</string>
     <string name="whats_new_summary">Release notes for this version and the ones before it</string>
+    <string name="devlog_share">Share debug logs</string>
+    <string name="devlog_share_summary">Everything logged since the last clear (%s). Dev builds only</string>
+    <string name="devlog_clear">Clear debug logs</string>
+    <string name="devlog_clear_confirm">Delete all saved debug logs? Nothing else ever deletes them.</string>
+    <string name="devlog_share_failed">Couldn\'t collect the logs</string>
 </resources>

@@ -94,6 +94,41 @@ translation feature:
 
 ## 6. Logs
 
+### The persistent log (dev builds)
+
+The dev build writes everything it logs — DEBUG and up, VERBOSE with
+**Verbose logging** on — to `files/devlog/mangalens-<date>.log`, one file per
+day. **Nothing deletes it automatically**; it grows until someone presses
+**Settings → Advanced → Clear debug logs**. The point is to use the app for a
+week and then read every error that happened, not just the last few minutes
+logcat still holds.
+
+On each start it also writes one `I/PreviousExit:` line per way the previous
+process ended (crash, native crash, ANR, killed by the system, closed by the
+user), with the system's own crash record for native crashes and ANRs — the
+only trace a native crash leaves, since it kills the process before Kotlin can
+write anything.
+
+Getting it off the phone:
+
+- **Settings → Advanced → Share debug logs** zips every day plus what logcat
+  still holds and opens a share sheet addressed to the developer address;
+- or over adb, without touching the phone:
+
+```bash
+adb shell run-as app.mangalens.dev ls -la files/devlog
+adb shell run-as app.mangalens.dev cat files/devlog/mangalens-2026-10-11.log
+```
+
+(Git Bash: prefix with `MSYS_NO_PATHCONV=1`.) Keys for the cloud engines are
+masked before a line is written (`Redactor`, with tests), since the file is
+meant to be emailed. What does **not** reach it: lines the native libraries
+and OkHttp's HTTP logging write straight to Android's log — the shared zip
+includes a logcat snapshot for those. Release builds do not write it at all.
+A day's file stops growing at 64 MB, which only a runaway loop would reach.
+
+### Live logcat
+
 ```bash
 adb logcat --pid=$(adb shell pidof app.mangalens.dev)
 ```

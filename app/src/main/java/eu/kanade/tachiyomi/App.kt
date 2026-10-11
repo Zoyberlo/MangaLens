@@ -54,6 +54,7 @@ import logcat.LogPriority
 import logcat.LogcatLogger
 import mihon.core.migration.Migrator
 import mihon.core.migration.migrations.migrations
+import mihon.feature.devlog.PersistentLog
 import mihon.telemetry.TelemetryConfig
 import org.conscrypt.Conscrypt
 import tachiyomi.core.common.i18n.stringResource
@@ -165,6 +166,7 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
             }
             LogcatLogger.install()
             LogcatLogger.loggers += AndroidLogcatLogger(minLogPriority)
+            if (BuildConfig.DEBUG) PersistentLog.install(this, minLogPriority)
         }
 
         initializeMigrator()
