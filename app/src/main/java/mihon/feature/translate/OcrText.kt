@@ -78,6 +78,10 @@ object OcrText {
     fun repairLetterConfusions(text: String, isWord: (String) -> Boolean): String =
         WORD_LIKE.replace(text) { match ->
             val token = match.value
+            // No letters means nothing to repair — and "12" or "--" would make
+            // prefix and suffix both the whole token, and the substring below
+            // throw. That took down every bubble with a number in it.
+            if (token.none { it.isLetter() }) return@replace token
             val prefix = token.takeWhile { !it.isLetter() }
             val suffix = token.takeLastWhile { !it.isLetter() }
             val core = token.substring(prefix.length, token.length - suffix.length)

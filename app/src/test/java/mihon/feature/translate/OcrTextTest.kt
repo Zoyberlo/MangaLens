@@ -149,6 +149,18 @@ class OcrTextTest {
         }
 
         @Test
+        fun `survives a token with no letters in it`() {
+            // Crashed with StringIndexOutOfBoundsException on the phone: the
+            // prefix and suffix of "12" are both the whole token. Every bubble
+            // with a number in it — "3 DAYS LATER", "100 YEARS" — failed to
+            // translate, though the text had been read perfectly well.
+            repair("12") shouldBe "12"
+            repair("--") shouldBe "--"
+            repair("3 DAYS LATER") shouldBe "3 DAYS LATER"
+            repair("IN 100 YEARS, VEARN") shouldBe "IN 100 YEARS, LEARN"
+        }
+
+        @Test
         fun `preserves punctuation around a repaired word`() {
             repair("ZEASON...") shouldBe "REASON..."
             repair("\"VEARN\"") shouldBe "\"LEARN\""
