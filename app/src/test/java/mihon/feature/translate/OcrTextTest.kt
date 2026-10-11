@@ -236,4 +236,29 @@ class OcrTextTest {
             OcrText.normalizeForTranslation("   ") shouldBe ""
         }
     }
+
+    @Nested
+    inner class Untranslated {
+
+        @Test
+        fun `an echoed source is not a translation`() {
+            // lingva.ml, HTTP 200, the input handed straight back
+            OcrText.isUntranslated("The lady said so", "The lady said so") shouldBe true
+        }
+
+        @Test
+        fun `tidied capitalisation and punctuation still count as an echo`() {
+            OcrText.isUntranslated("THE LADY SAID SO.", "The lady said so") shouldBe true
+        }
+
+        @Test
+        fun `a real translation is not an echo`() {
+            OcrText.isUntranslated("The lady said so", "Леді так сказала") shouldBe false
+        }
+
+        @Test
+        fun `nothing to compare is not called an echo`() {
+            OcrText.isUntranslated("...", "...") shouldBe false
+        }
+    }
 }

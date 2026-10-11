@@ -194,6 +194,23 @@ object OcrText {
         else -> null
     }
 
+    /**
+     * True when a "translation" is just the source handed back.
+     *
+     * A provider can answer HTTP 200 with the input unchanged — lingva.ml did
+     * exactly that while the fallback chain counted it as success, so the
+     * moment Google stumbled the bubble filled with the original English and
+     * the working provider further down the chain was never asked.
+     *
+     * Compared on letters and digits only, case-insensitively, so punctuation
+     * and capitalisation a provider tidies up do not hide an echo.
+     */
+    fun isUntranslated(source: String, result: String): Boolean {
+        val a = source.filter(Char::isLetterOrDigit).lowercase()
+        val b = result.filter(Char::isLetterOrDigit).lowercase()
+        return a.isNotEmpty() && a == b
+    }
+
     /** True when the text holds Han, kana or Hangul characters. */
     fun hasCjk(text: String): Boolean = text.any { it.isCjk() }
 

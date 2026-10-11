@@ -126,14 +126,7 @@ class TextTranslator(
             }
 
         val result = when (selectedProvider) {
-            TranslationProvider.AUTO -> {
-                translateViaGoogle(trimmed, from, to)
-                    ?.also { lastAutoProvider.value = TranslationProvider.GOOGLE }
-                    ?: translateViaLingva(trimmed, from, to)
-                        ?.also { lastAutoProvider.value = TranslationProvider.LINGVA }
-                    ?: translateViaMyMemory(trimmed, from, to)
-                        ?.also { lastAutoProvider.value = TranslationProvider.MYMEMORY }
-            }
+            TranslationProvider.AUTO -> translateAutomatically(trimmed, from, to)
             TranslationProvider.GOOGLE -> translateViaGoogle(trimmed, from, to)
             TranslationProvider.DEEPL -> translateViaDeepL(trimmed, from, to, context)
             TranslationProvider.LINGVA -> translateViaLingva(trimmed, from, to)
@@ -174,6 +167,36 @@ class TextTranslator(
             logcat(LogPriority.WARN, e) { "Variant lookup failed" }
         }
         return variants.distinctBy { it.lowercase() }.take(MAX_VARIANTS)
+    }
+
+    /**
+     * The free providers in order, first real answer wins.
+     *
+     * "Real" matters: a provider can answer HTTP 200 with the source handed
+     * back untranslated, and the chain used to stop there — so whenever Google
+     * stumbled, Lingva's echo filled the bubble with English and MyMemory,
+     * which worked, was never asked. An echo now only stands if every provider
+     * returns one, because then the text is probably untranslatable on its
+     * own — a name, a sound effect.
+     */
+    private suspend fun translateAutomatically(text: String, from: String, to: String): String? {
+        val chain = listOf<Pair<TranslationProvider, suspend () -> String?>>(
+            TranslationProvider.GOOGLE to { translateViaGoogle(text, from, to) },
+            TranslationProvider.LINGVA to { translateViaLingva(text, from, to) },
+            TranslationProvider.MYMEMORY to { translateViaMyMemory(text, from, to) },
+        )
+        var echo: String? = null
+        for ((provider, attempt) in chain) {
+            val result = attempt() ?: continue
+            if (OcrText.isUntranslated(text, result)) {
+                logcat(LogPriority.WARN) { "${provider.displayName} returned the source untranslated" }
+                if (echo == null) echo = result
+                continue
+            }
+            lastAutoProvider.value = provider
+            return result
+        }
+        return echo
     }
 
     /**
@@ -271,10 +294,20 @@ class TextTranslator(
                 .addQueryParameter("langpair", "$from|$to")
                 .build()
             val response = client.newCall(GET(url)).awaitSuccess()
-            with(json) { response.parseAs<MyMemoryResponse>() }
-                .responseData
+            val parsed = with(json) { response.parseAs<MyMemoryResponse>() }
+            // An exhausted daily quota still arrives as HTTP 200, with the
+            // warning text in the translation field — shown as-is, it would put
+            // "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS" in
+            // the bubble
+            if (parsed.quotaFinished == true || (parsed.responseStatus ?: 200) != 200) {
+                logcat(LogPriority.WARN) {
+                    "MyMemory refused: status ${parsed.responseStatus}, quota finished ${parsed.quotaFinished}"
+                }
+                return null
+            }
+            parsed.responseData
                 ?.translatedText
-                ?.takeIf { it.isNotBlank() }
+                ?.takeIf { it.isNotBlank() && !it.startsWith("MYMEMORY WARNING", ignoreCase = true) }
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "MyMemory translation failed" }
             null
@@ -299,6 +332,10 @@ class TextTranslator(
     @Serializable
     private data class MyMemoryResponse(
         val responseData: ResponseData? = null,
+        val quotaFinished: Boolean? = null,
+        // Sent as a number on success and as a string on some errors
+        @Serializable(with = LenientIntSerializer::class)
+        val responseStatus: Int? = null,
     ) {
         @Serializable
         data class ResponseData(
@@ -316,5 +353,26 @@ class TextTranslator(
             "https://lingva.ml",
             "https://translate.plausibility.cloud",
         )
+    }
+}
+
+/**
+ * MyMemory sends `responseStatus` as a number on success and as a quoted
+ * string on some errors ("403"); a strict Int field would turn its error
+ * replies into parse failures and hide the reason.
+ */
+private object LenientIntSerializer : kotlinx.serialization.KSerializer<Int?> {
+    override val descriptor = kotlinx.serialization.descriptors.PrimitiveSerialDescriptor(
+        "LenientInt",
+        kotlinx.serialization.descriptors.PrimitiveKind.STRING,
+    )
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): Int? {
+        val element = (decoder as? kotlinx.serialization.json.JsonDecoder)?.decodeJsonElement() ?: return null
+        return (element as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull()
+    }
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: Int?) {
+        encoder.encodeString(value?.toString().orEmpty())
     }
 }
