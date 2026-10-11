@@ -106,8 +106,14 @@ class TextTranslator(
         if (trimmed.isEmpty() || from == to) return null
 
         val key = "$from:$to:${trimmed.lowercase()}"
-        cache.get(key)?.let { return it }
+        // Logged because a cached answer survives fixes to the providers: a
+        // bubble re-tested after a change can still show the old result
+        cache.get(key)?.let {
+            logcat(LogPriority.DEBUG) { "Translated (cached): '$trimmed' -> '$it'" }
+            return it
+        }
         diskGet(key)?.let {
+            logcat(LogPriority.DEBUG) { "Translated (disk cache): '$trimmed' -> '$it'" }
             cache.put(key, it)
             return it
         }
@@ -134,8 +140,20 @@ class TextTranslator(
         }
 
         if (result != null) {
+            // Which provider said what: a wrong word in a bubble cannot be
+            // traced to Google or MyMemory after the fact otherwise
+            val via = when {
+                selectedProvider != TranslationProvider.AUTO -> selectedProvider.displayName
+                OcrText.isUntranslated(trimmed, result) -> "Auto, untranslated"
+                else -> lastAutoProvider.value?.displayName ?: "Auto"
+            }
+            logcat(LogPriority.DEBUG) { "Translated via $via: '$trimmed' -> '$result'" }
             cache.put(key, result)
             diskPut(key, result)
+        } else {
+            logcat(LogPriority.WARN) {
+                "No translation for '$trimmed' ($from to $to, ${selectedProvider.displayName})"
+            }
         }
         return result
     }

@@ -79,6 +79,7 @@ class PageTranslationBinder(
         val sourceRect = view.viewToSourceRect(viewRect) ?: return
         val sourceWidth = view.sourceWidth() ?: return
         scope.launchIO {
+            val started = System.currentTimeMillis()
             val result = try {
                 val bytes = pageBytes() ?: return@launchIO
                 val region = Rect(
@@ -92,8 +93,20 @@ class PageTranslationBinder(
                 logcat(LogPriority.WARN, e)
                 RegionTranslateResult.Failed
             }
+            logcat(LogPriority.INFO) {
+                "Translate area: ${describe(result)}, ${System.currentTimeMillis() - started} ms"
+            }
             withUIContext { showRegionResult(key, result) }
         }
+    }
+
+    private fun describe(result: RegionTranslateResult): String = when (result) {
+        is RegionTranslateResult.Success -> buildString {
+            append(result.translation.blocks.size).append(" blocks, read by ").append(result.usedEngine.displayName)
+            if (result.fellBack) append(" (").append(result.requestedEngine.displayName).append(" unavailable)")
+        }
+        RegionTranslateResult.NoText -> "no text recognized"
+        RegionTranslateResult.Failed -> "translation failed"
     }
 
     private fun showRegionResult(key: String, result: RegionTranslateResult) {
@@ -165,6 +178,7 @@ class PageTranslationBinder(
                 logcat(LogPriority.WARN, e)
                 CloudRetryResult.Failed
             }
+            logcat(LogPriority.INFO) { "Cloud re-read: ${result::class.simpleName}" }
             withUIContext {
                 view.setTranslationBusyBlock(null)
                 applyCloudRetry(key, block, result)

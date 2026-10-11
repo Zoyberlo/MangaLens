@@ -10,6 +10,8 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.core.content.ContextCompat
 import eu.kanade.tachiyomi.util.system.toast
+import logcat.LogPriority
+import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
 import uy.kohesive.injekt.injectLazy
 
@@ -71,6 +73,7 @@ class ReaderDictation(
 
     private fun start() {
         if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
+            logcat(LogPriority.WARN) { "No speech recognition service on this device" }
             activity.toast(MR.strings.voice_input_unavailable)
             return
         }
@@ -118,6 +121,7 @@ class ReaderDictation(
             editor()?.setListening(false)
             // Silence and "no match" are normal ways to stop talking, not failures
             if (error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                logcat(LogPriority.WARN) { "Speech recognition error $error" }
                 activity.toast(MR.strings.voice_input_unavailable)
             }
         }

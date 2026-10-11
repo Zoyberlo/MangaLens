@@ -27,10 +27,22 @@ Otherwise, live:
 adb logcat --pid $(adb shell pidof app.mangalens.dev)
 ```
 
-The fork logs failures at WARN with identifying prefixes: `OCR warm-up failed`,
-`Text recognition failed`, `Translation failed for block`,
+Every "Translate area" ends in one INFO line, `Translate area: <outcome>, <n> ms`,
+so a reported moment can be found by its time. Before it, in order:
+
+- `region read: ...` (DEBUG) — what recognition read, block by block;
+- `No text: <reason>` — which check produced a "No text recognized" toast,
+  including what the recognizer saw around the selection;
+- `Translated via <provider>: '<source>' -> '<result>'` (DEBUG), or
+  `(cached)` when the answer came from the cache rather than a provider;
+- `No translation for '<source>'` and `Area translation failed: <reason>` —
+  what lies behind a "Translation failed" toast.
+
+Provider and recognizer failures log at WARN with their own prefixes:
+`OCR warm-up failed`, `Text recognition failed`, `Translation failed for block`,
 `Lingva translation failed on <instance>`, `Google translation failed`,
-`DeepL translation failed`.
+`DeepL translation failed`, `MyMemory refused`, `<provider> returned the source
+untranslated`, `Speech recognition error <code>`.
 
 ## 3. Isolate by layer
 

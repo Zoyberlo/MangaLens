@@ -125,14 +125,14 @@ class PageTranslator(
         region: android.graphics.Rect,
         regionSpaceWidth: Int,
     ): RegionTranslateResult {
-        if (regionSpaceWidth <= 0) return RegionTranslateResult.NoText
+        if (regionSpaceWidth <= 0) return noText("the page has no measured width yet")
         val from = translationPreferences.autoTranslateSourceLanguage.get()
         val to = translationPreferences.autoTranslateTargetLanguage.get()
-        if (from.langCode == to) return RegionTranslateResult.Failed
+        if (from.langCode == to) return failed("source and target language are both $to")
 
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return RegionTranslateResult.NoText
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return noText("the page image could not be decoded")
 
         val scale = bounds.outWidth.toFloat() / regionSpaceWidth
         val imageRect = android.graphics.Rect(0, 0, bounds.outWidth, bounds.outHeight)
@@ -142,7 +142,7 @@ class PageTranslator(
             (region.right * scale).toInt(),
             (region.bottom * scale).toInt(),
         )
-        if (!clamped.intersect(imageRect)) return RegionTranslateResult.NoText
+        if (!clamped.intersect(imageRect)) return noText("the selection is outside the page image")
 
         // OCR a padded area so a partial selection still catches the whole
         // text block; blocks are then filtered by the original selection.
@@ -182,7 +182,9 @@ class PageTranslator(
         // translation has to follow it, not the configured setting
         val recognizedLanguage = recognition.language
         val recognized = recognition.blocks
-        if (recognizedLanguage.langCode == to) return RegionTranslateResult.Failed
+        if (recognizedLanguage.langCode == to) {
+            return failed("the text was read as ${recognizedLanguage.langCode}, which is the target language")
+        }
 
         val onPage = OcrLayout.dedupeOverlapping(
             recognized.map {
@@ -199,7 +201,10 @@ class PageTranslator(
             .filter { android.graphics.Rect.intersects(it.bounds, clamped) }
             .filter { block -> block.text.length >= 2 && block.text.any { it.isLetter() } }
             .take(MAX_BLOCKS_PER_PAGE)
-        if (merged.isEmpty()) return RegionTranslateResult.NoText
+        if (merged.isEmpty()) {
+            val seen = recognized.joinToString(" | ") { it.text }.ifEmpty { "nothing at all" }
+            return noText("nothing with letters inside the selection; the recognizer saw: $seen")
+        }
 
         // Second pass: each bubble is re-read on its own at full resolution.
         // Scaling by the whole selection means a generous selection shrinks the
@@ -248,13 +253,28 @@ class PageTranslator(
         }
 
         val blocks = translateBlocks(candidates, recognizedLanguage, to)
-        if (blocks.isEmpty()) return RegionTranslateResult.Failed
+        if (blocks.isEmpty()) return failed("no block could be translated")
 
         return RegionTranslateResult.Success(
             PageTranslation(bounds.outWidth, bounds.outHeight, blocks),
             requested,
             used,
         )
+    }
+
+    /**
+     * Every "No text recognized" toast leaves a line saying which check
+     * produced it. Without one, a report like "it said no text at 14:32"
+     * finds nothing in the log at all.
+     */
+    private fun noText(reason: String): RegionTranslateResult {
+        logcat(LogPriority.INFO) { "No text: $reason" }
+        return RegionTranslateResult.NoText
+    }
+
+    private fun failed(reason: String): RegionTranslateResult {
+        logcat(LogPriority.WARN) { "Area translation failed: $reason" }
+        return RegionTranslateResult.Failed
     }
 
     /**
