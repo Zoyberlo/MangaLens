@@ -78,6 +78,7 @@ class PageTranslationBinder(
         val key = pageKey() ?: return
         val sourceRect = view.viewToSourceRect(viewRect) ?: return
         val sourceWidth = view.sourceWidth() ?: return
+        val where = describePlace(key)
         scope.launchIO {
             val started = System.currentTimeMillis()
             val result = try {
@@ -94,10 +95,29 @@ class PageTranslationBinder(
                 RegionTranslateResult.Failed
             }
             logcat(LogPriority.INFO) {
-                "Translate area: ${describe(result)}, ${System.currentTimeMillis() - started} ms"
+                "Translate area: ${describe(result)}, ${System.currentTimeMillis() - started} ms; " +
+                    "$where, selection ${sourceRect.toShortString()} of $sourceWidth px wide"
             }
             withUIContext { showRegionResult(key, result) }
         }
+    }
+
+    /**
+     * "Manga - Chapter 12, page 5": enough to open the same page again and
+     * reproduce a reported moment, rather than guess from a screenshot.
+     * Read on the main thread, where the reader's state lives.
+     */
+    private fun describePlace(key: String): String = try {
+        val viewModel = activity().viewModel
+        val chapterId = key.substringBefore(':').toLongOrNull()
+        val pageIndex = key.substringAfter(':').toIntOrNull()
+        val chapters = viewModel.state.value.viewerChapters
+        val chapter = listOfNotNull(chapters?.currChapter, chapters?.prevChapter, chapters?.nextChapter)
+            .firstOrNull { it.chapter.id == chapterId }
+        val page = pageIndex?.let { "page ${it + 1}" } ?: "page ?"
+        "${viewModel.manga?.title} - ${chapter?.chapter?.name ?: "chapter $chapterId"}, $page"
+    } catch (_: Exception) {
+        "page $key"
     }
 
     private fun describe(result: RegionTranslateResult): String = when (result) {
@@ -178,7 +198,14 @@ class PageTranslationBinder(
                 logcat(LogPriority.WARN, e)
                 CloudRetryResult.Failed
             }
-            logcat(LogPriority.INFO) { "Cloud re-read: ${result::class.simpleName}" }
+            logcat(LogPriority.INFO) {
+                val now = when (result) {
+                    is CloudRetryResult.Success -> "'${result.sourceText}' -> '${result.translation}'"
+                    is CloudRetryResult.RecognizedOnly -> "'${result.sourceText}', not translated"
+                    else -> result::class.simpleName
+                }
+                "Cloud re-read of '${block.sourceText}': $now"
+            }
             withUIContext {
                 view.setTranslationBusyBlock(null)
                 applyCloudRetry(key, block, result)

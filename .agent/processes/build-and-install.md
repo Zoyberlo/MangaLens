@@ -122,10 +122,15 @@ adb shell run-as app.mangalens.dev cat files/devlog/mangalens-2026-10-11.log
 
 (Git Bash: prefix with `MSYS_NO_PATHCONV=1`.) Keys for the cloud engines are
 masked before a line is written (`Redactor`, with tests), since the file is
-meant to be emailed. What does **not** reach it: lines the native libraries
-and OkHttp's HTTP logging write straight to Android's log — the shared zip
-includes a logcat snapshot for those. Release builds do not write it at all.
-A day's file stops growing at 64 MB, which only a runaway loop would reach.
+meant to be emailed. Release builds do not write it at all. A day's file stops
+growing at 64 MB, which only a runaway loop would reach.
+
+Next to it, `system-<date>.log` holds Android's own log for the app's process
+at WARN and up — a `logcat --pid` child process started with the app. That is
+where ML Kit, ONNX Runtime, OkHttp and native abort messages end up, since
+they never pass through `logcat { }`. Expect vendor noise in it (ColorOS
+`SchedAssist`, `Oplus*`, extension class-loader warnings); the app's own WARN
+lines appear in both files.
 
 ### Live logcat
 

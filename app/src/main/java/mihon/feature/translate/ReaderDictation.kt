@@ -94,6 +94,7 @@ class ReaderDictation(
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
             }
         }
+        logcat(LogPriority.DEBUG) { "Dictation started ($language)" }
         listening = true
         editor.setListening(true)
         recognizer.startListening(intent)

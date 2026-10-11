@@ -16,6 +16,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 
 /**
  * A log that outlives logcat — dev builds only.
@@ -39,6 +40,7 @@ object PersistentLog {
     private const val LAST_EXIT_SEEN = "last_exit_seen"
 
     private var writer: DailyLogWriter? = null
+    private var systemWriter: DailyLogWriter? = null
 
     val isInstalled: Boolean
         get() = writer != null
@@ -48,10 +50,39 @@ object PersistentLog {
     /** Call once from Application.onCreate, dev builds only. */
     fun install(context: Context, minPriority: LogPriority) {
         if (writer != null) return
-        val created = DailyLogWriter(directory(context))
+        val created = DailyLogWriter(directory(context), "mangalens")
         writer = created
         LogcatLogger.loggers += FileLogcatLogger(created, minPriority)
         created.background { append -> recordPreviousExits(context, append) }
+        systemWriter = DailyLogWriter(directory(context), "system").also(::captureSystemLog)
+    }
+
+    /**
+     * Android's own log for this process, warnings and up, into
+     * `system-<date>.log`. ML Kit, ONNX Runtime, OkHttp and the system
+     * write there directly, never through `logcat { }`, so without this
+     * their side of a failure — a model that would not load, a native abort
+     * message — is gone within minutes. Lines the app logs itself at WARN
+     * and up appear in both files.
+     */
+    private fun captureSystemLog(writer: DailyLogWriter) {
+        val pid = android.os.Process.myPid()
+        thread(name = "PersistentLog-system", isDaemon = true) {
+            try {
+                val process = ProcessBuilder(
+                    "logcat",
+                    "--pid=$pid",
+                    "-v",
+                    "threadtime",
+                    "-v",
+                    "year",
+                    "*:W",
+                ).redirectErrorStream(true).start()
+                process.inputStream.bufferedReader().forEachLine { writer.write(Redactor.redact(it)) }
+            } catch (_: Exception) {
+                // No logcat binary, or not allowed to run it: the app's own log still works
+            }
+        }
     }
 
     fun files(context: Context): List<File> =
@@ -64,16 +95,15 @@ object PersistentLog {
     /** Blocks until every line logged so far is on disk. Call off the main thread. */
     fun sync() {
         writer?.sync()
+        systemWriter?.sync()
     }
 
     /** Call off the main thread. */
     fun clear(context: Context) {
-        val writer = writer
-        if (writer != null) {
-            writer.clear()
-        } else {
-            files(context).forEach { it.delete() }
-        }
+        // Both, so neither keeps writing into a file the other just deleted
+        writer?.clear()
+        systemWriter?.clear()
+        files(context).forEach { it.delete() }
     }
 
     /**
@@ -173,13 +203,13 @@ object PersistentLog {
 }
 
 /**
- * Appends to `mangalens-<date>.log`, on one background thread so lines land in
+ * Appends to `<prefix>-<date>.log`, on one background thread so lines land in
  * the order they were logged and the reader never waits on the disk.
  *
  * Every line is flushed as it is written: a process can be killed at any
  * moment, and the lines just before a kill are the ones that explain it.
  */
-private class DailyLogWriter(private val dir: File) {
+private class DailyLogWriter(private val dir: File, private val prefix: String) {
 
     private val executor = Executors.newSingleThreadExecutor { task ->
         Thread(task, "PersistentLog").apply { isDaemon = true }
@@ -212,7 +242,7 @@ private class DailyLogWriter(private val dir: File) {
             out?.runCatching { close() }
             out = null
             day = null
-            dir.listFiles { f -> f.isFile && f.name.endsWith(".log") }?.forEach { it.delete() }
+            dir.listFiles { f -> f.isFile && f.name.startsWith("$prefix-") }?.forEach { it.delete() }
         }
     }
 
@@ -255,7 +285,7 @@ private class DailyLogWriter(private val dir: File) {
         out?.let { if (day == today) return it }
         out?.runCatching { close() }
         dir.mkdirs()
-        val file = File(dir, "mangalens-$today.log")
+        val file = File(dir, "$prefix-$today.log")
         return FileWriter(file, true).also {
             out = it
             day = today

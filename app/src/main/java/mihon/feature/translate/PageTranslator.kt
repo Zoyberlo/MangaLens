@@ -235,7 +235,11 @@ class PageTranslator(
         // few pixels differently per selection, and one drag in a dozen clips
         // a letter. A single good read proves nothing, so leave a trace that a
         // jittered stress run can count. DEBUG: dev builds only.
-        logcat(LogPriority.DEBUG) { "region read: " + candidates.joinToString(" | ") { it.text } }
+        // "(?)" marks a reading with words no dictionary knows: the app's own
+        // guess that recognition went wrong
+        logcat(LogPriority.DEBUG) {
+            "region read: " + candidates.joinToString(" | ") { if (it.confident) it.text else "${it.text} (?)" }
+        }
 
         // Original-first mode (overlay display only): show the recognized text
         // untranslated; each block is translated on demand via translateSingle

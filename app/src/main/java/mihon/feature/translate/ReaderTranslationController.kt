@@ -12,8 +12,10 @@ import eu.kanade.tachiyomi.ui.reader.viewer.webtoon.WebtoonViewer
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import logcat.LogPriority
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.withUIContext
+import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
 import uy.kohesive.injekt.injectLazy
 import kotlin.math.abs
@@ -63,6 +65,9 @@ class ReaderTranslationController(
      */
     private var pendingEditTarget: ((String, String) -> Unit)? = null
 
+    /** The recognized text the editor was opened on, to log what the user changed. */
+    private var editOriginal: String? = null
+
     private var scrollAccumulator = 0f
 
     /** What dictation writes into, or null while the panel is closed. */
@@ -77,10 +82,12 @@ class ReaderTranslationController(
      */
     fun onPhraseSelected(phrase: String?) {
         if (phrase == null) {
-            hidePanel()
+            hide("word unpicked")
             return
         }
+        logcat(LogPriority.DEBUG) { "Panel: looking up '$phrase'" }
         pendingEditTarget = null
+        editOriginal = null
         val panel = ensurePanel()
         scrollAccumulator = 0f
         panel.showLoading(phrase)
@@ -98,7 +105,9 @@ class ReaderTranslationController(
             .mapNotNull { it.translatedText.takeIf(String::isNotBlank) }
             .joinToString("\n\n")
         if (original.isBlank() || translated.isBlank()) return
+        logcat(LogPriority.DEBUG) { "Panel: showing the result" }
         pendingEditTarget = null
+        editOriginal = null
         val panel = ensurePanel()
         scrollAccumulator = 0f
         panel.showResult(original, translated)
@@ -112,7 +121,11 @@ class ReaderTranslationController(
      * into the overlay block the text came from.
      */
     fun openTextEditor(initial: String, onTranslated: ((String, String) -> Unit)? = null) {
+        logcat(LogPriority.DEBUG) {
+            if (initial.isEmpty()) "Panel: editor opened empty" else "Panel: editing '$initial'"
+        }
         pendingEditTarget = onTranslated
+        editOriginal = initial.takeIf { onTranslated != null }
         val panel = ensurePanel()
         lookupJob?.cancel()
         scrollAccumulator = 0f
@@ -125,14 +138,20 @@ class ReaderTranslationController(
      * on the page, or that recognition cannot read.
      */
     fun startManualTranslate() {
+        logcat(LogPriority.DEBUG) { "Manual translate" }
         closeMenu()
         openTextEditor("")
     }
 
-    fun hidePanel() {
+    /** The reader calls this when the page changes. */
+    fun hidePanel() = hide("page changed")
+
+    private fun hide(reason: String) {
+        if (panel?.visibility == View.VISIBLE) logcat(LogPriority.DEBUG) { "Panel hidden: $reason" }
         lookupJob?.cancel()
         dictation().stop()
         pendingEditTarget = null
+        editOriginal = null
         panel?.onHidden()
         panel?.visibility = View.GONE
     }
@@ -148,7 +167,7 @@ class ReaderTranslationController(
         if (panel.isEditingText) return
         scrollAccumulator += abs(dy)
         if (scrollAccumulator > container().height / 3f) {
-            hidePanel()
+            hide("page scrolled")
         }
     }
 
@@ -170,6 +189,12 @@ class ReaderTranslationController(
     /** Translates whatever the user typed, dictated or corrected. */
     private fun onEditorTextSubmitted(text: String) {
         val panel = panel ?: return
+        // A correction of recognized text is the clearest record of a
+        // misreading there is: the user wrote down what it should have been
+        val original = editOriginal
+        if (original != null && original != text) {
+            logcat(LogPriority.INFO) { "Corrected by the user: '$original' -> '$text'" }
+        }
         panel.showTranslating()
         lookupJob?.cancel()
         lookupJob = scope.launchIO {
@@ -188,7 +213,7 @@ class ReaderTranslationController(
 
     private fun ensurePanel(): WordInspectorView {
         return panel ?: WordInspectorView(activity).also { view ->
-            view.onDismiss = ::hidePanel
+            view.onDismiss = { hide("dismissed") }
             view.onPhraseTap = { phrase -> lookupVariants(view, phrase) }
             view.onTextSubmitted = ::onEditorTextSubmitted
             view.onVoiceInput = { dictation().toggle() }
@@ -210,10 +235,14 @@ class ReaderTranslationController(
 
     /** Shows the "translate area" rubber-band selector over the current page. */
     fun startSelection() {
+        logcat(LogPriority.DEBUG) { "Selection started" }
         closeMenu()
         val selector = selector ?: TranslateSelectionView(activity).also { view ->
             view.onSelectionFinished = { rect ->
                 view.visibility = View.GONE
+                logcat(LogPriority.DEBUG) {
+                    if (rect == null) "Selection cancelled" else "Selection drawn: ${rect.toShortString()}"
+                }
                 if (rect != null) {
                     showHint(MR.strings.translate_in_progress)
                     translate(rect)
@@ -245,6 +274,7 @@ class ReaderTranslationController(
      * screen, without drawing a selection.
      */
     fun translateFullPage(viewerWidth: Int, viewerHeight: Int) {
+        logcat(LogPriority.DEBUG) { "Translate whole screen (long-press)" }
         closeMenu()
         showHint(MR.strings.translate_in_progress)
         when (val viewer = currentViewer()) {
