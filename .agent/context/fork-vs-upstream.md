@@ -59,6 +59,10 @@ Plus fork-only files outside that package:
   flash is skipped in long strips unless the user opts in: there a "page change"
   happens wherever two images meet, and scrolling over a seam flashed the whole
   screen black again and again
+- `app/src/main/java/mihon/feature/extensionswap/` — finds installed extensions
+  no configured repo can update (installed from a repo the user no longer has)
+  and replaces them from one that can: uninstall, then install, after checking
+  the library's source ids survive the swap
 - `app/src/main/java/mihon/feature/upstreamsync/` — fork migrations that run
   upstream's version-numbered migrations for MangaLens version codes
 - `.github/workflows/build-fork.yml` — CI building signed release APKs (upstream's
@@ -116,6 +120,7 @@ conflict when syncing with upstream.
 | `presentation/reader/appbars/ReaderAppBars.kt`, `ReaderBottomBar.kt` | translate button |
 | `presentation/reader/settings/ReaderSettingsDialog.kt` | 4th tab |
 | `presentation/more/settings/screen/SettingsReaderScreen.kt` | tap-zone sliders; `longStripFlashPreference` in the E-Ink group |
+| `presentation/browse/ExtensionsScreen.kt` | one line: `extensionReplacementItem()` before the list sections |
 | `presentation/reader/settings/GeneralSettingsPage.kt` | `LongStripFlashCheckbox()` under the flash options; `ReaderBarActionsSetting()` at the end |
 | `App.kt` | one line after the logcat install: `PersistentLog.install` in debug builds |
 | `icons/material-symbols/src/main/valkyrieResources/rounded/` | added SVGs: translate, keyboard, move_down, update, coffee, restore, archive (new files only; Valkyrie generates `MaterialSymbols.Rounded.*`) |

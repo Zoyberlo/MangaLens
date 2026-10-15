@@ -155,4 +155,18 @@ Got:
     <string name="devlog_share_failed">Couldn\'t collect the logs</string>
     <string name="pref_flash_long_strip">Also flash in long strip</string>
     <string name="pref_flash_long_strip_summary">A long strip has no page turns: its page number changes wherever two images meet, so the flash fires while scrolling</string>
+    <string name="ext_swap_banner">%1$s can\'t update: they were installed from a repo you no longer have. Another of your repos has the same extensions.</string>
+    <string name="ext_swap_action">Replace…</string>
+    <string name="ext_swap_dialog_title">Replace extensions</string>
+    <string name="ext_swap_dialog_text">Android only updates an app with one signed by the same key, so each is uninstalled and installed again from the repo below, and Android asks you to confirm both steps. Your library and reading progress stay: the new versions have the same sources.</string>
+    <string name="ext_swap_item_in_library">%1$s from %2$s · %3$d in your library</string>
+    <string name="ext_swap_item_unused">%1$s from %2$s · not used by your library</string>
+    <string name="ext_swap_confirm">Replace</string>
+    <string name="ext_swap_checking">%1$s (%2$d of %3$d): checking the new version is reachable…</string>
+    <string name="ext_swap_uninstalling">%1$s (%2$d of %3$d): confirm the uninstall</string>
+    <string name="ext_swap_installing">%1$s (%2$d of %3$d): installing the new version…</string>
+    <string name="ext_swap_done">Replaced: %1$s</string>
+    <string name="ext_swap_failed_unreachable">%1$s: couldn\'t reach the repo, nothing was changed</string>
+    <string name="ext_swap_failed_kept">%1$s: uninstall cancelled, nothing was changed</string>
+    <string name="ext_swap_failed_install">%1$s: removed, but the new version didn\'t install. Install it from the list below; your library is intact</string>
 </resources>

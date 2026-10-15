@@ -53,6 +53,7 @@ import eu.kanade.tachiyomi.util.system.LocaleHelper
 import eu.kanade.tachiyomi.util.system.copyToClipboard
 import eu.kanade.tachiyomi.util.system.launchRequestPackageInstallsPermission
 import mihon.domain.extension.model.ExtensionStore
+import mihon.feature.extensionswap.extensionReplacementItem
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.rounded.Close
 import mihon.icons.materialsymbols.rounded.Download
@@ -167,6 +168,8 @@ private fun ExtensionContent(
                 )
             }
         }
+
+        extensionReplacementItem()
 
         state.items.forEach { (header, items) ->
             item(
