@@ -153,4 +153,6 @@ Got:
     <string name="devlog_clear">Clear debug logs</string>
     <string name="devlog_clear_confirm">Delete all saved debug logs? Nothing else ever deletes them.</string>
     <string name="devlog_share_failed">Couldn\'t collect the logs</string>
+    <string name="pref_flash_long_strip">Also flash in long strip</string>
+    <string name="pref_flash_long_strip_summary">A long strip has no page turns: its page number changes wherever two images meet, so the flash fires while scrolling</string>
 </resources>

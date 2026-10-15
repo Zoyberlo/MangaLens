@@ -97,6 +97,7 @@ import kotlinx.coroutines.launch
 import logcat.LogPriority
 import mihon.app.di.AppGraph
 import mihon.core.metro.metroGraph
+import mihon.feature.reader.shouldFlashOnPageChange
 import mihon.feature.translate.ReaderDictation
 import mihon.feature.translate.ReaderTranslationController
 import tachiyomi.core.common.Constants
@@ -288,7 +289,7 @@ class ReaderActivity : BaseActivity() {
                         viewModel.state.value.viewerChapters?.let(::setChapters)
                     }
                     ReaderViewModel.Event.PageChanged -> {
-                        displayRefreshHost.flash()
+                        if (shouldFlashOnPageChange(this, viewModel.state.value.viewer)) displayRefreshHost.flash()
                     }
                     is ReaderViewModel.Event.SetOrientation -> {
                         setOrientation(event.orientation)

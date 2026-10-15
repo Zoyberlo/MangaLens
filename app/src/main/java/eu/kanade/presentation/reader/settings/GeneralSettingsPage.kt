@@ -11,6 +11,7 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderSettingsViewModel
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import eu.kanade.tachiyomi.util.system.hasDisplayCutout
+import mihon.feature.reader.LongStripFlashCheckbox
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.CheckboxItem
 import tachiyomi.presentation.core.components.SettingsChipRow
@@ -164,6 +165,7 @@ internal fun ColumnScope.GeneralPage(viewModel: ReaderSettingsViewModel) {
                 )
             }
         }
+        LongStripFlashCheckbox()
     }
 
     // Fork: which buttons the bottom bar shows

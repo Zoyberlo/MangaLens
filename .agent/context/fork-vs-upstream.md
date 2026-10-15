@@ -55,6 +55,10 @@ Plus fork-only files outside that package:
 - `app/src/main/java/eu/kanade/presentation/reader/settings/TranslationSettingsPage.kt`
 - `app/src/main/java/mihon/feature/devlog/` — the dev build's persistent log and
   its two Settings → Advanced entries
+- `app/src/main/java/mihon/feature/reader/LongStripFlash.kt` — the e-ink page
+  flash is skipped in long strips unless the user opts in: there a "page change"
+  happens wherever two images meet, and scrolling over a seam flashed the whole
+  screen black again and again
 - `app/src/main/java/mihon/feature/upstreamsync/` — fork migrations that run
   upstream's version-numbered migrations for MangaLens version codes
 - `.github/workflows/build-fork.yml` — CI building signed release APKs (upstream's
@@ -102,7 +106,7 @@ conflict when syncing with upstream.
 | `gradle/libs.versions.toml` | `mlkit-text` version, 4 libraries, `mlkit-text` bundle |
 | `i18n/.../moko-resources/base/strings.xml` | `app_name` + translation strings |
 | `ui/reader/setting/ReaderPreferences.kt` | translation preferences block |
-| `ui/reader/ReaderActivity.kt` | warm-up call, selection overlay, translate button wiring |
+| `ui/reader/ReaderActivity.kt` | `translation.start()`, selection overlay, translate button wiring; `PageChanged` flash gated by `shouldFlashOnPageChange` |
 | `ui/reader/ReaderViewModel.kt` | webtoon auto-detection (`maybeAutoDetectWebtoon`) |
 | `ui/reader/viewer/ReaderPageImageView.kt` | hosts the overlay; `viewToSourceRect`, `sourceWidth`, `setTranslation` (mapping itself lives in `PageCoordinates`) |
 | `ui/reader/viewer/pager/PagerPageHolder.kt` | `translateRegion` |
@@ -111,7 +115,8 @@ conflict when syncing with upstream.
 | `ui/reader/viewer/webtoon/WebtoonViewer.kt` | `translateRegionAt` (routes a selection to a holder) |
 | `presentation/reader/appbars/ReaderAppBars.kt`, `ReaderBottomBar.kt` | translate button |
 | `presentation/reader/settings/ReaderSettingsDialog.kt` | 4th tab |
-| `presentation/more/settings/screen/SettingsReaderScreen.kt` | translation preference group |
+| `presentation/more/settings/screen/SettingsReaderScreen.kt` | tap-zone sliders; `longStripFlashPreference` in the E-Ink group |
+| `presentation/reader/settings/GeneralSettingsPage.kt` | `LongStripFlashCheckbox()` under the flash options; `ReaderBarActionsSetting()` at the end |
 | `App.kt` | one line after the logcat install: `PersistentLog.install` in debug builds |
 | `icons/material-symbols/src/main/valkyrieResources/rounded/` | added SVGs: translate, keyboard, move_down, update, coffee, restore, archive (new files only; Valkyrie generates `MaterialSymbols.Rounded.*`) |
 | `ui/main/MainActivity.kt` | upstream's donation campaign sheet removed (call and function) — it asks for money on Mihon's behalf inside an app that collects none |
