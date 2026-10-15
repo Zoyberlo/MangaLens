@@ -18,22 +18,26 @@
 Two package roots coexist in `:app`: `eu.kanade.*` (legacy Tachiyomi lineage) and
 `mihon.*` (newer code). **Fork code goes under `mihon.feature.*`.**
 
-## Dependency injection — Injekt
+## Dependency injection — Metro
 
-No Hilt/Koin/Dagger. Bootstrapped in `App.kt`:
+Since Mihon 0.21, [Metro](https://zacsweers.github.io/metro/) (compile-time,
+Dagger-like). Classes declare `@Inject` constructors, singletons add
+`@SingleIn(AppScope::class)`, and `mihon/app/di/AppGraph.kt` exposes what code
+outside the graph needs (`context.appGraph.readerPreferences`). Activities and
+workers use member injection (`graph.inject(this)` + `@Inject lateinit var`).
 
-```kotlin
-Injekt.importModule(PreferenceModule(this))
-Injekt.importModule(AppModule(this))
-Injekt.importModule(DomainModule())
-```
+**The fork never edits `AppGraph`.** It contributes its own interfaces with
+`@ContributesTo(AppScope::class)`, which Metro merges into the graph at compile
+time: `mihon/feature/translate/TranslationGraph.kt` (`context.translationGraph`)
+and `mihon/feature/migratefromapp/MigrateFromAppGraph.kt`. A migration joins
+the migrator the same way, with `@ContributesIntoSet(AppScope::class)`.
 
-- `di/AppModule.kt` — services and singletons (`NetworkHelper`, `SourceManager`,
-  `DownloadManager`, `PageTranslator`, …)
-- `di/PreferenceModule.kt` — all `*Preferences` classes
-- `domain/DomainModule.kt` — repositories + interactors
-
-Consume with `Injekt.get<X>()` or `by injectLazy()`.
+**Injekt still exists, read-only**, for extensions:
+`mihon/app/di/injekt/MetroInjektRegistrar.kt` hands out only Application,
+Context, Json, ProtoBuf, XML, NetworkHelper and JavaScriptEngine. Anything else
+through `Injekt.get<X>()` or `by injectLazy()` **compiles and then crashes at
+runtime** — the compiler cannot catch it. Code with no Context at hand reaches
+the graph as Mihon's own does: `Injekt.get<Context>().appGraph`.
 
 ## Preferences
 

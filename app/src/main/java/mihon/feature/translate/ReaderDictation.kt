@@ -2,6 +2,7 @@ package mihon.feature.translate
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -13,7 +14,6 @@ import eu.kanade.tachiyomi.util.system.toast
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
-import uy.kohesive.injekt.injectLazy
 
 /**
  * Speech-to-text for the translation editor.
@@ -34,7 +34,7 @@ class ReaderDictation(
     private val requestPermission: () -> Unit,
 ) {
 
-    private val translationPreferences: TranslationPreferences by injectLazy()
+    private val translationPreferences by lazy { activity.translationGraph.translationPreferences }
 
     private var recognizer: SpeechRecognizer? = null
     private var listening = false

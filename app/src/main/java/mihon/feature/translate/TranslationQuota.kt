@@ -1,5 +1,8 @@
 package mihon.feature.translate
 
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.MutableSharedFlow
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.getAndSet
@@ -34,6 +37,8 @@ data class QuotaEvent(val kind: QuotaKind, val level: QuotaLevel)
  * screen. Every metered service reports here so the reader only has to listen
  * in one place.
  */
+@Inject
+@SingleIn(AppScope::class)
 class QuotaNotifier {
     val events = MutableSharedFlow<QuotaEvent>(extraBufferCapacity = 8)
 

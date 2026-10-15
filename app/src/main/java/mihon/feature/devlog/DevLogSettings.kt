@@ -22,9 +22,10 @@ import eu.kanade.tachiyomi.util.storage.getUriCompat
 import eu.kanade.tachiyomi.util.system.createFileInCacheDir
 import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
-import tachiyomi.core.common.util.lang.launchIO
-import tachiyomi.core.common.util.lang.withIOContext
-import tachiyomi.core.common.util.lang.withUIContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import mihon.app.di.appGraph
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
 import java.io.File
@@ -45,7 +46,7 @@ fun devLogPreferences(): Array<Preference> {
     var confirmClear by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        bytes = withIOContext { PersistentLog.totalBytes(context) }
+        bytes = withContext(Dispatchers.IO) { PersistentLog.totalBytes(context) }
     }
 
     if (confirmClear) {
@@ -56,7 +57,7 @@ fun devLogPreferences(): Array<Preference> {
                 TextButton(
                     onClick = {
                         confirmClear = false
-                        scope.launchIO {
+                        scope.launch(Dispatchers.IO) {
                             PersistentLog.clear(context)
                             bytes = PersistentLog.totalBytes(context)
                         }
@@ -76,7 +77,7 @@ fun devLogPreferences(): Array<Preference> {
         Preference.PreferenceItem.TextPreference(
             title = stringResource(MR.strings.devlog_share),
             subtitle = stringResource(MR.strings.devlog_share_summary, size),
-            onClick = { scope.launchIO { shareDevLogs(context) } },
+            onClick = { scope.launch(Dispatchers.IO) { shareDevLogs(context) } },
         ),
         Preference.PreferenceItem.TextPreference(
             title = stringResource(MR.strings.devlog_clear),
@@ -95,7 +96,7 @@ private suspend fun shareDevLogs(context: Context) {
     try {
         PersistentLog.sync()
         val logs = PersistentLog.files(context)
-        val crashLogUtil = CrashLogUtil(context)
+        val crashLogUtil = context.appGraph.crashLogUtil
         val debugInfo = crashLogUtil.getDebugInfo()
 
         val recent = File(context.externalCacheDir, "logcat-recent.txt").apply { delete() }
@@ -125,7 +126,7 @@ private suspend fun shareDevLogs(context: Context) {
         recent.delete()
 
         val uri = zip.getUriCompat(context)
-        withUIContext {
+        withContext(Dispatchers.Main) {
             context.startActivity(
                 uri.toShareIntent(
                     context = context,
@@ -137,6 +138,6 @@ private suspend fun shareDevLogs(context: Context) {
             )
         }
     } catch (_: Throwable) {
-        withUIContext { context.toast(MR.strings.devlog_share_failed) }
+        withContext(Dispatchers.Main) { context.toast(MR.strings.devlog_share_failed) }
     }
 }

@@ -35,6 +35,27 @@ Expect them only in the files listed in `context/fork-vs-upstream.md`. For each:
   `ReaderBottomBar`'s parameter list, `ReaderSettingsDialog`'s tab indices,
   `PagerViewer.currentPage`, `WebtoonRecyclerView`'s zoom matrix.
 
+## 3a. What the 0.21 merge taught
+
+- **Dependency injection moved to Metro.** Port fork classes with `@Inject` /
+  `@SingleIn(AppScope::class)` and expose them through a fork
+  `@ContributesTo(AppScope::class)` interface — never by editing `AppGraph`.
+  Then scan for `Injekt.get<X>()` / `injectLazy()` of anything the read-only
+  bridge does not hand out: those compile and crash at runtime
+  (`context/architecture.md`).
+- **Icons come from `:icons:*`**, generated from SVGs; Material icons are gone.
+  A missing icon is a new SVG (Material Symbols Rounded, Apache 2.0) in
+  `icons/material-symbols/src/main/valkyrieResources/rounded/`.
+- **Upstream migrations are numbered by upstream version codes**, and the
+  migrator runs those between the previous and current code. MangaLens codes
+  start at 100, so an upstream migration numbered below that never runs for our
+  users. For every upstream migration the merge brings in, decide whether our
+  users need it and, if so, run it from a fork migration numbered with the
+  release that ships the merge — `mihon/feature/upstreamsync/Mihon021Migration.kt`
+  is the pattern. Database schema migrations (`data/.../migrations/*.sqm`) go by
+  schema version and are not affected.
+- **JDK** requirements follow upstream's `.github/.java-version`.
+
 ## 4. Re-check the version catalog
 
 Upstream churns `gradle/libs.versions.toml` constantly (Renovate). Keep both sides:

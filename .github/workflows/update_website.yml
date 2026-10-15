@@ -12,7 +12,7 @@ jobs:
     # Upstream-only: this pings mihonapp/website, which forks cannot access,
     # so every release here failed the job and mailed the owner
     if: github.repository == 'mihonapp/mihon'
-    runs-on: 'ubuntu-24.04'
+    runs-on: 'ubuntu-26.04'
 
     steps:
       - name: Update website

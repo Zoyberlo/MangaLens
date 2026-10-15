@@ -10,7 +10,7 @@
        preferenceStore.getEnum("pref_translation_provider", TranslationProvider.AUTO)
    ```
 
-   Registered as a singleton in `di/PreferenceModule.kt`. Keys are string literals
+   The class is an `@Inject @SingleIn(AppScope::class)` singleton (Metro). Keys are string literals
    and are **persisted** — renaming one silently resets users' settings.
 
 2. **Global UI** — `presentation/more/settings/screen/SettingsReaderScreen.kt`,

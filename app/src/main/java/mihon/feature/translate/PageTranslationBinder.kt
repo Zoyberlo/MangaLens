@@ -1,18 +1,19 @@
 package mihon.feature.translate
 
+import android.content.Context
 import android.graphics.Rect
 import android.graphics.RectF
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.i18n.stringResource
-import tachiyomi.core.common.util.lang.launchIO
-import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
-import uy.kohesive.injekt.injectLazy
 
 /**
  * Everything a reader page holder does for translation.
@@ -41,8 +42,8 @@ class PageTranslationBinder(
     private val pageBytes: suspend () -> ByteArray?,
 ) {
 
-    private val pageTranslator: PageTranslator by injectLazy()
-    private val translationPreferences: TranslationPreferences by injectLazy()
+    private val pageTranslator by lazy { view.context.translationGraph.pageTranslator }
+    private val translationPreferences by lazy { view.context.translationGraph.translationPreferences }
 
     /** Call from the holder's bind. */
     fun bind() = with(view) {
@@ -79,10 +80,10 @@ class PageTranslationBinder(
         val sourceRect = view.viewToSourceRect(viewRect) ?: return
         val sourceWidth = view.sourceWidth() ?: return
         val where = describePlace(key)
-        scope.launchIO {
+        scope.launch(Dispatchers.IO) {
             val started = System.currentTimeMillis()
             val result = try {
-                val bytes = pageBytes() ?: return@launchIO
+                val bytes = pageBytes() ?: return@launch
                 val region = Rect(
                     sourceRect.left.toInt(),
                     sourceRect.top.toInt(),
@@ -98,7 +99,7 @@ class PageTranslationBinder(
                 "Translate area: ${describe(result)}, ${System.currentTimeMillis() - started} ms; " +
                     "$where, selection ${sourceRect.toShortString()} of $sourceWidth px wide"
             }
-            withUIContext { showRegionResult(key, result) }
+            withContext(Dispatchers.Main) { showRegionResult(key, result) }
         }
     }
 
@@ -159,9 +160,9 @@ class PageTranslationBinder(
     /** Original-first mode: translates one block in place. */
     private fun translateBlock(block: TranslatedBlock) {
         val key = pageKey() ?: return
-        scope.launchIO {
+        scope.launch(Dispatchers.IO) {
             val translated = pageTranslator.translateSingle(block.sourceText)
-            withUIContext {
+            withContext(Dispatchers.Main) {
                 if (translated != null) {
                     pageTranslator.updateOverlayBlock(key, block, translated)?.let(view::setTranslation)
                 } else {
@@ -186,7 +187,7 @@ class PageTranslationBinder(
     private fun cloudRetryBlock(block: TranslatedBlock) {
         val key = pageKey() ?: return
         view.setTranslationBusyBlock(block)
-        scope.launchIO {
+        scope.launch(Dispatchers.IO) {
             val result = try {
                 val bytes = pageBytes()
                 if (bytes == null) {
@@ -206,7 +207,7 @@ class PageTranslationBinder(
                 }
                 "Cloud re-read of '${block.sourceText}': $now"
             }
-            withUIContext {
+            withContext(Dispatchers.Main) {
                 view.setTranslationBusyBlock(null)
                 applyCloudRetry(key, block, result)
             }

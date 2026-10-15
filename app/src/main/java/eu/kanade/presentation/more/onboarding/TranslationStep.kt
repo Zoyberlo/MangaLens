@@ -1,5 +1,6 @@
 package eu.kanade.presentation.more.onboarding
 
+import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -12,6 +13,7 @@ import eu.kanade.tachiyomi.util.system.LocaleHelper
 import mihon.feature.translate.TARGET_LANGUAGES
 import mihon.feature.translate.TranslationPreferences
 import mihon.feature.translate.TranslationSourceLanguage
+import mihon.feature.translate.translationGraph
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.SelectItem
 import tachiyomi.presentation.core.i18n.stringResource
@@ -27,7 +29,7 @@ internal class TranslationStep : OnboardingStep {
 
     override val isComplete: Boolean = true
 
-    private val translationPreferences: TranslationPreferences = Injekt.get()
+    private val translationPreferences = Injekt.get<Context>().translationGraph.translationPreferences
 
     @Composable
     override fun Content() {

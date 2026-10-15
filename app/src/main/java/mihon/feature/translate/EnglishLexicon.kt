@@ -1,6 +1,9 @@
 package mihon.feature.translate
 
 import android.content.Context
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 
@@ -15,6 +18,8 @@ import tachiyomi.core.common.util.system.logcat
  * All this class does is feed the asset to [WordFilter]; the logic worth
  * testing lives there, where a test can reach it without a device.
  */
+@Inject
+@SingleIn(AppScope::class)
 class EnglishLexicon(private val context: Context) {
 
     private val filter by lazy { load() }

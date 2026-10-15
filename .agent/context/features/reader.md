@@ -42,9 +42,16 @@ Both holders follow the same shape:
 2. On `Ready`, `setImage()` reads `page.stream!!` on IO, passes the bytes through
    `process(...)` (dual-page split / rotate-to-fit via `ImageUtil`), and hands a
    `BufferedSource` to `ReaderPageImageView.setImage(...)`.
-3. `ReaderPageImageView` picks `SubsamplingScaleImageView` (static) or
+3. `ReaderPageImageView` picks `SubsamplingScaleImageView` (static, paged),
+   `WebtoonStripImageView` (static, long strip — since Mihon 0.21) or
    `PhotoView`/`AppCompatImageView` (animated), and reports back through
    `onImageLoaded` / `onImageLoadError` / `onScaleChanged` / `onViewClicked`.
+
+   `WebtoonStripImageView` draws the decoded strips at its own width, top-left
+   aligned, and does no zooming of its own — the recycler's matrix does. The
+   fork's `mihon/feature/translate/PageCoordinates.kt` is the one place that
+   knows how each view maps to its image; code that assumes SSIV silently does
+   nothing in long-strip mode, which is how 0.21 first broke translation there.
 
 Useful properties of `SubsamplingScaleImageView` (SSIV):
 

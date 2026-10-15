@@ -8,11 +8,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.outlined.BugReport
-import androidx.compose.material.icons.outlined.Code
-import androidx.compose.material.icons.outlined.Coffee
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,13 +26,19 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.more.settings.widget.TextPreferenceWidget
 import eu.kanade.presentation.util.Screen
+import mihon.icons.materialsymbols.MaterialSymbols
+import mihon.icons.materialsymbols.automirroredrounded.OpenInNew
+import mihon.icons.materialsymbols.rounded.BugReport
+import mihon.icons.materialsymbols.rounded.Code
+import mihon.icons.materialsymbols.rounded.Coffee
+import mihon.icons.simpleicons.Discord
+import mihon.icons.simpleicons.OpenCollective
+import mihon.icons.simpleicons.Patreon
+import mihon.icons.simpleicons.SimpleIcons
 import tachiyomi.core.common.Constants
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
-import tachiyomi.presentation.core.icons.CustomIcons
-import tachiyomi.presentation.core.icons.OpenCollective
-import tachiyomi.presentation.core.icons.Patreon
 
 /**
  * Fork version of the screen: MangaLens takes no donations, so this credits
@@ -94,12 +95,12 @@ class SupportUsScreen : Screen() {
                 )
 
                 SupportItem(
-                    icon = Icons.Outlined.Code,
+                    icon = MaterialSymbols.Rounded.Code,
                     title = stringResource(MR.strings.supportUsScreen_sourceCode),
                     onClick = { uriHandler.openUri(FORK_REPO_URL) },
                 )
                 SupportItem(
-                    icon = Icons.Outlined.BugReport,
+                    icon = MaterialSymbols.Rounded.BugReport,
                     title = stringResource(MR.strings.supportUsScreen_reportIssue),
                     onClick = { uriHandler.openUri("$FORK_REPO_URL/issues") },
                 )
@@ -108,7 +109,7 @@ class SupportUsScreen : Screen() {
                 // carries a dead button
                 if (TIP_URL.isNotBlank()) {
                     SupportItem(
-                        icon = Icons.Outlined.Coffee,
+                        icon = MaterialSymbols.Rounded.Coffee,
                         title = stringResource(MR.strings.supportUsScreen_tip),
                         onClick = { uriHandler.openUri(TIP_URL) },
                     )
@@ -121,12 +122,12 @@ class SupportUsScreen : Screen() {
                 )
 
                 SupportItem(
-                    icon = CustomIcons.Patreon,
+                    icon = SimpleIcons.Patreon,
                     title = stringResource(MR.strings.supportUsScreen_donationPlatform_patreon),
                     onClick = { uriHandler.openUri(Constants.URL_DONATE_PATREON) },
                 )
                 SupportItem(
-                    icon = CustomIcons.OpenCollective,
+                    icon = SimpleIcons.OpenCollective,
                     title = stringResource(MR.strings.supportUsScreen_donationPlatform_opencollective),
                     onClick = { uriHandler.openUri(Constants.URL_DONATE_OPENCOLLECTIVE) },
                 )
@@ -148,7 +149,7 @@ class SupportUsScreen : Screen() {
                 icon = icon,
                 widget = {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                        imageVector = MaterialSymbols.AutoMirroredRounded.OpenInNew,
                         contentDescription = null,
                     )
                 },

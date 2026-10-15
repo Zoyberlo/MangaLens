@@ -1,5 +1,6 @@
 package eu.kanade.presentation.more.settings.screen
 
+import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
@@ -20,6 +21,7 @@ import mihon.feature.translate.PaddleTextRecognizer
 import mihon.feature.translate.TranslationPreferences
 import mihon.feature.translate.TranslationSourceLanguage
 import mihon.feature.translate.ocrOverrideFor
+import mihon.feature.translate.translationGraph
 import mihon.feature.translate.withOcrOverride
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
@@ -41,13 +43,13 @@ object SettingsRecognitionScreen : SearchableSettings {
 
     @Composable
     override fun getPreferences(): List<Preference> {
-        val translationPreferences = remember { Injekt.get<TranslationPreferences>() }
+        val translationPreferences = remember { Injekt.get<Context>().translationGraph.translationPreferences }
         var guide by remember { mutableStateOf<ApiKeyGuide?>(null) }
         guide?.let { ApiKeyGuideDialog(guide = it, onDismissRequest = { guide = null }) }
         val showGuide: (ApiKeyGuide) -> Unit = { guide = it }
 
         val scope = rememberCoroutineScope()
-        val recognizer = remember { Injekt.get<CloudTextRecognizer>() }
+        val recognizer = remember { Injekt.get<Context>().translationGraph.cloudTextRecognizer }
         var report by remember { mutableStateOf<String?>(null) }
         var busy by remember { mutableStateOf(false) }
         var models by remember { mutableStateOf<List<String>?>(null) }
@@ -101,7 +103,7 @@ object SettingsRecognitionScreen : SearchableSettings {
                 report = testingLabel
                 scope.launch {
                     val outcome = withContext(Dispatchers.Default) {
-                        PaddleSelfTest(Injekt.get<PaddleTextRecognizer>()).run()
+                        PaddleSelfTest(Injekt.get<Context>().translationGraph.paddleTextRecognizer).run()
                     }
                     report = when {
                         !outcome.engineAvailable -> paddleUnavailable
@@ -171,7 +173,7 @@ object SettingsRecognitionScreen : SearchableSettings {
         engine: OcrEngine,
         onTest: (OcrEngine) -> Unit,
     ): Preference.PreferenceItem.TextPreference {
-        val recognizer = remember { Injekt.get<CloudTextRecognizer>() }
+        val recognizer = remember { Injekt.get<Context>().translationGraph.cloudTextRecognizer }
         return Preference.PreferenceItem.TextPreference(
             title = stringResource(MR.strings.pref_engine_test),
             subtitle = recognizer.lastError(engine) ?: stringResource(MR.strings.pref_engine_test_summary),
@@ -258,13 +260,12 @@ object SettingsRecognitionScreen : SearchableSettings {
                     onHelpClick = { showGuide(ApiKeyGuide.GOOGLE_VISION) },
                 ),
                 Preference.PreferenceItem.SliderPreference(
-                    value = limit,
+                    preference = translationPreferences.visionMonthlyLimit,
                     valueRange = 0..2000,
                     steps = 39,
                     title = stringResource(MR.strings.pref_vision_monthly_limit),
                     subtitle = usageSubtitle(key, used, limit, MR.strings.pref_vision_monthly_limit_summary),
-                    valueString = limitLabel(limit),
-                    onValueChanged = { translationPreferences.visionMonthlyLimit.set(it) },
+                    valueText = { limitLabel(it) },
                 ),
                 testItem(OcrEngine.GOOGLE_VISION, onTest),
             ),
@@ -296,13 +297,12 @@ object SettingsRecognitionScreen : SearchableSettings {
                     onHelpClick = { showGuide(ApiKeyGuide.AZURE) },
                 ),
                 Preference.PreferenceItem.SliderPreference(
-                    value = limit,
+                    preference = translationPreferences.azureMonthlyLimit,
                     valueRange = 0..10000,
                     steps = 39,
                     title = stringResource(MR.strings.pref_azure_monthly_limit),
                     subtitle = usageSubtitle(key, used, limit, MR.strings.pref_azure_monthly_limit_summary),
-                    valueString = limitLabel(limit),
-                    onValueChanged = { translationPreferences.azureMonthlyLimit.set(it) },
+                    valueText = { limitLabel(it) },
                 ),
                 testItem(OcrEngine.AZURE_READ, onTest),
             ),
@@ -344,13 +344,12 @@ object SettingsRecognitionScreen : SearchableSettings {
                     onClick = onFetchModels,
                 ),
                 Preference.PreferenceItem.SliderPreference(
-                    value = limit,
+                    preference = translationPreferences.geminiMonthlyLimit,
                     valueRange = 0..10000,
                     steps = 39,
                     title = stringResource(MR.strings.pref_gemini_monthly_limit),
                     subtitle = usageSubtitle(key, used, limit, MR.strings.pref_gemini_monthly_limit_summary),
-                    valueString = limitLabel(limit),
-                    onValueChanged = { translationPreferences.geminiMonthlyLimit.set(it) },
+                    valueText = { limitLabel(it) },
                 ),
                 testItem(OcrEngine.GEMINI, onTest),
             ),
@@ -360,7 +359,7 @@ object SettingsRecognitionScreen : SearchableSettings {
     /** Re-read whenever the key or limit changes, which is when it can matter. */
     @Composable
     private fun rememberUsage(engine: OcrEngine, key: String, limit: Int): Int {
-        val recognizer = remember { Injekt.get<CloudTextRecognizer>() }
+        val recognizer = remember { Injekt.get<Context>().translationGraph.cloudTextRecognizer }
         return remember(engine, key, limit) { recognizer.usedThisMonth(engine) }
     }
 

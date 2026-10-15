@@ -5,12 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.FilterList
-import androidx.compose.material.icons.outlined.FlipToBack
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
@@ -35,6 +29,12 @@ import eu.kanade.tachiyomi.ui.updates.UpdatesViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
+import mihon.icons.materialsymbols.MaterialSymbols
+import mihon.icons.materialsymbols.rounded.CalendarMonth
+import mihon.icons.materialsymbols.rounded.FilterList
+import mihon.icons.materialsymbols.rounded.FlipToBack
+import mihon.icons.materialsymbols.rounded.Refresh
+import mihon.icons.materialsymbols.rounded.SelectAll
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.FastScrollLazyColumn
 import tachiyomi.presentation.core.components.material.PullRefresh
@@ -54,7 +54,7 @@ fun UpdateScreen(
     onSelectAll: (Boolean) -> Unit,
     onInvertSelection: () -> Unit,
     onCalendarClicked: () -> Unit,
-    onUpdateLibrary: () -> Boolean,
+    onUpdateLibrary: suspend () -> Boolean,
     onDownloadChapter: (List<UpdatesItem>, ChapterDownloadAction) -> Unit,
     onMultiBookmarkClicked: (List<UpdatesItem>, bookmark: Boolean) -> Unit,
     onMultiMarkAsReadClicked: (List<UpdatesItem>, read: Boolean) -> Unit,
@@ -68,11 +68,13 @@ fun UpdateScreen(
         onSelectAll(false)
     }
 
+    val scope = rememberCoroutineScope()
+
     Scaffold(
         topBar = { scrollBehavior ->
             UpdatesAppBar(
                 onCalendarClicked = { onCalendarClicked() },
-                onUpdateLibrary = { onUpdateLibrary() },
+                onUpdateLibrary = { scope.launch { onUpdateLibrary() } },
                 onFilterClicked = { onFilterClicked() },
                 hasFilters = hasActiveFilters,
                 actionModeCounter = state.selected.size,
@@ -96,15 +98,13 @@ fun UpdateScreen(
         when {
             state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
             else -> {
-                val scope = rememberCoroutineScope()
                 var isRefreshing by remember { mutableStateOf(false) }
 
                 PullRefresh(
                     refreshing = isRefreshing,
                     onRefresh = {
-                        val started = onUpdateLibrary()
-                        if (!started) return@PullRefresh
                         scope.launch {
+                            if (!onUpdateLibrary()) return@launch
                             // Fake refresh status but hide it after a second as it's a long running task
                             isRefreshing = true
                             delay(1.seconds)
@@ -174,18 +174,18 @@ private fun UpdatesAppBar(
                 listOf(
                     AppBar.Action(
                         title = stringResource(MR.strings.action_filter),
-                        icon = Icons.Outlined.FilterList,
+                        icon = MaterialSymbols.Rounded.FilterList,
                         iconTint = if (hasFilters) MaterialTheme.colorScheme.active else LocalContentColor.current,
                         onClick = onFilterClicked,
                     ),
                     AppBar.Action(
                         title = stringResource(MR.strings.action_view_upcoming),
-                        icon = Icons.Outlined.CalendarMonth,
+                        icon = MaterialSymbols.Rounded.CalendarMonth,
                         onClick = onCalendarClicked,
                     ),
                     AppBar.Action(
                         title = stringResource(MR.strings.action_update_library),
-                        icon = Icons.Outlined.Refresh,
+                        icon = MaterialSymbols.Rounded.Refresh,
                         onClick = onUpdateLibrary,
                     ),
                 ),
@@ -198,12 +198,12 @@ private fun UpdatesAppBar(
                 listOf(
                     AppBar.Action(
                         title = stringResource(MR.strings.action_select_all),
-                        icon = Icons.Outlined.SelectAll,
+                        icon = MaterialSymbols.Rounded.SelectAll,
                         onClick = onSelectAll,
                     ),
                     AppBar.Action(
                         title = stringResource(MR.strings.action_select_inverse),
-                        icon = Icons.Outlined.FlipToBack,
+                        icon = MaterialSymbols.Rounded.FlipToBack,
                         onClick = onInvertSelection,
                     ),
                 ),
@@ -235,7 +235,7 @@ private fun UpdatesBottomBar(
         }.takeIf { selected.fastAny { !it.update.read } },
         onMarkAsUnreadClicked = {
             onMultiMarkAsReadClicked(selected, false)
-        }.takeIf { selected.fastAny { it.update.read || it.update.lastPageRead > 0L } },
+        }.takeIf { selected.fastAny { it.update.read || it.update.lastPageRead > 0 } },
         onDownloadClicked = {
             onDownloadChapter(selected, ChapterDownloadAction.START)
         }.takeIf {

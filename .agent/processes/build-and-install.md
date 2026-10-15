@@ -2,10 +2,11 @@
 
 ## 1. Environment
 
-The build needs JDK 17 and the Android SDK. On the developer's Windows machine:
+The build needs JDK 21 and the Android SDK — JDK 17 fails at configuration
+since Mihon 0.21. On the developer's Windows machine:
 
 ```powershell
-$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot"
+$env:JAVA_HOME = "$env:USERPROFILE\.jdks\jdk-21.0.12.1+1"
 $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
 ```
 

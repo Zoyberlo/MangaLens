@@ -1,5 +1,6 @@
 package eu.kanade.presentation.more.settings.screen
 
+import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
@@ -12,6 +13,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import mihon.feature.translate.PageTranslator
+import mihon.feature.translate.ScaledIntPreference
 import mihon.feature.translate.TARGET_LANGUAGES
 import mihon.feature.translate.TextTranslator
 import mihon.feature.translate.TranslateResultDisplay
@@ -19,6 +21,7 @@ import mihon.feature.translate.TranslationPreferences
 import mihon.feature.translate.TranslationProvider
 import mihon.feature.translate.TranslationSourceLanguage
 import mihon.feature.translate.labelWithAutoHint
+import mihon.feature.translate.translationGraph
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
@@ -42,7 +45,7 @@ object SettingsTranslationScreen : SearchableSettings {
 
     @Composable
     override fun getPreferences(): List<Preference> {
-        val translationPreferences = remember { Injekt.get<TranslationPreferences>() }
+        val translationPreferences = remember { Injekt.get<Context>().translationGraph.translationPreferences }
         return listOf(
             getLanguageGroup(translationPreferences),
             getProviderGroup(translationPreferences),
@@ -72,11 +75,11 @@ object SettingsTranslationScreen : SearchableSettings {
 
     @Composable
     private fun getProviderGroup(translationPreferences: TranslationPreferences): Preference.PreferenceGroup {
-        val pageTranslator = remember { Injekt.get<PageTranslator>() }
+        val pageTranslator = remember { Injekt.get<Context>().translationGraph.pageTranslator }
         val lastAutoProvider by pageTranslator.lastAutoProvider.collectAsState()
         val deeplApiKey by translationPreferences.deeplApiKey.collectAsState()
         val deeplLimit by translationPreferences.deeplMonthlyCharLimit.collectAsState()
-        val textTranslator = remember { Injekt.get<TextTranslator>() }
+        val textTranslator = remember { Injekt.get<Context>().translationGraph.textTranslator }
         val deeplUsed = remember(deeplApiKey, deeplLimit) { textTranslator.deeplUsedThisMonth() }
         val retryEngine by translationPreferences.ocrRetryEngine.collectAsState()
         val navigator = LocalNavigator.currentOrThrow
@@ -102,7 +105,7 @@ object SettingsTranslationScreen : SearchableSettings {
                 ),
                 Preference.PreferenceItem.SliderPreference(
                     // Stepped in thousands: character budgets are large numbers
-                    value = deeplLimit / 1000,
+                    preference = ScaledIntPreference(translationPreferences.deeplMonthlyCharLimit, 1000),
                     valueRange = 0..1000,
                     steps = 39,
                     title = stringResource(MR.strings.pref_deepl_monthly_limit),
@@ -111,12 +114,9 @@ object SettingsTranslationScreen : SearchableSettings {
                     } else {
                         stringResource(MR.strings.pref_deepl_usage, deeplUsed, deeplLimit)
                     },
-                    valueString = if (deeplLimit == 0) {
-                        stringResource(MR.strings.pref_vision_no_limit)
-                    } else {
-                        "${deeplLimit / 1000}k"
+                    valueText = { thousands ->
+                        if (thousands == 0) stringResource(MR.strings.pref_vision_no_limit) else "${thousands}k"
                     },
-                    onValueChanged = { translationPreferences.deeplMonthlyCharLimit.set(it * 1000) },
                 ),
                 Preference.PreferenceItem.TextPreference(
                     title = stringResource(MR.strings.pref_category_recognition),

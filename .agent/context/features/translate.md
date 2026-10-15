@@ -42,7 +42,8 @@ Upstream call-outs are listed in `context/fork-vs-upstream.md`.
      recycler's zoom matrix, finds the child under its center, and converts to that
      holder's coordinates.
 4. **Coordinates** — the holder converts view → *displayed source* coordinates with
-   `ReaderPageImageView.viewToSourceRect()`, and passes
+   `ReaderPageImageView.viewToSourceRect()` (through `PageCoordinates`, which
+   covers both page views — see `features/reader.md`), and passes
    `sourceWidth()` so `PageTranslator` can rescale into *full-image* space (a long
    strip displayed through Coil is downsampled; the region decoder needs original
    pixels).
@@ -192,7 +193,7 @@ existed for three of the four source languages. Those scripts now score on
 
 ## Overlay behavior
 
-- Box positions come from `sourceToViewCoord`, so they track pan/zoom.
+- Box positions come from `PageCoordinates.sourceToView`, so they track pan/zoom.
 - Text size is chosen by binary search: the **largest** size in 11–40sp that fits.
 - If the text cannot fit even at 11sp, the box grows (up to 1.6× wider, taller as
   needed) and is clamped to stay on screen.

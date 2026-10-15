@@ -3,6 +3,9 @@ package mihon.feature.translate
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.util.Base64
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.POST
@@ -34,6 +37,8 @@ import java.util.concurrent.TimeUnit
  * returns null rather than throwing on any failure — callers keep whatever the
  * on-device pass produced, so a bad key or a dead network only costs quality.
  */
+@Inject
+@SingleIn(AppScope::class)
 class CloudTextRecognizer(
     private val networkHelper: NetworkHelper,
     private val json: Json,

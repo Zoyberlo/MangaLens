@@ -11,7 +11,7 @@ what the task needs.
 |-------|--------------|-----------------|
 | What this fork changes vs upstream Mihon | ✅ `context/fork-vs-upstream.md` | `git diff upstream/main...HEAD` |
 | Stack, build, SDK/JDK setup, commands | ✅ `context/stack.md` | `gradle/libs.versions.toml`, `gradle/mihon.versions.toml`, `app/build.gradle.kts` |
-| Module layout & app architecture | ✅ `context/architecture.md` | `settings.gradle.kts`, `app/src/main/java/eu/kanade/tachiyomi/di/AppModule.kt` |
+| Module layout & app architecture | ✅ `context/architecture.md` | `settings.gradle.kts`, `app/src/main/java/mihon/app/di/AppGraph.kt` |
 | Code conventions | ✅ `context/conventions.md` | `.editorconfig`, spotless config in `build.gradle.kts` |
 | Design decisions ("why") | ✅ `context/decisions.md` | — |
 | Glossary | ✅ `context/glossary.md` | — |

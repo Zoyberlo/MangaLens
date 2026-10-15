@@ -1,6 +1,10 @@
 package mihon.feature.translate
 
+import android.content.Context
 import android.util.LruCache
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.POST
@@ -20,8 +24,10 @@ import kotlin.coroutines.cancellation.CancellationException
  * Text translation with an in-memory cache.
  * Strategy: Lingva instances (Google Translate proxy) first, MyMemory as fallback.
  */
+@Inject
+@SingleIn(AppScope::class)
 class TextTranslator(
-    private val context: android.app.Application,
+    private val context: Context,
     private val networkHelper: NetworkHelper,
     private val json: Json,
     private val translationPreferences: TranslationPreferences,

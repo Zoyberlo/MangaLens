@@ -1,5 +1,6 @@
 package eu.kanade.presentation.reader.settings
 
+import android.content.Context
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
@@ -9,6 +10,7 @@ import androidx.compose.runtime.remember
 import eu.kanade.presentation.more.settings.widget.InfoWidget
 import mihon.feature.translate.ReaderBarAction
 import mihon.feature.translate.TranslationPreferences
+import mihon.feature.translate.translationGraph
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.SettingsChipRow
 import tachiyomi.presentation.core.i18n.stringResource
@@ -28,7 +30,7 @@ import uy.kohesive.injekt.api.get
  */
 @Composable
 internal fun ColumnScope.ReaderBarActionsSetting() {
-    val preferences = remember { Injekt.get<TranslationPreferences>() }
+    val preferences = remember { Injekt.get<Context>().translationGraph.translationPreferences }
     val enabled by preferences.readerBarActions.collectAsState()
     SettingsChipRow(MR.strings.pref_reader_bar_actions) {
         ReaderBarAction.entries.forEach { action ->

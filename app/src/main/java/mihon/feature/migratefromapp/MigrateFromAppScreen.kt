@@ -14,10 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
-import androidx.compose.material.icons.outlined.Archive
-import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,8 +38,13 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.hippo.unifile.UniFile
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.util.Screen
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import tachiyomi.core.common.util.lang.withIOContext
+import kotlinx.coroutines.withContext
+import mihon.icons.materialsymbols.MaterialSymbols
+import mihon.icons.materialsymbols.automirroredrounded.OpenInNew
+import mihon.icons.materialsymbols.rounded.Archive
+import mihon.icons.materialsymbols.rounded.Restore
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
@@ -209,7 +210,7 @@ class MigrateFromAppScreen : Screen() {
                             },
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                                imageVector = MaterialSymbols.AutoMirroredRounded.OpenInNew,
                                 contentDescription = null,
                             )
                         }
@@ -222,7 +223,7 @@ class MigrateFromAppScreen : Screen() {
                             if (hasAllFilesAccess()) {
                                 scanning = true
                                 scope.launch {
-                                    backups = withIOContext { scanSharedStorage() }
+                                    backups = withContext(Dispatchers.IO) { scanSharedStorage() }
                                     scanning = false
                                     scanned = true
                                 }
@@ -282,7 +283,7 @@ class MigrateFromAppScreen : Screen() {
                         } else {
                             // Uninstalled or unrecognized producer
                             Icon(
-                                imageVector = Icons.Outlined.Archive,
+                                imageVector = MaterialSymbols.Rounded.Archive,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
@@ -313,7 +314,7 @@ class MigrateFromAppScreen : Screen() {
                             }
                         }
                         IconButton(onClick = { navigator.push(MigrateRestoreScreen(entry.backup.uri)) }) {
-                            Icon(imageVector = Icons.Outlined.Restore, contentDescription = null)
+                            Icon(imageVector = MaterialSymbols.Rounded.Restore, contentDescription = null)
                         }
                     }
                 }

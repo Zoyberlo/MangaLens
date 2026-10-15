@@ -11,16 +11,14 @@ import android.text.TextPaint
 import android.view.MotionEvent
 import android.view.View
 import androidx.core.graphics.withSave
-import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
 import kotlin.math.hypot
 
 /**
  * Draws translated text blocks over a manga page. Must be a sibling of the
- * [SubsamplingScaleImageView] (same parent, same size) so that view
- * coordinates line up; block positions are mapped through
- * [SubsamplingScaleImageView.sourceToViewCoord] so they stay pinned to the
- * image through pan/zoom. The hosting view invalidates this overlay whenever
- * the image scale or center changes.
+ * page's image view (same parent, same size) so that view coordinates line
+ * up; block positions are mapped through [PageCoordinates] so they stay
+ * pinned to the image through pan/zoom. The hosting view invalidates this
+ * overlay whenever the image scale or center changes.
  *
  * Tapping a block selects it and shows a close button; tapping the close
  * button removes that block. Touches outside any block fall through to the
@@ -28,8 +26,8 @@ import kotlin.math.hypot
  */
 class TranslationOverlayView(context: Context) : View(context) {
 
-    /** Supplies the image view to map coordinates through; set by the host. */
-    var ssivProvider: (() -> SubsamplingScaleImageView?)? = null
+    /** How the page view maps to its image right now; set by the host. */
+    var coordinates: (() -> PageCoordinates?)? = null
 
     /**
      * Called when the user taps the + button of a selected but still
@@ -246,19 +244,18 @@ class TranslationOverlayView(context: Context) : View(context) {
         translateButtonVisible = false
         selectedLayout = null
         if (blocks.isEmpty() || imageWidth <= 0 || imageHeight <= 0) return
-        val ssiv = ssivProvider?.invoke() ?: return
-        if (!ssiv.isReady) return
+        val page = coordinates?.invoke() ?: return
 
-        val scaleX = ssiv.sWidth.toFloat() / imageWidth
-        val scaleY = ssiv.sHeight.toFloat() / imageHeight
+        val scaleX = page.sourceWidth.toFloat() / imageWidth
+        val scaleY = page.sourceHeight.toFloat() / imageHeight
         val cornerRadius = 3 * density
 
         for (block in blocks) {
-            val topLeft = ssiv.sourceToViewCoord(
+            val topLeft = page.sourceToView(
                 block.bounds.left * scaleX,
                 block.bounds.top * scaleY,
             ) ?: continue
-            val bottomRight = ssiv.sourceToViewCoord(
+            val bottomRight = page.sourceToView(
                 block.bounds.right * scaleX,
                 block.bounds.bottom * scaleY,
             ) ?: continue

@@ -7,9 +7,9 @@
 | Language | Kotlin 2.4 (JVM target 17) |
 | Build | Gradle 9.6 (wrapper) + AGP 9.3, convention plugins in `gradle/build-logic/` |
 | UI | Jetpack Compose (Material 3) everywhere **except the reader**, which is Android Views |
-| DI | [Injekt](https://github.com/mihonapp/injekt) — `Injekt.get()` / `by injectLazy()` |
+| DI | [Metro](https://zacsweers.github.io/metro/) since 0.21 — see `architecture.md`; Injekt survives read-only, for extensions |
 | Networking | OkHttp 5 via `NetworkHelper` (`core/common`) |
-| Serialization | kotlinx.serialization (`Json` singleton from `AppModule`) |
+| Serialization | kotlinx.serialization (`Json` singleton from `AppBindings`) |
 | Database | SQLDelight 2 + AndroidX SQLite driver (`data/` module) |
 | Images | Coil 3, `SubsamplingScaleImageView` (tachiyomiorg fork), `PhotoView` |
 | Strings | moko-resources — `MR.strings.*`, defined in `i18n/` |
@@ -21,10 +21,12 @@ through the version catalog**, never as a hard-coded coordinate.
 
 ## Local toolchain (Windows)
 
-The build needs a JDK 17 and an Android SDK. On this machine:
+The build needs **JDK 21** (Mihon 0.21's Metro plugin refuses 17; CI reads
+`.github/.java-version`) and an Android SDK. On this machine a portable
+Temurin 21 lives in the user's `.jdks` folder:
 
 ```powershell
-$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot"
+$env:JAVA_HOME = "$env:USERPROFILE\.jdks\jdk-21.0.12.1+1"
 $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
 ```
 

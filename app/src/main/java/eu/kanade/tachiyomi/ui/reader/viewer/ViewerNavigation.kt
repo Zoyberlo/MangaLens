@@ -1,13 +1,16 @@
 package eu.kanade.tachiyomi.ui.reader.viewer
 
+import android.content.Context
 import android.graphics.Color
 import android.graphics.PointF
 import android.graphics.RectF
 import dev.icerock.moko.resources.StringResource
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.lang.invert
+import mihon.app.di.appGraph
 import tachiyomi.i18n.MR
-import uy.kohesive.injekt.injectLazy
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 
 abstract class ViewerNavigation {
 
@@ -37,7 +40,7 @@ abstract class ViewerNavigation {
 
     protected abstract var regionList: List<Region>
 
-    private val readerPreferences: ReaderPreferences by injectLazy()
+    private val readerPreferences: ReaderPreferences by lazy { Injekt.get<Context>().appGraph.readerPreferences }
 
     /**
      * Returns regions with the user's per-axis tap-zone sizes applied

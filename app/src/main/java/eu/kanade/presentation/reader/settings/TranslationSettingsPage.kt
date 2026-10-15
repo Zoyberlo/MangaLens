@@ -1,5 +1,6 @@
 package eu.kanade.presentation.reader.settings
 
+import android.content.Context
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
@@ -17,6 +18,7 @@ import mihon.feature.translate.TranslationPreferences
 import mihon.feature.translate.TranslationProvider
 import mihon.feature.translate.TranslationSourceLanguage
 import mihon.feature.translate.labelWithAutoHint
+import mihon.feature.translate.translationGraph
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.CheckboxItem
 import tachiyomi.presentation.core.components.SelectItem
@@ -30,7 +32,7 @@ import uy.kohesive.injekt.api.get
 internal fun ColumnScope.TranslationSettingsPage(viewModel: ReaderSettingsViewModel) {
     // Its own store now: these preferences left ReaderPreferences so they
     // would stop living inside a file upstream maintains
-    val translationPreferences = remember { Injekt.get<TranslationPreferences>() }
+    val translationPreferences = remember { Injekt.get<Context>().translationGraph.translationPreferences }
     val sourceLanguage by translationPreferences.autoTranslateSourceLanguage.collectAsState()
     SelectItem(
         label = stringResource(MR.strings.pref_auto_translate_source),
@@ -51,7 +53,7 @@ internal fun ColumnScope.TranslationSettingsPage(viewModel: ReaderSettingsViewMo
 
     val provider by translationPreferences.translationProvider.collectAsState()
     val deeplApiKey by translationPreferences.deeplApiKey.collectAsState()
-    val pageTranslator = remember { Injekt.get<PageTranslator>() }
+    val pageTranslator = remember { Injekt.get<Context>().translationGraph.pageTranslator }
     val lastAutoProvider by pageTranslator.lastAutoProvider.collectAsState()
     SettingsChipRow(MR.strings.pref_translation_provider) {
         TranslationProvider.entries.map {

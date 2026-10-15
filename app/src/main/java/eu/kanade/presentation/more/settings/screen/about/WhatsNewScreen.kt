@@ -14,7 +14,8 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.manga.components.MarkdownRender
 import eu.kanade.presentation.util.Screen
-import tachiyomi.core.common.util.lang.withIOContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.components.material.padding
@@ -37,7 +38,7 @@ class WhatsNewScreen : Screen() {
         val context = LocalContext.current
 
         val changelog by produceState<String?>(initialValue = null) {
-            value = withIOContext {
+            value = withContext(Dispatchers.IO) {
                 runCatching {
                     context.assets.open(CHANGELOG_ASSET).bufferedReader().use { it.readText() }
                 }.getOrNull().orEmpty()

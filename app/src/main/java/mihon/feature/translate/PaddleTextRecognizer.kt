@@ -6,6 +6,9 @@ import ai.onnxruntime.OrtSession
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.core.graphics.scale
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 import java.nio.FloatBuffer
@@ -24,6 +27,8 @@ import java.nio.FloatBuffer
  * ML Kit finds those boxes perfectly well, and it is the reading that fails, so
  * there is no reason to carry PP-OCR's detection stage too.
  */
+@Inject
+@SingleIn(AppScope::class)
 class PaddleTextRecognizer(private val context: Context) {
 
     private val session: OrtSession? by lazy { loadSession() }

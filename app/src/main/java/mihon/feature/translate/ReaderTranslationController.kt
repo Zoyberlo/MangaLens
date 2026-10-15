@@ -11,13 +11,15 @@ import eu.kanade.tachiyomi.ui.reader.viewer.pager.PagerViewer
 import eu.kanade.tachiyomi.ui.reader.viewer.webtoon.WebtoonViewer
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
-import tachiyomi.core.common.util.lang.launchIO
-import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
-import uy.kohesive.injekt.injectLazy
 import kotlin.math.abs
 
 /**
@@ -51,9 +53,10 @@ class ReaderTranslationController(
     private val dictation: () -> ReaderDictation,
 ) {
 
-    private val translationPreferences: TranslationPreferences by injectLazy()
-    private val textTranslator: TextTranslator by injectLazy()
-    private val pageTranslator: PageTranslator by injectLazy()
+    private val translationPreferences by lazy { activity.translationGraph.translationPreferences }
+    private val textTranslator by lazy { activity.translationGraph.textTranslator }
+    private val pageTranslator by lazy { activity.translationGraph.pageTranslator }
+    private val quotaNotifier by lazy { activity.translationGraph.quotaNotifier }
 
     private var panel: WordInspectorView? = null
     private var selector: TranslateSelectionView? = null
@@ -69,6 +72,19 @@ class ReaderTranslationController(
     private var editOriginal: String? = null
 
     private var scrollAccumulator = 0f
+
+    /**
+     * Call once from the reader's onCreate. Loads the OCR model and probes the
+     * translation backends off the critical path, so the first "translate
+     * area" is fast, and surfaces metered-service quota news where the user
+     * will see it: those services bill their account, not ours.
+     */
+    fun start() {
+        scope.launch(Dispatchers.IO) { pageTranslator.warmUp() }
+        quotaNotifier.events
+            .onEach { event -> activity.toast(quotaMessage(event)) }
+            .launchIn(scope)
+    }
 
     /** What dictation writes into, or null while the panel is closed. */
     val editor: WordInspectorView?
@@ -178,11 +194,11 @@ class ReaderTranslationController(
 
     private fun lookupVariants(panel: WordInspectorView, phrase: String) {
         lookupJob?.cancel()
-        lookupJob = scope.launchIO {
+        lookupJob = scope.launch(Dispatchers.IO) {
             val from = translationPreferences.autoTranslateSourceLanguage.get().langCode
             val to = translationPreferences.autoTranslateTargetLanguage.get()
             val variants = textTranslator.lookupVariants(phrase, from, to)
-            withUIContext { panel.showVariantsFor(phrase, variants) }
+            withContext(Dispatchers.Main) { panel.showVariantsFor(phrase, variants) }
         }
     }
 
@@ -197,9 +213,9 @@ class ReaderTranslationController(
         }
         panel.showTranslating()
         lookupJob?.cancel()
-        lookupJob = scope.launchIO {
+        lookupJob = scope.launch(Dispatchers.IO) {
             val translated = pageTranslator.translateSingle(text)
-            withUIContext {
+            withContext(Dispatchers.Main) {
                 if (translated.isNullOrBlank()) {
                     activity.toast(MR.strings.translate_selection_failed)
                     panel.startEditing(text)

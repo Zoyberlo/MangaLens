@@ -1,5 +1,8 @@
 package mihon.feature.translate
 
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.core.common.preference.getEnum
@@ -15,6 +18,8 @@ import tachiyomi.core.common.preference.getEnum
  * **The keys are unchanged on purpose.** They are what a user's stored settings
  * are filed under; renaming one silently resets it to its default.
  */
+@Inject
+@SingleIn(AppScope::class)
 class TranslationPreferences(
     private val preferenceStore: PreferenceStore,
 ) {

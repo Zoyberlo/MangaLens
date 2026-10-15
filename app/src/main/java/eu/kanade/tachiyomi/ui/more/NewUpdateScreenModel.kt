@@ -3,10 +3,16 @@ package eu.kanade.tachiyomi.ui.more
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Immutable
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.CreationExtras
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Assisted
+import dev.zacsweers.metro.AssistedFactory
+import dev.zacsweers.metro.AssistedInject
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactory
+import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
+import eu.kanade.domain.base.BasePreferences
 import eu.kanade.tachiyomi.extension.util.ExtensionInstaller
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
@@ -16,23 +22,35 @@ import eu.kanade.tachiyomi.network.newCachelessCallWithProgress
 import eu.kanade.tachiyomi.util.storage.getUriCompat
 import eu.kanade.tachiyomi.util.storage.saveTo
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
-import mihon.core.viewmodel.StateViewModel
-import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
-import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.get
 import java.io.File
 
+@AssistedInject
 class NewUpdateScreenModel(
-    changelogInfo: String,
-    private val downloadLink: String,
-    private val context: Context = Injekt.get(),
-    private val network: NetworkHelper = Injekt.get(),
-) : StateViewModel<NewUpdateScreenModel.State>(State(changelogInfo = changelogInfo)) {
+    @Assisted changelogInfo: String,
+    @Assisted private val downloadLink: String,
+    private val context: Context,
+    private val network: NetworkHelper,
+    private val preferences: BasePreferences,
+) : ViewModel() {
+
+    val state: StateFlow<NewUpdateScreenModel.State>
+        field = MutableStateFlow<NewUpdateScreenModel.State>(State(changelogInfo = changelogInfo))
+
+    @AssistedFactory
+    @ManualViewModelAssistedFactoryKey
+    @ContributesIntoMap(AppScope::class)
+    interface Factory : ManualViewModelAssistedFactory {
+        fun create(changelogInfo: String, downloadLink: String): NewUpdateScreenModel
+    }
 
     private val apkFile: File
         get() = File(context.externalCacheDir, "update.apk")
@@ -43,16 +61,16 @@ class NewUpdateScreenModel(
         if (downloadJob?.isActive == true) return
 
         downloadJob = viewModelScope.launch {
-            mutableState.update { it.copy(downloadProgress = 0, stage = Stage.Downloading) }
+            state.update { it.copy(downloadProgress = 0, stage = Stage.Downloading) }
             try {
-                withIOContext { downloadApk() }
-                mutableState.update { it.copy(downloadProgress = 100, stage = Stage.Downloaded) }
+                withContext(Dispatchers.IO) { downloadApk() }
+                state.update { it.copy(downloadProgress = 100, stage = Stage.Downloaded) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 logcat(LogPriority.ERROR, e)
                 apkFile.delete()
-                mutableState.update { it.copy(stage = Stage.Failed) }
+                state.update { it.copy(stage = Stage.Failed) }
             }
         }
     }
@@ -71,13 +89,18 @@ class NewUpdateScreenModel(
                 if (progress > savedProgress && currentTime - 200 > lastTick) {
                     savedProgress = progress
                     lastTick = currentTime
-                    mutableState.update { it.copy(downloadProgress = progress) }
+                    state.update { it.copy(downloadProgress = progress) }
                 }
             }
         }
 
         val response = network.client.newCachelessCallWithProgress(GET(downloadLink), progressListener).awaitSuccess()
         response.body.source().saveTo(apkFile)
+    }
+
+    fun skipUpdate(versionName: String) {
+        downloadJob?.cancel()
+        preferences.skippedAppUpdate.set(versionName)
     }
 
     fun installUpdate() {
@@ -100,19 +123,5 @@ class NewUpdateScreenModel(
         Downloading,
         Downloaded,
         Failed,
-    }
-
-    companion object {
-        val CHANGELOG_INFO_KEY = CreationExtras.Key<String>()
-        val DOWNLOAD_LINK_KEY = CreationExtras.Key<String>()
-
-        val Factory = viewModelFactory {
-            initializer {
-                NewUpdateScreenModel(
-                    changelogInfo = get(CHANGELOG_INFO_KEY)!!,
-                    downloadLink = get(DOWNLOAD_LINK_KEY)!!,
-                )
-            }
-        }
     }
 }

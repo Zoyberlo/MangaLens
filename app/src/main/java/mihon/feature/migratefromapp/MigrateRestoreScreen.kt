@@ -27,15 +27,17 @@ import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.data.backup.BackupDecoder
 import eu.kanade.tachiyomi.data.backup.models.Backup
-import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreJob
+import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreWorker
 import eu.kanade.tachiyomi.data.backup.restore.RestoreOptions
 import eu.kanade.tachiyomi.util.system.toast
+import eu.kanade.tachiyomi.util.system.workManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.protobuf.ProtoBuf
 import okio.buffer
 import okio.gzip
 import okio.sink
-import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.domain.manga.interactor.GetMangaByUrlAndSourceId
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.CheckboxItem
@@ -84,7 +86,9 @@ class MigrateRestoreScreen(private val uriString: String) : Screen() {
 
         LaunchedEffect(uriString) {
             try {
-                val (decoded, computed) = withIOContext { decodeAndPreview(context, Uri.parse(uriString)) }
+                val (decoded, computed) = withContext(Dispatchers.IO) {
+                    decodeAndPreview(context, Uri.parse(uriString))
+                }
                 backup = decoded
                 preview = computed
             } catch (e: Exception) {
@@ -170,12 +174,12 @@ class MigrateRestoreScreen(private val uriString: String) : Screen() {
                             scope.launch {
                                 val source = backup ?: return@launch
                                 val restoreUri = if (onlyNew) {
-                                    withIOContext { writeFilteredBackup(context, source) }
+                                    withContext(Dispatchers.IO) { writeFilteredBackup(context, source) }
                                 } else {
                                     Uri.parse(uriString)
                                 }
-                                BackupRestoreJob.start(
-                                    context = context,
+                                BackupRestoreWorker.start(
+                                    workManager = context.workManager,
                                     uri = restoreUri,
                                     options = RestoreOptions(
                                         libraryEntries = true,
@@ -201,8 +205,8 @@ class MigrateRestoreScreen(private val uriString: String) : Screen() {
     }
 
     private suspend fun decodeAndPreview(context: Context, uri: Uri): Pair<Backup, BackupPreview> {
-        val backup = BackupDecoder(context).decode(uri)
-        val getMangaByUrlAndSourceId = Injekt.get<GetMangaByUrlAndSourceId>()
+        val backup = BackupDecoder(context, Injekt.get<ProtoBuf>()).decode(uri)
+        val getMangaByUrlAndSourceId = context.migrateFromAppGraph.getMangaByUrlAndSourceId
         val existing = backup.backupManga.count { getMangaByUrlAndSourceId.await(it.url, it.source) != null }
         return backup to BackupPreview(
             totalEntries = backup.backupManga.size,
@@ -217,7 +221,7 @@ class MigrateRestoreScreen(private val uriString: String) : Screen() {
      * restoring it cannot modify anything currently in the library.
      */
     private suspend fun writeFilteredBackup(context: Context, backup: Backup): Uri {
-        val getMangaByUrlAndSourceId = Injekt.get<GetMangaByUrlAndSourceId>()
+        val getMangaByUrlAndSourceId = context.migrateFromAppGraph.getMangaByUrlAndSourceId
         val newEntries = backup.backupManga.filter { getMangaByUrlAndSourceId.await(it.url, it.source) == null }
         val filtered = backup.copy(backupManga = newEntries)
 

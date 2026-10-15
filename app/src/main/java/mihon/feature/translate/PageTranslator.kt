@@ -1,6 +1,9 @@
 package mihon.feature.translate
 
 import android.graphics.BitmapFactory
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -15,6 +18,8 @@ import tachiyomi.core.common.util.system.logcat
  *
  * Results are cached in memory so re-entering a page is instant.
  */
+@Inject
+@SingleIn(AppScope::class)
 class PageTranslator(
     private val recognizer: PageTextRecognizer,
     private val cloudRecognizer: CloudTextRecognizer,

@@ -19,14 +19,14 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.more.settings.widget.TextPreferenceWidget
-import eu.kanade.tachiyomi.data.updater.AppUpdateChecker
 import eu.kanade.tachiyomi.ui.more.NewUpdateScreen
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
-import tachiyomi.core.common.util.lang.withIOContext
-import tachiyomi.core.common.util.lang.withUIContext
+import mihon.app.di.appGraph
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.release.interactor.GetApplicationRelease
 import tachiyomi.i18n.MR
@@ -53,10 +53,10 @@ class AppUpdateCheck internal constructor(
         if (isChecking) return
         isChecking = true
         scope.launch {
-            val checker = AppUpdateChecker()
-            withUIContext {
+            val checker = context.appGraph.updateChecker
+            withContext(Dispatchers.Main) {
                 try {
-                    when (val result = withIOContext { checker.checkForUpdate(forceCheck = true) }) {
+                    when (val result = withContext(Dispatchers.IO) { checker.checkForUpdate(forceCheck = true) }) {
                         is GetApplicationRelease.Result.NewUpdate -> navigator.push(
                             NewUpdateScreen(
                                 versionName = result.release.version,

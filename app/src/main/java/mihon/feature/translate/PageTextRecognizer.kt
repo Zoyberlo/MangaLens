@@ -10,6 +10,7 @@ import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
 import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -17,6 +18,7 @@ import kotlin.coroutines.resumeWithException
 /**
  * On-device OCR for manga pages via bundled ML Kit text recognition models.
  */
+@Inject
 class PageTextRecognizer {
 
     private val recognizers = mutableMapOf<TranslationSourceLanguage, TextRecognizer>()

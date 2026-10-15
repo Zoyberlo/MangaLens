@@ -5,10 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Keyboard
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -19,17 +15,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.res.painterResource
-import eu.kanade.tachiyomi.R
+import androidx.compose.ui.platform.LocalContext
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderOrientation
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import mihon.feature.translate.ReaderBarAction
-import mihon.feature.translate.TranslationPreferences
+import mihon.feature.translate.translationGraph
+import mihon.icons.custommaterialsymbols.CustomMaterialSymbols
+import mihon.icons.custommaterialsymbols.rounded.CropOff
+import mihon.icons.materialsymbols.MaterialSymbols
+import mihon.icons.materialsymbols.rounded.Crop
+import mihon.icons.materialsymbols.rounded.Keyboard
+import mihon.icons.materialsymbols.rounded.Settings
+import mihon.icons.materialsymbols.rounded.Translate
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
-import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.get
 
 @Composable
 fun ReaderBottomBar(
@@ -49,7 +49,9 @@ fun ReaderBottomBar(
     // down, so the change stops at this file instead of threading a parameter
     // through ReaderAppBars as well. The gear is deliberately not gated — it is
     // the way back to the screen that edits this list.
-    val visibleActions by remember { Injekt.get<TranslationPreferences>().readerBarActions }.collectAsState()
+    val context = LocalContext.current
+    val visibleActions by remember { context.translationGraph.translationPreferences.readerBarActions }
+        .collectAsState()
 
     Row(
         modifier = modifier
@@ -60,7 +62,7 @@ fun ReaderBottomBar(
         if (ReaderBarAction.READING_MODE.id in visibleActions) {
             IconButton(onClick = onClickReadingMode) {
                 Icon(
-                    painter = painterResource(readingMode.iconRes),
+                    imageVector = readingMode.icon,
                     contentDescription = stringResource(MR.strings.viewer),
                 )
             }
@@ -76,9 +78,11 @@ fun ReaderBottomBar(
         if (ReaderBarAction.CROP_BORDERS.id in visibleActions) {
             IconButton(onClick = onClickCropBorder) {
                 Icon(
-                    painter = painterResource(
-                        if (cropEnabled) R.drawable.ic_crop_24dp else R.drawable.ic_crop_off_24dp,
-                    ),
+                    imageVector = if (cropEnabled) {
+                        MaterialSymbols.Rounded.Crop
+                    } else {
+                        CustomMaterialSymbols.Rounded.CropOff
+                    },
                     contentDescription = stringResource(MR.strings.pref_crop_borders),
                 )
             }
@@ -96,7 +100,7 @@ fun ReaderBottomBar(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Translate,
+                    imageVector = MaterialSymbols.Rounded.Translate,
                     contentDescription = stringResource(MR.strings.action_translate_selection),
                 )
             }
@@ -105,7 +109,7 @@ fun ReaderBottomBar(
         if (onClickManualTranslate != null && ReaderBarAction.MANUAL_TRANSLATE.id in visibleActions) {
             IconButton(onClick = onClickManualTranslate) {
                 Icon(
-                    imageVector = Icons.Outlined.Keyboard,
+                    imageVector = MaterialSymbols.Rounded.Keyboard,
                     contentDescription = stringResource(MR.strings.action_manual_translate),
                 )
             }
@@ -113,7 +117,7 @@ fun ReaderBottomBar(
 
         IconButton(onClick = onClickSettings) {
             Icon(
-                imageVector = Icons.Outlined.Settings,
+                imageVector = MaterialSymbols.Rounded.Settings,
                 contentDescription = stringResource(MR.strings.action_settings),
             )
         }
