@@ -14,6 +14,7 @@ import logcat.LogPriority
 import okhttp3.FormBody
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import tachiyomi.core.common.util.system.logcat
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Text translation with an in-memory cache.
@@ -181,6 +182,8 @@ class TextTranslator(
                     term.jsonPrimitive.content.takeIf { it.isNotBlank() }?.let { variants += it }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Variant lookup failed" }
         }
@@ -236,6 +239,8 @@ class TextTranslator(
                 .jsonArray
                 .joinToString("") { segment -> segment.jsonArray[0].jsonPrimitive.content }
                 .takeIf { it.isNotBlank() }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Google translation failed" }
             null
@@ -272,6 +277,8 @@ class TextTranslator(
                 ?.text
                 ?.takeIf { it.isNotBlank() }
                 ?.also { deeplQuota.record(text.length) }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "DeepL translation failed" }
             null
@@ -295,6 +302,8 @@ class TextTranslator(
                 if (!translation.isNullOrBlank()) {
                     return translation
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 logcat(LogPriority.WARN, e) { "Lingva translation failed on $instance" }
                 synchronized(instanceBackoffUntil) {
@@ -326,6 +335,8 @@ class TextTranslator(
             parsed.responseData
                 ?.translatedText
                 ?.takeIf { it.isNotBlank() && !it.startsWith("MYMEMORY WARNING", ignoreCase = true) }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "MyMemory translation failed" }
             null

@@ -256,7 +256,17 @@ class PageTranslator(
             )
         }
 
-        val blocks = translateBlocks(candidates, recognizedLanguage, to)
+        val translated = translateBlocks(candidates, recognizedLanguage, to)
+        // No dictionary knows it and no provider could translate it: a
+        // watermark ("ARVENSCANS.COM") or lettering in the art read as noise.
+        // Shown, it only covers the page with the same garbage in a box.
+        val blocks = translated.filterNot { block ->
+            (!block.confident && OcrText.isUntranslated(block.sourceText, block.translatedText))
+                .also { unreadable ->
+                    if (unreadable) logcat(LogPriority.DEBUG) { "Dropped unreadable '${block.sourceText}'" }
+                }
+        }
+        if (blocks.isEmpty() && translated.isNotEmpty()) return noText("only unreadable text in the selection")
         if (blocks.isEmpty()) return failed("no block could be translated")
 
         return RegionTranslateResult.Success(
