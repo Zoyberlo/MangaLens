@@ -57,7 +57,7 @@ android {
 
         // Fork versioning, independent of upstream: release tags are "v<name>"
         // and the in-app updater compares against them. Upstream was on
-        // 0.21.2 (versionCode 38) at the last merge; do not take theirs, or every
+        // 0.21.3 (versionCode 39) at the last merge; do not take theirs, or every
         // installed copy sees a downgrade and stops updating. This is the one
         // conflict no amount of file-splitting removes — both sides must own
         // these two lines — and resolving it is always "keep ours".
@@ -338,7 +338,6 @@ dependencies {
 
     // UI libraries
     implementation(libs.material)
-    implementation(libs.flexibleAdapter)
     implementation(libs.photoView)
     implementation(libs.directionalViewPager) {
         exclude(group = "androidx.viewpager", module = "viewpager")

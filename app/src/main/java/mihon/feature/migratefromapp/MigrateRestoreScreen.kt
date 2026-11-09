@@ -32,6 +32,9 @@ import eu.kanade.tachiyomi.data.backup.restore.RestoreOptions
 import eu.kanade.tachiyomi.util.system.toast
 import eu.kanade.tachiyomi.util.system.workManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.count
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -174,7 +177,9 @@ class MigrateRestoreScreen(private val uriString: String) : Screen() {
                             scope.launch {
                                 val source = backup ?: return@launch
                                 val restoreUri = if (onlyNew) {
-                                    withContext(Dispatchers.IO) { writeFilteredBackup(context, source) }
+                                    withContext(Dispatchers.IO) {
+                                        writeFilteredBackup(context, Uri.parse(uriString), source)
+                                    }
                                 } else {
                                     Uri.parse(uriString)
                                 }
@@ -204,12 +209,20 @@ class MigrateRestoreScreen(private val uriString: String) : Screen() {
         }
     }
 
+    /**
+     * Everything but the entries, plus how many entries are already in the
+     * library. Entries are streamed, never held all at once: a big library's
+     * backup does not fit in memory as one object, which is why Mihon's decoder
+     * stopped offering that.
+     */
     private suspend fun decodeAndPreview(context: Context, uri: Uri): Pair<Backup, BackupPreview> {
-        val backup = BackupDecoder(context, Injekt.get<ProtoBuf>()).decode(uri)
+        val decoder = BackupDecoder(context, Injekt.get<ProtoBuf>())
+        val metadata = decoder.decodeMetadata(uri)
         val getMangaByUrlAndSourceId = context.migrateFromAppGraph.getMangaByUrlAndSourceId
-        val existing = backup.backupManga.count { getMangaByUrlAndSourceId.await(it.url, it.source) != null }
+        val existing = decoder.decodeEntries(uri).count { getMangaByUrlAndSourceId.await(it.url, it.source) != null }
+        val backup = metadata.backup
         return backup to BackupPreview(
-            totalEntries = backup.backupManga.size,
+            totalEntries = metadata.entryCount,
             alreadyInLibrary = existing,
             categories = backup.backupCategories.size,
             hasSettings = backup.backupPreferences.isNotEmpty() || backup.backupSourcePreferences.isNotEmpty(),
@@ -217,12 +230,15 @@ class MigrateRestoreScreen(private val uriString: String) : Screen() {
     }
 
     /**
-     * Writes a copy of [backup] without series that already exist locally, so
-     * restoring it cannot modify anything currently in the library.
+     * Writes a copy of the backup at [uri] without series that already exist
+     * locally, so restoring it cannot modify anything currently in the library.
+     * [backup] is everything but its entries, as [decodeAndPreview] read it.
      */
-    private suspend fun writeFilteredBackup(context: Context, backup: Backup): Uri {
+    private suspend fun writeFilteredBackup(context: Context, uri: Uri, backup: Backup): Uri {
         val getMangaByUrlAndSourceId = context.migrateFromAppGraph.getMangaByUrlAndSourceId
-        val newEntries = backup.backupManga.filter { getMangaByUrlAndSourceId.await(it.url, it.source) == null }
+        val newEntries = BackupDecoder(context, Injekt.get<ProtoBuf>()).decodeEntries(uri)
+            .filter { getMangaByUrlAndSourceId.await(it.url, it.source) == null }
+            .toList()
         val filtered = backup.copy(backupManga = newEntries)
 
         val bytes = Injekt.get<ProtoBuf>().encodeToByteArray(Backup.serializer(), filtered)
