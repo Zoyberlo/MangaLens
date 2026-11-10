@@ -1,3 +1,41 @@
+## 1.0.5
+
+### Built on Mihon 0.21
+
+MangaLens now runs on Mihon's newest release: much faster with big
+libraries, reader pages loaded ahead of time, and many download, backup
+and tracker fixes. The first start after updating converts your library,
+which takes a moment and can't be undone, so make a backup first
+(Settings → Data and storage).
+
+### Extensions that could never update
+
+- Extensions installed from a repo you no longer have can't update: Android only accepts an update signed with the same key
+- The Extensions tab now offers to replace those with the same extension from one of your repos, keeping your library linked to them
+- Extensions only update from the repo they came from, and show which one that is
+
+### Translation
+
+- Translating a bubble again replaces its box instead of stacking a second one on top
+- Each line is read with a margin around it, so letters at the edges are no longer cut off
+- Watermarks and lettering in the artwork no longer show up as untranslated boxes
+- A number in a bubble no longer makes the whole translation fail
+- When a free service hands the English back untranslated, the next service is tried
+
+### Reader
+
+- Choose which buttons the bottom bar shows (reader settings → General); the settings button always stays
+- The area selector mentions, the first few times, that a long press on the translate button translates the whole screen
+- "Flash on page change", meant for e-ink screens, no longer fires in long strip, where the page number changes wherever two images meet; "Also flash in long strip" turns it back on
+- Reader settings tabs have names that fit
+
+### Also in this update
+
+1.0.4 was never published on its own, so its changes arrive now too:
+
+- About → What's new shows these notes inside the app
+- Check for updates is on the More screen, next to the version you are running
+
 ## 1.0.4
 
 ### Release notes in the app
