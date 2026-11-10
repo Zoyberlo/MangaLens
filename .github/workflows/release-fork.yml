@@ -92,13 +92,22 @@ jobs:
           EXPECTED: 2774faf612c68966970934bf73db0d3477c2b94338462622628cb24eb1ebbbbd
         run: |
           set -euo pipefail
-          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
+          # The newest build-tools folder is not guaranteed to ship apksigner
+          APKSIGNER=""
+          for dir in $(ls -d "$ANDROID_HOME"/build-tools/* | sort -Vr); do
+            if [ -x "$dir/apksigner" ]; then APKSIGNER="$dir/apksigner"; break; fi
+          done
+          if [ -z "$APKSIGNER" ]; then echo "::error::no apksigner under $ANDROID_HOME/build-tools"; exit 1; fi
+          echo "Using $APKSIGNER"
           for apk in app/build/outputs/apk/release/mangalens-*.apk; do
-            digest=$("$APKSIGNER" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+            certs=$("$APKSIGNER" verify --print-certs "$apk" 2>&1) || { echo "$certs"; echo "::error::$apk does not verify"; exit 1; }
+            digest=$(echo "$certs" | grep -m1 -oE 'SHA-256 digest: [0-9a-f]{64}' | cut -d' ' -f3 || true)
             if [ "$digest" != "$EXPECTED" ]; then
+              echo "$certs"
               echo "::error::$apk is signed with '$digest', not the MangaLens key"
               exit 1
             fi
+            echo "$apk: MangaLens key"
           done
 
       # The same notes the app shows under About -> What's new. Using them as the
