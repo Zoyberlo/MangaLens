@@ -197,6 +197,21 @@ adb shell dumpsys activity exit-info app.mangalens | head -12
 `reason=5 (APP CRASH(NATIVE))` there is the signature — check
 `adb logcat -b crash -d` for the abort message before changing anything.
 
+### When the release workflow fails after the tag is pushed
+
+Nothing is published until the last step, so a failed run leaves no
+release behind. Fix the workflow on the branch and run it again for the
+same tag; the tag does not need to move:
+
+```bash
+gh workflow run release-fork.yml --ref feature/auto-translate -f tag=v1.0.5
+```
+
+The workflow file comes from the branch, the code from the tag. Before
+publishing it checks every APK is signed with the MangaLens certificate
+(SHA-256 `2774faf6…ebbbbd`): an APK signed with anything else publishes
+fine and then fails to install over every existing copy.
+
 ## The changelog
 
 `app/src/main/assets/CHANGELOG.md` is shown in the app under About → What's new,
